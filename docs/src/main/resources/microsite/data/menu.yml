@@ -1,0 +1,30 @@
+options:
+  - title: Getting Started
+    url: docs/index.html
+    
+  - title: entity
+    url: docs/entity.html
+
+  - title: importdata
+    url: docs/importdata.html
+
+  - title: importmaps
+    url: docs/importmaps.html
+
+  - title: plugins
+    url: docs/plugins.html
+
+  - title: solutions
+    url: docs/solutions.html
+
+  - title: systemjobs
+    url: docs/systemjobs.html
+
+  - title: webresources
+    url: docs/webresources.html
+
+  - title: Create your own CLI
+    url: docs/creatingacustomcli.html
+
+  - title: ETL
+    url: docs/etl.html

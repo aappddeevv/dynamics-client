@@ -1,0 +1,82 @@
+// Copyright (c) 2017 aappddeevv@gmail.com
+// This software is licensed under the MIT License (MIT).
+// For more information see LICENSE or https://opensource.org/licenses/MIT
+
+package dynamics
+package client
+
+import scala.scalajs.js
+import js.{|, _}
+import scala.concurrent.{Future, ExecutionContext}
+import js.annotation._
+import fs2._
+import fs2.util._
+import cats._
+import cats.data._
+import cats.implicits._
+import fs2.interop.cats._
+import fs2.Task._
+
+import js.JSConverters._
+import scala.annotation.implicitNotFound
+import scala.collection.mutable
+import retry._
+import scala.concurrent.duration._
+
+import dynamics.common._
+import dynamics.http._
+import fs2helpers._
+
+/**
+  * Middleware: Add auth to a Client via Bearer token. A token is
+  * immediately obtained then a stream is started to renew tokens
+  * so two tokens are obtained.
+  *
+  * Token renewal only works on node for the moment.
+  */
+object ADAL extends LazyLogger {
+
+  import java.util.concurrent.{TimeUnit => TU}
+
+  def apply(info: ConnectionInfo, retryPolicy: Policy = Pause(3, 2.seconds))(implicit s: Strategy,
+                                                                             sch: Scheduler,
+                                                                             e: ExecutionContext): Middleware =
+    (c: Client) => {
+      val auth                   = new AuthManager(info)
+      val ctx                    = auth.getAuthContext()
+      var token: Task[TokenInfo] = auth.getToken(ctx) // get initial...
+      var terminate              = new java.util.concurrent.atomic.AtomicBoolean(false)
+
+      val tokenSetter: Sink[Task, TokenInfo] = _ map { ti =>
+        logger.info(s"Setting new token.")
+        token = Task.now(ti)
+      }
+
+      var setme: fs2.async.mutable.Signal[Task, Boolean] = null
+
+      Stream
+        .eval(fs2.async.signalOf[Task, Boolean](false))
+        .flatMap { stop =>
+          setme = stop; // can't do in normal world...
+          AuthManager
+            .tokenStream(auth.getTokenWithRetry(ctx, retryPolicy), _ => FiniteDuration(55, TU.MINUTES))
+            .interruptWhen(stop)
+            .to(tokenSetter)
+        }
+        .run
+        .unsafeRunAsync(_ => logger.warn("Token renewal stream exited."))
+
+      val dispose = Task.delay {
+        if (setme != null) setme.set(true)
+        else Task.now(())
+      }.flatten
+
+      val xf: HttpRequest => Task[HttpRequest] = (request: HttpRequest) =>
+        token.map { ti =>
+          val h = HttpHeaders("Authorization" -> ("Bearer " + ti.accessToken))
+          request.copy(headers = h ++ request.headers)
+      }
+
+      c.copy(open = c.open compose xf, c.dispose.flatMap(_ => dispose))
+    }
+}

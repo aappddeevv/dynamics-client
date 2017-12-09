@@ -1,0 +1,129 @@
+// Copyright (c) 2017 aappddeevv@gmail.com
+// This software is licensed under the MIT License (MIT).
+// For more information see LICENSE or https://opensource.org/licenses/MIT
+
+package dynamics
+
+import scala.scalajs.js
+import js._
+import fs2._
+import fs2.util._
+import cats._
+import cats.data._
+import cats.implicits._
+import fs2.interop.cats._
+
+import dynamics.common._
+import fs2helpers._
+
+package object etl {
+
+  /** Common data record format for alot of ETL functions. */
+  type DataRecord = js.Object
+
+  /** Basic transform takes one input and returns a TransformResult wrapped in an effect. */
+  type Transform[I, O] = Kleisli[Task, InputContext[I], TransformResult[I, O]]
+
+  /** The result of a transformation. Outputs in Result are wrapped
+    * in a Stream effect.
+    */
+  type TransformResult[I, O] = Either[TransformFailure[I], Result[O]]
+
+  ///** Inner type of the monad transformer TransformResult[I,O] */
+  //type TRInner[I,O] = //Either[TransformFailure[I], Result[O]]
+
+  /** Deep copy the input object. The deep copy is _2. */
+  val DeepCopy: Pipe[Task, DataRecord, (DataRecord, DataRecord)] =
+    _ map (orig => (orig, jsdatahelpers.deepCopy(orig)))
+
+  /** Emit the individual results objects.
+    * Since you lose the TransformResult, you will want to log
+    * or process the result prior to this. This pipe is typically used
+    * between successive pipe that are running different transforms
+    * and you don't care about the source tag.
+    */
+  def EmitResultData[I, O](): Pipe[Task, TransformResult[I, O], O] =
+    EmitResult[I, O] andThen (_.flatMap(_.output))
+
+  /** Emits individual result objects but pairs each output O ith the source tag. */
+  def EmitResultDataWithTag[I, O](): Pipe[Task, TransformResult[I, O], (O, String)] =
+    EmitResult[I, O] andThen {
+      _.flatMap { r =>
+        r.output.map(d => (d, r.source))
+      }
+    }
+
+  /** Emit valid result part of TransformResult or emit an empty stream.
+    * Left transform result errors are silently dropped.
+    */
+  def EmitResult[I, O]: Pipe[Task, TransformResult[I, O], Result[O]] =
+    _.collect { case Right(result) => result }
+  //_.evalMap(_.value).collect { case Right(result) => result }
+
+  /** Use Result output to cerate InputContext. */
+  def ResultToInputContext[I, O]: Pipe[Task, Result[O], InputContext[O]] =
+    _ flatMap { r =>
+      r.output.map(InputContext[O](_, r.source))
+    }
+
+  /** Make a pipe from a transform. The transform is eval'd in this pipe.*/
+  def mkPipe[I, O](t: Transform[I, O]): Pipe[Task, InputContext[I], TransformResult[I, O]] =
+    _ evalMap { t(_) }
+
+  /** Transform that filters attributes on an input DataRecord.
+    * Order of changes is drops,renames then keeps.
+    */
+  def FilterAttributes(drops: Seq[String] = Nil,
+                       renames: Seq[(String, String)] = Nil,
+                       keeps: Seq[String] = Nil): Transform[DataRecord, DataRecord] =
+    Transform.instance { input: InputContext[DataRecord] =>
+      import dynamics.common.syntax.jsobject._
+      Task.delay {
+        val j0 = jsdatahelpers.updateObject(drops, renames, input.input)
+        val j1 = jsdatahelpers.keepOnly(j0.asDict[js.Any], keeps: _*)
+        TransformResult.success(Result(input.source, Stream.emit(j1)))
+      }
+    }
+
+  /** Pipe to mutate a DataRecord. f identifies the object to mutate. Can use `identity`
+    * if the object is not wrapped. Easier than using `xf` and `filterAttributesTransform`.
+    */
+  def UpdateObject[A](drops: Seq[String], renames: Seq[(String, String)], f: A => DataRecord): Pipe[Task, A, A] =
+    _ map { a =>
+      jsdatahelpers.updateObject[A](drops, renames, f(a))
+      a
+    }
+
+  def LogErrorsOnly[O](r: Result[O]) = None
+
+  /** A logger pipe. Logs errors mostly. */
+  def LogTransformResult[I, O](
+      f: Result[O] => Option[String] = LogErrorsOnly[O] _): Pipe[Task, TransformResult[I, O], TransformResult[I, O]] =
+    _ map {
+      _ bimap (e => {
+        println(s"${e.getMessage}")
+        println(s"Record ${e.source.getOrElse("<no source info>")}")
+        e.messages.foreach(println)
+        e.cause.foreach { t =>
+          println(s"Cause: ${t.getMessage}")
+        }
+        e
+      },
+      r => {
+        f(r).foreach { m =>
+          println(m)
+          r.messages.foreach(println)
+        }
+        r
+      })
+    }
+
+  def DropTake[A](drop: Int, take: Int): Pipe[Task, A, A] =
+    _.drop(drop).take(take)
+
+  def PrintIt[A](marker: String = ">"): Pipe[Task, A, A] =
+    _ evalMap { a =>
+      Task.delay { println(s"$marker $a"); a }
+    }
+
+}
