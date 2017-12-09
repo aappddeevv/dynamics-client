@@ -1,0 +1,11 @@
+name: dynamics-client
+baseurl: /dynamics-client
+description: A Microsoft Dynamics CLI swiss-army knife and browser/server library.
+highlighter: rouge
+docs: true
+collections:
+  tut:
+    output: true
+version: 0.1.0
+org: com.github.aappddeevv.dynamics
+markdown: kramdown
