@@ -45,7 +45,7 @@ class MetadataActions(val context: DynamicsContext) {
   def listEntities() = Action { config =>
     println("Entities")
     val q     = QuerySpec(select = Seq("LogicalName", "EntitySetName", "PrimaryIdAttribute", "ObjectTypeCode"))
-    val topts = new TableOptions(border = Table.getBorderCharacters(config.tableFormat))
+    val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
     lift {
       val list =
         unlift(dynclient.getList[EntityDefinition](q.url("EntityDefinitions"))).sortBy(_.LogicalName.getOrElse(""))
@@ -65,8 +65,11 @@ class MetadataActions(val context: DynamicsContext) {
   }
 
   def downloadCSDL() = Action { config =>
-    println(s"Downloading CSDL to output file ${config.metadataDownloadOutputFile}")
-    getCSDL().flatMap { Utils.writeToFile(config.metadataDownloadOutputFile, _) }
+    config.common.outputFile
+      .fold(Task.delay(println("An output file name is required for the downloaded CSDL.")))(ofile => {
+        println(s"Downloading CSDL to output file ${config.common.outputFile}")
+        getCSDL().flatMap(Utils.writeToFile(ofile, _))
+      })
   }
 
   def test() = Action { config =>

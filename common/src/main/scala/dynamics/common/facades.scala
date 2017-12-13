@@ -11,9 +11,11 @@ import annotation._
 import io.scalajs.nodejs._
 import io.scalajs.nodejs.buffer.Buffer
 import io.scalajs.nodejs.fs._
-//import io.scalajs.npm.request._
 import io.scalajs.util.PromiseHelper._
 import scala.concurrent.Future
+import io.scalajs.RawOptions
+import io.scalajs.nodejs.stream.Writable
+import io.scalajs.nodejs.events.IEventEmitter
 
 class BulkDeleteAction(
     val JobName: String,
@@ -271,6 +273,9 @@ object processhack extends js.Object {
   def hrtime(previous: UndefOr[Array[Int]] = js.undefined): Array[Int] = js.native
 }
 
+/**
+  *  From js ADAL library. For details on using ADAL in general: https://msdn.microsoft.com/en-us/library/gg327838.aspx.
+  */
 @js.native
 @JSImport("adal-node", "AuthenticationContext")
 class AuthenticationContext(authority: String, validateAuthority: Boolean = true) extends js.Object {
@@ -566,4 +571,76 @@ trait PluginType extends js.Object {
   val overwritetime: js.UndefOr[String] = js.undefined
   @JSName("overwritetime@OData.Community.Display.V1.FormattedValue")
   val overwritetime_f: js.UndefOr[String] = js.undefined
+}
+
+class MSSQLConfig(
+    val user: js.UndefOr[String] = js.undefined,
+    val password: js.UndefOr[String] = js.undefined,
+    val server: js.UndefOr[String] = js.undefined,
+    val database: js.UndefOr[String] = js.undefined,
+    val port: js.UndefOr[Int] = js.undefined,
+    val domain: js.UndefOr[String] = js.undefined,
+    val connectionTimeout: js.UndefOr[Int] = js.undefined,
+    val requestTimeout: js.UndefOr[Int] = js.undefined,
+    val parseJSON: js.UndefOr[Boolean] = js.undefined,
+    val stream: js.UndefOr[Boolean] = js.undefined,
+    val pool: js.UndefOr[PoolOptions] = js.undefined,
+    val options: js.UndefOr[RawOptions] = js.undefined
+) extends js.Object
+
+class PoolOptions(
+    val max: js.UndefOr[Int] = js.undefined,
+    val min: js.UndefOr[Int] = js.undefined,
+    val idleTimeoutMillis: js.UndefOr[Int] = js.undefined,
+    val acquireTimeoutMillis: js.UndefOr[Int] = js.undefined,
+    val fifo: js.UndefOr[Boolean] = js.undefined,
+    val priorityRange: js.UndefOr[Int] = js.undefined,
+    val autostart: js.UndefOr[Boolean] = js.undefined
+    // ...more should go here...
+) extends js.Object
+
+@js.native
+@JSImport("mssql", JSImport.Namespace)
+object MSSQL extends js.Object {
+  def connect(config: RawOptions | String): js.Promise[Pool] = js.native
+}
+
+@js.native
+trait Pool extends js.Object {
+  def request(): Query = js.native
+}
+
+@js.native
+trait Query extends js.Object with IEventEmitter {
+  def input(p: String, t: Int, value: js.Any): Query = js.native
+  var stream: js.UndefOr[Boolean]                    = js.native
+  def query(q: String): js.Object                    = js.native
+}
+
+/**
+  * Uses https://github.com/uhop/stream-json
+  */
+@js.native
+trait Source extends js.Object {
+  val input: io.scalajs.nodejs.stream.Writable  = js.native
+  val output: io.scalajs.nodejs.stream.Readable = js.native
+  val streams: js.Array[js.Any]                 = js.native
+}
+
+/**
+  * Uses https://github.com/uhop/stream-json
+  */
+@js.native
+@JSImport("stream-json/utils/StreamJsonObjects", JSImport.Namespace)
+object StreamJsonObjects extends js.Object {
+  def make(options: js.UndefOr[RawOptions] = js.undefined): Source = js.native
+}
+
+/**
+  * Uses https://github.com/uhop/stream-json
+  */
+@js.native
+//@JSImport("stream-json/utils/StreamArray", JSImport.Namespace)
+object StreamArray extends js.Object {
+  def make(options: js.UndefOr[RawOptions] = js.undefined): Source = js.native
 }

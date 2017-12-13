@@ -23,11 +23,12 @@ import dynamics.common._
 import dynamics.common.implicits._
 import dynamics.client._
 import dynamics.http._
+import dynamics.http.implicits._
 
 class PublisherActions(context: DynamicsContext) {
 
   import context._
-  implicit val dec = EntityDecoder.JsObjectDecoder[PublisherOData]
+  implicit val dec = JsObjectDecoder[PublisherOData]
 
   protected def getList() = {
     val query =
@@ -43,7 +44,7 @@ class PublisherActions(context: DynamicsContext) {
     Kleisli { config =>
       getList()
         .map { wr =>
-          filter(wr, config.filter)
+          filter(wr, config.common.filter)
         }
         .map((config, _))
     }
@@ -54,7 +55,7 @@ class PublisherActions(context: DynamicsContext) {
         Task.delay {
           println("Publishers")
           val cols  = jsobj("5" -> jsobj(width = 40))
-          val topts = new TableOptions(border = Table.getBorderCharacters(config.tableFormat), columns = cols)
+          val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat), columns = cols)
           val data: Seq[Seq[String]] =
             Seq(Seq("#", "publisherid", "uniquename", "friendlyname", "customizationprefix", "description")) ++
               wr.zipWithIndex.map {

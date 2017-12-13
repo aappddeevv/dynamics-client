@@ -17,7 +17,7 @@ package object http {
   type HttpService        = Service[HttpRequest, HttpResponse]
   type StreamingClient[A] = fs2.Pipe[Task, HttpRequest, Task[A]]
 
-  /** Total non-streaming and strict! */
+  /** Non-streaming but good enough for our needs. */
   type Entity = Task[String]
 
   /** Basic headers are a dict of strings. */

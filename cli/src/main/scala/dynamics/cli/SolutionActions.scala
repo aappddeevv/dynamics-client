@@ -17,16 +17,14 @@ import cats.implicits._
 import fs2.interop.cats._
 import js.Dynamic.{literal => jsobj}
 
-import dynamics.common._
+import common._
 import MonadlessTask._
-import Utils._
-import dynamics.common.implicits._
-import dynamics.http._
-import EntityDecoder._
-import EntityEncoder._
-import dynamics.client.implicits._
-import dynamics.client._
-import dynamics.http.syntax.all._
+import common.Utils._
+import common.implicits._
+import dynamics.http._ // nodejs has an http pkg
+import dynamics.http.implicits._
+import client._
+import client.implicits._
 
 class ExportSolution(
     /** Required */
@@ -69,7 +67,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
   import SolutionActions._
   import context._
   import dynclient._
-  implicit val solnDecoder = EntityDecoder.JsObjectDecoder[SolutionOData]
+  implicit val solnDecoder = JsObjectDecoder[SolutionOData]
 
   protected def getList() = {
     val query =
@@ -88,7 +86,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
     Kleisli { config =>
       {
         getList().map { wr =>
-          val matchedItems = filterSolutions(wr, config.filter)
+          val matchedItems = filterSolutions(wr, config.common.filter)
           (config, matchedItems)
         }
       }
@@ -97,7 +95,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
   protected def _list(): Kleisli[Task, (AppConfig, Seq[SolutionOData]), Unit] =
     Kleisli {
       case (config, wr) =>
-        val topts  = new TableOptions(border = Table.getBorderCharacters(config.tableFormat))
+        val topts  = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
         val header = Seq("#", "solutionid", "name", "displayname", "version")
         Task.delay {
           val data =
@@ -112,7 +110,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
   def list(): Action = withData andThen _list
 
   def upload(): Action = Kleisli { config =>
-    val jsonconfig = config.solutionJsonConfigFile
+    val jsonconfig = config.solution.solutionJsonConfigFile
       .map(Utils.slurp(_))
       .map(JSON.parse(_))
       .map(_.asInstanceOf[ImportSolution])
@@ -120,13 +118,13 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
     println(s"Solution upload config:\n${PrettyJson.render(jsonconfig)}")
 
     if (!jsonconfig.ImportJobId.isDefined) jsonconfig.ImportJobId = CRMGUID()
-    jsonconfig.CustomizationFile = slurp(config.solutionUploadFile, "base64")
-    jsonconfig.PublishWorkflows = config.solutionPublishWorkflows
+    jsonconfig.CustomizationFile = slurp(config.solution.solutionUploadFile, "base64")
+    jsonconfig.PublishWorkflows = config.solution.solutionPublishWorkflows
 
     val merged = mergeJSObjects(new ImportSolution(), jsonconfig)
     val x      = new ImportDataActions(context)
 
-    println(s"Uploading solution file: ${config.solutionUploadFile}.")
+    println(s"Uploading solution file: ${config.solution.solutionUploadFile}.")
     println(s"""Import job id: ${merged.ImportJobId.getOrElse("NA")}""")
 
     executeAction[String](ImportSolutionAction, merged.toEntity._1).flatMap { _ =>
@@ -135,25 +133,25 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
   }
 
   def export(): Action = Kleisli { config =>
-    val jsonconfig = config.solutionJsonConfigFile
+    val jsonconfig = config.solution.solutionJsonConfigFile
       .map(Utils.slurp(_))
       .map(JSON.parse(_))
       .map(_.asInstanceOf[ExportSolution])
       .fold(new ExportSolution())(identity)
     logger.debug(s"configfile content: ${Utils.render(jsonconfig)}")
-    if (!jsonconfig.SolutionName.isDefined) jsonconfig.SolutionName = config.solutionName
-    if (!jsonconfig.Managed.isDefined) jsonconfig.Managed = config.solutionExportManaged
+    if (!jsonconfig.SolutionName.isDefined) jsonconfig.SolutionName = config.solution.solutionName
+    if (!jsonconfig.Managed.isDefined) jsonconfig.Managed = config.solution.solutionExportManaged
     val merged = mergeJSObjects(new ExportSolution(), jsonconfig)
 
-    val dec = EntityDecoder.ValueWrapper[SolutionOData]
+    val dec = ValueWrapper[SolutionOData]
 
-    Task.delay(println(s"Export solution named ${config.solutionName}.")).flatMap { _ =>
+    Task.delay(println(s"Export solution named ${config.solution.solutionName}.")).flatMap { _ =>
       executeAction[ExportSolutionResponse](ExportSolutionAction, merged.toEntity._1).flatMap { filecontent =>
         val q = QuerySpec(filter = Some(s"uniquename eq '${merged.SolutionName}'"))
         getOne[SolutionOData](q.url("solutions"))(dec).flatMap { solninfo =>
           val mergedext = if (merged.Managed.getOrElse(false)) "_managed" else ""
           val version   = solninfo.version.map(_.replaceAllLiterally(".", "_")).getOrElse("noversion")
-          val file      = pathjoin(config.outputDir, s"${merged.SolutionName}_${version}${mergedext}.zip")
+          val file      = pathjoin(config.common.outputDir, s"${merged.SolutionName}_${version}${mergedext}.zip")
           println(s"Output solution file: $file")
           writeToFile(file, fromBase64(filecontent.ExportSolutionFile.orEmpty))
         }
@@ -162,11 +160,11 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
   }
 
   def delete() = Action { config =>
-    val dec = EntityDecoder.ValueWrapper[SolutionJS] // expect a single record
+    val dec = ValueWrapper[SolutionJS] // expect a single record
     Task
-      .delay(println(s"Deleting solution with name ${config.solutionName}."))
+      .delay(println(s"Deleting solution with name ${config.solution.solutionName}."))
       .flatMap { _ =>
-        val q = QuerySpec(filter = Some(s"uniquename eq '${config.solutionName}'"))
+        val q = QuerySpec(filter = Some(s"uniquename eq '${config.solution.solutionName}'"))
         getOne(q.url("solutions"))(dec)
       }
       .flatMap(s => dynclient.delete("solutions", s.solutionid))

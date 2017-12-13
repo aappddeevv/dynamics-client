@@ -23,10 +23,9 @@ import dynamics.common._
 import MonadlessTask._
 import dynamics.client._
 import dynamics.http._
-import EntityDecoder._
 import dynamics.common.syntax.jsdynamic._
 import dynamics.client.implicits._
-import dynamics.http.syntax.all._
+import dynamics.http.implicits._
 
 case class EnityReference(entity: String, id: String)
 
@@ -36,11 +35,11 @@ class ImportDataActions(val context: DynamicsContext) {
   import dynamics.common.implicits._
   import ImportDataActions._
 
-  implicit val jobDecoder            = EntityDecoder.JsObjectDecoder[AsyncOperationOData]
-  implicit val importJsonDecoder     = EntityDecoder.JsObjectDecoder[ImportJson]
-  implicit val importFileJsonDecoder = EntityDecoder.JsObjectDecoder[ImportFileJson]
-  implicit val WhoAmIDecoder         = EntityDecoder.JsObjectDecoder[WhoAmI]
-  implicit val dec10                 = EntityDecoder.JsObjectDecoder[BulkDeleteResponse]
+  implicit val jobDecoder            = JsObjectDecoder[AsyncOperationOData]
+  implicit val importJsonDecoder     = JsObjectDecoder[ImportJson]
+  implicit val importFileJsonDecoder = JsObjectDecoder[ImportFileJson]
+  implicit val WhoAmIDecoder         = JsObjectDecoder[WhoAmI]
+  implicit val dec10                 = JsObjectDecoder[BulkDeleteResponse]
 
   type WaitTuple   = (Int, String, AsyncOperationOData) // status, msg, data
   type WaitHandler = PartialFunction[fs2.util.Attempt[AsyncOperationOData], Option[WaitTuple]]
@@ -108,19 +107,19 @@ class ImportDataActions(val context: DynamicsContext) {
   val importData: Action = Kleisli { config =>
     {
 
-      val path          = config.importDataInputFile
-      val importmapname = config.importDataImportMapName
+      val path          = config.importdata.importDataInputFile
+      val importmapname = config.importdata.importDataImportMapName
       val name =
-        config.importDataName.getOrElse(Utils.filename(path).get) + " using " + importmapname
+        config.importdata.importDataName.getOrElse(Utils.filename(path).get) + " using " + importmapname
       println(s"Import job name: [$name]")
 
       val filename = Utils.namepart(path)
 
       val ftype     = Utils.extension(path)
       val ftypeint  = ftype.map(ext => FileType.extToInt(ext.toLowerCase)).getOrElse(FileType.csv)
-      val modecode  = if (config.importDataCreate) ModeCode.Create else ModeCode.Update
+      val modecode  = if (config.importdata.importDataCreate) ModeCode.Create else ModeCode.Update
       val importRec = new ImportJson(s"$name", modecode = modecode)
-      val waitforit = waitForJobStreamPrint(_: String, config.importDataPollingInterval.seconds) //curry
+      val waitforit = waitForJobStreamPrint(_: String, config.importdata.importDataPollingInterval.seconds) //curry
 
       val x = lift {
         new TestJS(name = "blah")
@@ -154,7 +153,7 @@ class ImportDataActions(val context: DynamicsContext) {
             content = content,
             isfirstrowheader = true,
             usesystemmap = false,
-            enableduplicatedetection = config.importDataEnableDuplicateDetection,
+            enableduplicatedetection = config.importdata.importDataEnableDuplicateDetection,
             sourceentityname = s, // must be the same as in the mapping file
             targetentityname = t, // must be the same as the mapping file
             fielddelimitercode = FieldDelimiter.comma,
@@ -185,7 +184,7 @@ class ImportDataActions(val context: DynamicsContext) {
           unlift(requestImport(importid) flatMap after)
 
           // Report import stats from the input file...
-          unlift(reportImportFileBasicStats(ifileid, config.debug))
+          unlift(reportImportFileBasicStats(ifileid, config.common.debug))
 
           // Report final status.
           unlift(reportImportStatus(importid))
@@ -231,7 +230,7 @@ class ImportDataActions(val context: DynamicsContext) {
   }
 
   val listImportFiles: Action = Kleisli { config =>
-    val opts   = new TableOptions(border = Table.getBorderCharacters(config.tableFormat))
+    val opts   = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
     val header = Seq("#", "importfileid", "name", "statuscode", "createdon")
 
     dynclient.getList[ImportFileJson]("/importfiles").map { list =>
@@ -251,9 +250,11 @@ class ImportDataActions(val context: DynamicsContext) {
     println("Resume import data processing...")
 
     lift {
-      val theImport = unlift(dynclient.getOneWithKey[ImportJson]("/imports", config.importDataResumeImportId.id))
+      val theImport =
+        unlift(dynclient.getOneWithKey[ImportJson]("/imports", config.importdata.importDataResumeImportId.id))
       val theImportfile =
-        unlift(dynclient.getOneWithKey[ImportFileJson]("/importfiles", config.importDataResumeImportFileId.id))
+        unlift(
+          dynclient.getOneWithKey[ImportFileJson]("/importfiles", config.importdata.importDataResumeImportFileId.id))
 
       println("import")
       PrettyJson.render(theImport)
@@ -272,7 +273,7 @@ class ImportDataActions(val context: DynamicsContext) {
       .withExpand(Expand("Import_AsyncOperations"))
       .withOrderBy("createdon asc")
 
-    val opts   = new TableOptions(border = Table.getBorderCharacters(config.tableFormat))
+    val opts   = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
     val header = Seq("#", "importid", "name", "statuscode", "createdon")
 
     lift {
@@ -293,7 +294,7 @@ class ImportDataActions(val context: DynamicsContext) {
   }
 
   val delete = Action { config =>
-    val filterOne = Utils.filterOneForMatches[ImportJson](imp => Seq(imp.name), config.filter)
+    val filterOne = Utils.filterOneForMatches[ImportJson](imp => Seq(imp.name), config.common.filter)
     val q = QuerySpec(
       select = Seq("importid", "name")
     )
@@ -320,14 +321,15 @@ class ImportDataActions(val context: DynamicsContext) {
     println("Bulk delete - yeah, this is under importdata :-)")
 
     // convert queryjson to js.Array[js.Object]
-    val qjson = config.importDataDeleteQueryJson.map(JSON.parse(_).asInstanceOf[js.Array[js.Object]])
+    val qjson = config.importdata.importDataDeleteQueryJson.map(JSON.parse(_).asInstanceOf[js.Array[js.Object]])
 
     val req = new BulkDeleteAction(
       QuerySet = qjson.getOrElse(js.Array()),
-      JobName = config.importDataDeleteJobName,
-      SourceImportId = config.importDataDeleteImportId,
-      StartDateTime = config.importDataDeleteStartTime.getOrElse(Utils.addMinutes(new js.Date(), 3).toISOString()),
-      RecurrencePattern = config.importDataDeleteRecurrencePattern.getOrElse("")
+      JobName = config.importdata.importDataDeleteJobName,
+      SourceImportId = config.importdata.importDataDeleteImportId,
+      StartDateTime =
+        config.importdata.importDataDeleteStartTime.getOrElse(Utils.addMinutes(new js.Date(), 3).toISOString()),
+      RecurrencePattern = config.importdata.importDataDeleteRecurrencePattern.getOrElse("")
     )
     dynclient.executeAction[BulkDeleteResponse](BulkDeleteAction, req.toEntity._1).flatMap { resp =>
       resp.JobId.fold({

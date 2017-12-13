@@ -1,8 +1,8 @@
 dynamicscli - a nodejs CLI application and client framework for working with online Microsoft Dynamics applications. The application will not currently authenticate with on-premise systems.
 
-dynamicscli uses the new ODatav4 REST data api which means that you must register the application with Azure Active Directory. It's easy to do, but you need Admin access to create the registration. You can use any application registration that allows your userid access to the data and has a application id.
+dynamicscli uses the new ODatav4 REST data api which means that you must register the application with Azure Active Directory. It's easy to do, but you need Admin access to create the registration. You can use any application registration that allows your userid access to the data and has an application id.
 
-The application has two goals:
+dynamics-client two personalities:
 * A CLI that can be used from any OS. While one could use PowerShell for everything, its much easier to add commands or make commands robust using an application directly.
 * An extensive client library that is performant on the nodejs platform. You can use this as a framework for developing small Dynamics applications like ETL or platform management. For example, I added a command to help manage the dynamics platform in around 30 minutes and it worked the first time.
 
@@ -12,6 +12,24 @@ Why nodejs? nodejs has an extensive array of web oriented resources and is light
 
 ## Installing
 Currently, you need to build the solution from github. We will publish the CLI progarm on npm shortly.
+
+```sh
+npm i -g dynamics-client
+```
+
+## Running
+The script can be run, assuming it is on the path:
+```sh
+dynamicscli ...
+```
+If you need to run directly with node,
+```sh
+node dynamicscli <args for dynamicscli>
+```
+If you are on a recent node release, you may also want to use NODE_OPTS to set a large stack size if you are using a high level of concurrency:
+```sh
+export NODE_OPTIONS="--max_old_space_size=6000"
+```
 
 ## CRM Connection Parameters
 Dynamics connection parameters should be placed in a json file. The default is crm.json. The file should look like below. Some typical values are also shown but you must find the values that match your application.

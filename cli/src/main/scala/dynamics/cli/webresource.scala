@@ -77,7 +77,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
     Kleisli { config =>
       getList()
         .map { wr =>
-          filter(wr, config.filter)
+          filter(wr, config.common.filter)
         }
         .map((config, _))
     }
@@ -88,8 +88,8 @@ class WebResourcesCommand(val context: DynamicsContext) {
     *  List Web Resources but apply a filter.
     */
   def list() = Action { config =>
-    val topts = new TableOptions(border = Table.getBorderCharacters(config.tableFormat))
-    getList().map(filter(_, config.filter)).map { wr =>
+    val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
+    getList().map(filter(_, config.common.filter)).map { wr =>
       val data =
         Seq(Seq("#", "webresourceid", "displayname", "name", "webresourcetype", "solutionid").map(Chalk.bold(_))) ++
           wr.zipWithIndex.map {
@@ -112,7 +112,8 @@ class WebResourcesCommand(val context: DynamicsContext) {
       val wrs = unlift(getList())
 
       // Filter locally using the delete regexs
-      val filtered = Utils.filterForMatches(wrs.map(wr => (wr, Seq(wr.name))), config.webResourceDeleteNameRegex)
+      val filtered =
+        Utils.filterForMatches(wrs.map(wr => (wr, Seq(wr.name))), config.webResource.webResourceDeleteNameRegex)
       if (filtered.length == 0)
         println(s"No Web Resources matched the regex arguments.")
 
@@ -122,7 +123,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
       unlift(
         bunchOfDeletes.sequence.flatMap(
           _ =>
-            if (config.webResourceDeletePublish)
+            if (config.webResource.webResourceDeletePublish)
               publishXml(filtered.map(_.webresourceid)).map(_ => println("Published changes."))
             else Task.now(())))
     }
@@ -132,7 +133,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
   def _dumpRaw(): WRKleisli =
     Kleisli {
       case (config, wr) => {
-        println(s"Dumping raw json responses to ${config.webResourceDumpRawOutputFile}")
+        println(s"Dumping raw json responses to ${config.webResource.webResourceDumpRawOutputFile}")
         val content = wr.toList map { item =>
           lift {
             val json = unlift(dynclient.getOneWithKey[WebResourceOData]("webresourceset", item.webresourceid))
@@ -153,14 +154,14 @@ class WebResourcesCommand(val context: DynamicsContext) {
       case (config, wr) => {
         // download and save to the files sytem looking out for path separators
         println(s"Downloading ${wr.size} Web Resources.")
-        println(s"Output directory: ${config.outputDir}")
-        val noclobber = config.noclobber
+        println(s"Output directory: ${config.common.outputDir}")
+        val noclobber = config.common.noclobber
         val downloads = wr.toSeq map { item =>
           lift {
             val wr = unlift(dynclient.getOneWithKey[WebResourceOData]("webresourceset", item.webresourceid))
             //println(s"Processing web resource json: ${Utils.pprint(wr)}")
             val origFilename = wr.name
-            val filename     = Utils.pathjoin(config.outputDir, origFilename)
+            val filename     = Utils.pathjoin(config.common.outputDir, origFilename)
             val exists       = Utils.fexists(filename)
             val downloadOrNot: Task[Unit] =
               if (exists && noclobber)
@@ -196,10 +197,10 @@ class WebResourcesCommand(val context: DynamicsContext) {
 
   def upload() = Action { config =>
     val f: String => Task[Seq[WebResourceOData]] = getWRByName(_)
-    val sources = determineCreateOrUpdateActions(config.webResourceUploadSource flatMap interpretGlob,
-                                                 config.webResourceUploadPrefix,
+    val sources = determineCreateOrUpdateActions(config.webResource.webResourceUploadSource flatMap interpretGlob,
+                                                 config.webResource.webResourceUploadPrefix,
                                                  f,
-                                                 config.webResourceUploadType)
+                                                 config.webResource.webResourceUploadType)
     _process(config, sources)
   }
 
@@ -216,13 +217,13 @@ class WebResourcesCommand(val context: DynamicsContext) {
 
     // create a stream of events that closes the chokidar watcher when completed
     val str2 = Stream.bracket(
-      Task.delay(chokidar.watch(config.webResourceUploadSource.toJSArray,
+      Task.delay(chokidar.watch(config.webResource.webResourceUploadSource.toJSArray,
                                 new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
       cwatcher => FSWatcherOps.toStream(cwatcher, Seq(add, unlink, change, error)),
       cwatcher => Task.delay(cwatcher.close()))
 
     // array of regexs
-    val skips = config.webResourceUploadWatchIgnore.map(new Regex(_))
+    val skips = config.webResource.webResourceUploadWatchIgnore.map(new Regex(_))
 
     def identifyFileAction(p: (String, String)): Traversable[Task[FileAction]] = {
       val event = p._1
@@ -233,9 +234,12 @@ class WebResourcesCommand(val context: DynamicsContext) {
       } else
         event match {
           case "add" | "change" =>
-            determineCreateOrUpdateActions(Seq(path), config.webResourceUploadPrefix, f, config.webResourceUploadType)
+            determineCreateOrUpdateActions(Seq(path),
+                                           config.webResource.webResourceUploadPrefix,
+                                           f,
+                                           config.webResource.webResourceUploadType)
           case "unlink" =>
-            val resourceName = Utils.stripUpTo(path, config.webResourceUploadPrefix.getOrElse(""))
+            val resourceName = Utils.stripUpTo(path, config.webResource.webResourceUploadPrefix.getOrElse(""))
             val fileActionF = f(resourceName) map { arr =>
               if (arr.length == 1) (Delete(arr(0).webresourceid), WebResourceFile(path, path))
               else if (arr.length > 1)
@@ -350,15 +354,15 @@ class WebResourcesCommand(val context: DynamicsContext) {
   def _process(config: AppConfig, sources: Traversable[Task[FileAction]]): Task[Unit] = {
     //val publish = (id: String) => publishXml(dynclient, Seq(id))
     val create          = (data: String) => dynclient.createReturnId("webresourceset", data)
-    val allowedToCreate = config.webResourceUploadRegister
-    val shouldPublish   = config.webResourceUploadPublish
-    val canAddToSoln    = config.webResourceUploadSolution != ""
+    val allowedToCreate = config.webResource.webResourceUploadRegister
+    val shouldPublish   = config.webResource.webResourceUploadPublish
+    val canAddToSoln    = config.webResource.webResourceUploadSolution != ""
 
     def maybeAddToSoln(id: String, mkMsg: String => String = identity): Task[Unit] =
       if (canAddToSoln)
-        addToSolution(id, config.webResourceUploadSolution)
+        addToSolution(id, config.webResource.webResourceUploadSolution)
           .map(_ => ())
-          .map(_ => println(mkMsg(s"Added to solution: ${config.webResourceUploadSolution}.")))
+          .map(_ => println(mkMsg(s"Added to solution: ${config.webResource.webResourceUploadSolution}.")))
       else Task.now(println(mkMsg(s"Added to solution: Default.")))
 
     val factions: Seq[Task[Option[String]]] = sources.toList map {
@@ -463,7 +467,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
     val xml   = s"<importexportxml><webresources>$ids</webresources></importexportxml>"
     val query = "/PublishXml"
     val body  = JSON.stringify(jsobj("ParameterXml" -> xml))
-    dynclient.executeAction("PublishXml", Entity.fromString(body), None)(EntityDecoder.void)
+    dynclient.executeAction("PublishXml", Entity.fromString(body), None)(void)
   }
 
   /** Add a WR to a Solution. */
@@ -473,7 +477,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
   }
 
   val selectUpload = Action { config =>
-    if (config.webResourceUploadWatch) {
+    if (config.webResource.webResourceUploadWatch) {
       watchAndUpload()(config)
     } else upload()(config)
   }

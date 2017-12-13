@@ -26,16 +26,17 @@ class TokenActions(context: DynamicsContext) extends LazyLogger {
   import dynclient._
 
   def doit(n: Long = 1) = Action { config =>
-    println(s"Token output file: ${config.tokenOutputFile}")
-    val auth = new AuthManager(config.connectInfo)
+    println(s"Token output file: ${config.common.outputFile}")
+    val auth = new AuthManager(config.common.connectInfo)
     val ctx  = auth.getAuthContext();
     val str =
       AuthManager.tokenStream(auth.getTokenWithRetry(ctx, Pause(3, 2.seconds)), _ => FiniteDuration(55, TU.MINUTES))
     str
       .take(n)
-      .evalMap { ti =>
-        println(s"Writing token to file: ${config.tokenOutputFile}. ${js.Date()}")
-        writeToFile(config.tokenOutputFile, JSON.stringify(ti))
+      .map { ti =>
+        println(s"Writing token to file: ${config.common.outputFile}. ${js.Date()}")
+        config.common.outputFile.foreach(f => writeToFile(f, JSON.stringify(ti)))
+        1
       }
       .run
   }

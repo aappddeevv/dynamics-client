@@ -23,6 +23,7 @@ import MonadlessTask._
 import dynamics.http._
 import dynamics.client._
 import dynamics.client.implicits._
+import dynamics.http.implicits._
 
 trait WorkflowJson extends js.Object {
   val workflowid: UndefOr[String]  = js.undefined
@@ -69,7 +70,7 @@ class WorkflowActions(val context: DynamicsContext) {
   import context._
   import dynamics.common.implicits._
 
-  implicit val dec = EntityDecoder.JsObjectDecoder[WorkflowJson]
+  implicit val dec = JsObjectDecoder[WorkflowJson]
 
   protected def getList(attrs: Seq[String] = Nil) = {
     val q = QuerySpec(select = attrs)
@@ -102,11 +103,11 @@ class WorkflowActions(val context: DynamicsContext) {
   def list() = Action { config =>
     println("Workflows. See https://msdn.microsoft.com/en-us/library/mt622427.aspx for value definitions.")
     val cols  = jsobj("8" -> jsobj(width = 40))
-    val topts = new TableOptions(border = Table.getBorderCharacters(config.tableFormat), columns = cols)
+    val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat), columns = cols)
 
     lift {
       val res      = unlift(getList())
-      val filtered = filter(res, config.filter)
+      val filtered = filter(res, config.common.filter)
       val data =
         Seq(
           Seq("#",
@@ -145,11 +146,15 @@ class WorkflowActions(val context: DynamicsContext) {
     import dynamics.etl._
     val updater = new UpdateProcessor(context)
     val updateone =
-      dynclient.update("workflows", _: String, _: String, config.upsertPreventCreate, config.upsertPreventUpdate)
-    val newStateCode  = if (config.workflowActivate) WorkflowStateCode.Activated else WorkflowStateCode.Draft
-    val newStatusCode = if (config.workflowActivate) WorkflowStatusCode.Activated else WorkflowStatusCode.Draft
+      dynclient.update("workflows",
+                       _: String,
+                       _: String,
+                       config.update.upsertPreventCreate,
+                       config.update.upsertPreventUpdate)
+    val newStateCode  = if (config.workflow.workflowActivate) WorkflowStateCode.Activated else WorkflowStateCode.Draft
+    val newStatusCode = if (config.workflow.workflowActivate) WorkflowStatusCode.Activated else WorkflowStatusCode.Draft
 
-    val sourceFromIds = Stream.emits(config.workflowIds)
+    val sourceFromIds = Stream.emits(config.workflow.workflowIds)
 
     val runme = sourceFromIds
       .evalMap(getById)
@@ -169,27 +174,27 @@ class WorkflowActions(val context: DynamicsContext) {
       .map(updater.mkOne(_, "workflowid", updateone))
       .map(Stream.eval(_).map(println))
 
-    concurrent.join(config.concurrency)(runme).run
+    concurrent.join(config.common.concurrency)(runme).run
   }
 
   /** Execute a workflow against the results of a query. */
   def executeWorkflow() = Action { config =>
-    println(s"Execute a workflow against the results of a query: [${config.workflowODataQuery.get}]")
+    println(s"Execute a workflow against the results of a query: [${config.workflow.workflowODataQuery.get}]")
     println(s"This does not pause to wait for the workflow system job to complete.")
-    val entities   = dynclient.getListStream[js.Dictionary[String]](config.workflowODataQuery.get)
+    val entities   = dynclient.getListStream[js.Dictionary[String]](config.workflow.workflowODataQuery.get)
     val counter    = new java.util.concurrent.atomic.AtomicInteger(0)
     val inputs     = new java.util.concurrent.atomic.AtomicInteger(0)
     val updater    = new UpdateProcessor(context)
-    val workflowId = config.workflowIds(0)
+    val workflowId = config.workflow.workflowIds(0)
 
     val cache =
-      if (config.workflowCache)
-        LineCache(config.workflowCacheFilename.getOrElse(config.workflowPkName) + ".workflow.cache")
+      if (config.workflow.workflowCache)
+        LineCache(config.workflow.workflowCacheFilename.getOrElse(config.workflow.workflowPkName) + ".workflow.cache")
       else NeverInCache()
 
     // single shot or batch, batch does not seem to work right now...
     val finalStep: Pipe[Task, (String, Int), Task[String]] =
-      if (!config.workflowBatch) {
+      if (!config.workflow.workflowBatch) {
         _ map { p =>
           val entityId = p._1
           val body     = s"""{ "EntityId": "$entityId" }"""
@@ -206,7 +211,7 @@ class WorkflowActions(val context: DynamicsContext) {
             (request.copy(path = dynclient.base + request.path), source) // make full URL for odata patch
           }
         val pt2: Pipe[Task, (HttpRequest, String), Task[String]] =
-          _.vectorChunkN(config.batchSize).map(updater.mkBatchFromRequests(_))
+          _.vectorChunkN(config.common.batchSize).map(updater.mkBatchFromRequests(_))
         pt1 andThen pt2
       }
 
@@ -214,7 +219,7 @@ class WorkflowActions(val context: DynamicsContext) {
       .through(fs2helpers.log[js.Dictionary[String]] { _ =>
         inputs.getAndIncrement()
       })
-      .map(_.get(config.workflowPkName))
+      .map(_.get(config.workflow.workflowPkName))
       .collect { case Some(id) => id }
       .through(cache.contains)
       .collect { case (false, id) => id }
@@ -226,12 +231,12 @@ class WorkflowActions(val context: DynamicsContext) {
       .map(Stream.eval(_).map(println))
 
     concurrent
-      .join(config.concurrency)(runme)
+      .join(config.common.concurrency)(runme)
       .run
       .flatMap(_ =>
         Task.delay {
           println(s"${inputs.get} input records.")
-          if (config.workflowCache) println(s"${cache.stats} (writes, hits) in cache.")
+          if (config.workflow.workflowCache) println(s"${cache.stats} (writes, hits) in cache.")
           println(s"${counter.get} workflows initiated.")
       })
   }

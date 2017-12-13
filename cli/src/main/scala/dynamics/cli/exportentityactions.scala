@@ -33,6 +33,7 @@ import dynamics.client._
 import MonadlessTask._
 import dynamics.http._
 import dynamics.client.syntax.queryspec._
+import dynamics.http.implicits._
 
 object CSVStringifyX {
 
@@ -95,16 +96,18 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   import CSVStringifyX._
   import context._
-  implicit val decoder = EntityDecoder.JSONDecoder
+  implicit val decoder = JSONDecoder
 
   def export() = Action { config =>
-    val query = QuerySpec(select = config.exportSelect,
-                          filter = config.exportFilter,
-                          top = config.exportTop,
-                          orderBy = config.exportOrderBy,
-                          includeCount = config.exportIncludeCount)
+    val query = QuerySpec(
+      select = config.export.exportSelect,
+      filter = config.export.exportFilter,
+      top = config.export.exportTop,
+      orderBy = config.export.exportOrderBy,
+      includeCount = config.export.exportIncludeCount
+    )
 
-    if (config.exportRaw)
+    if (config.export.exportRaw)
       exportOne(config, query)
     else
       exportAll(config, query)
@@ -115,13 +118,13 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     val counter                           = new java.util.concurrent.atomic.AtomicInteger(0)
     def deleteOne(es: String, id: String) = dynclient.delete(es, Id(id))
 
-    println(s"Deleting entities using query: ${config.entityQuery}")
-    val edef = m.getEntityDefinition3(config.exportEntity)
+    println(s"Deleting entities using query: ${config.export.entityQuery}")
+    val edef = m.getEntityDefinition3(config.export.exportEntity)
 
     val deletes =
       Stream.eval(edef).flatMap { ed =>
         dynclient
-          .getListStream[js.Object](config.entityQuery)
+          .getListStream[js.Object](config.export.entityQuery)
           .map(jsobj => jsobj.asDict[String](ed.PrimaryId))
           .map { a =>
             counter.getAndIncrement(); a
@@ -131,7 +134,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       }
 
     concurrent
-      .join(config.concurrency)(deletes)
+      .join(config.common.concurrency)(deletes)
       .run
       .flatMap(_ =>
         Task.delay {
@@ -140,50 +143,52 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
   }
 
   def exportFromQuery() = Action { config =>
-    println(s"Export entity using query: ${config.entityQuery}")
-    val outputpath = config.outputFile.getOrElse(config.entityQuery.hashCode() + ".json")
+    println(s"Export entity using query: ${config.export.entityQuery}")
+    val outputpath = config.common.outputFile.getOrElse(config.export.entityQuery.hashCode() + ".json")
     println(s"Output file: $outputpath")
 
     val opts = DynamicsOptions(
-      prefers = OData.PreferOptions(maxPageSize = config.exportMaxPageSize,
-                                    includeFormattedValues = Some(config.exportIncludeFormattedValues)))
+      prefers = OData.PreferOptions(maxPageSize = config.export.exportMaxPageSize,
+                                    includeFormattedValues = Some(config.export.exportIncludeFormattedValues)))
     val values =
-      dynclient.getListStream[js.Object](config.entityQuery, opts).drop(config.exportSkip.map(_.toLong).getOrElse(0))
+      dynclient
+        .getListStream[js.Object](config.export.entityQuery, opts)
+        .drop(config.export.exportSkip.map(_.toLong).getOrElse(0))
 
     Stream
       .bracket(Task.delay(Fs.createWriteStream(outputpath, null)))(
         f => {
-          if (config.exportWrap) f.write("[")
+          if (config.export.exportWrap) f.write("[")
           values
             .map(Utils.render(_))
             .to(_ map { jstr =>
               {
-                f.write(jstr + (if (config.exportWrap) ",\n" else "\n"))
+                f.write(jstr + (if (config.export.exportWrap) ",\n" else "\n"))
               }
             })
         },
-        f => Task.delay(if (config.exportWrap) f.write("]")).flatMap(_ => f.endFuture().toTask)
+        f => Task.delay(if (config.export.exportWrap) f.write("]")).flatMap(_ => f.endFuture().toTask)
       )
       .run
   }
 
   def exportAll(config: AppConfig, q: QuerySpec): Task[Unit] = {
-    println(s"Export entity: ${config.exportEntity}")
-    val url = q.url(config.exportEntity)
+    println(s"Export entity: ${config.export.exportEntity}")
+    val url = q.url(config.export.exportEntity)
     val opts = DynamicsOptions(
-      prefers = OData.PreferOptions(maxPageSize = config.exportMaxPageSize,
-                                    includeFormattedValues = Some(config.exportIncludeFormattedValues)))
+      prefers = OData.PreferOptions(maxPageSize = config.export.exportMaxPageSize,
+                                    includeFormattedValues = Some(config.export.exportIncludeFormattedValues)))
 
-    val values = dynclient.getListStream[js.Object](url, opts).drop(config.exportSkip.map(_.toLong).getOrElse(0))
+    val values = dynclient.getListStream[js.Object](url, opts).drop(config.export.exportSkip.map(_.toLong).getOrElse(0))
 
     // either explicit from CLI or retrieve all of them by getting one record
     val columns =
       (
-        if (config.exportSelect.size > 0) Task.now(config.exportSelect)
+        if (config.export.exportSelect.size > 0) Task.now(config.export.exportSelect)
         else getAllColumnNames(config, q)
       ).map(allcols => allcols.map(n => (n, n)))
 
-    val outputpath = config.outputFile.getOrElse(s"${config.exportEntity}.csv")
+    val outputpath = config.common.outputFile.getOrElse(s"${config.export.exportEntity}.csv")
 
     println(s"Output path: $outputpath")
     // TODO, resource control the file descriptor
@@ -222,7 +227,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
   /** Get column names by retrieving a single record. */
   def getAllColumnNames(config: AppConfig, q: QuerySpec): Task[Seq[String]] = {
     val query = q.copy(top = Option(1), select = Nil)
-    val url   = query.url(config.exportEntity)
+    val url   = query.url(config.export.exportEntity)
     dynclient.getList[js.Object](url).map { records =>
       if (records.size == 0) Nil
       else js.Object.keys(records(0)).toSeq
@@ -231,8 +236,8 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   def exportOne(config: AppConfig, q: QuerySpec): Task[Unit] = {
     val query = q.copy(top = Option(1), select = Nil)
-    val url   = query.url(config.exportEntity)
-    Task.delay(println(s"Dump one record in simple key-value format: ${config.exportEntity}")).flatMap { _ =>
+    val url   = query.url(config.export.exportEntity)
+    Task.delay(println(s"Dump one record in simple key-value format: ${config.export.exportEntity}")).flatMap { _ =>
       dynclient.getList[js.Object](url).map { records =>
         records.foreach(r => println(s"${PrettyJson.render(r)}"))
         ()
@@ -282,7 +287,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       .flatMap(Stream.emits)
       . // emit one by one
       filter { entity =>
-        config.filter.contains(entity.LogicalName)
+        config.common.filter.contains(entity.LogicalName)
       }
       .map(entity => (entity.LogicalCollectionName, entity.PrimaryId))
 
@@ -290,7 +295,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       entityList.map(p => mkCountingStream(p._1, p._2))
 
     val runCounts = concurrent
-      .join(config.concurrency)(counters)
+      .join(config.common.concurrency)(counters)
       .runLog
       .map(_.sortBy(_._1))
       .flatMap(results =>
@@ -298,7 +303,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
           results.foreach(p => println(s"${p._1}, ${p._2}"))
       })
 
-    if (config.exportRepeat) Stream.eval(runCounts).repeat.run
+    if (config.export.exportRepeat) Stream.eval(runCounts).repeat.run
     else Stream.eval(runCounts).run
   }
 

@@ -18,6 +18,7 @@ import cats._
 import cats.data._
 import cats.implicits._
 import fs2.interop.cats._
+import scala.scalajs.runtime.wrapJavaScriptException
 
 import io.scalajs.RawOptions
 import io.scalajs.nodejs.Error
@@ -34,50 +35,6 @@ import fs2helpers._
 import dynamics.common.implicits._
 import MonadlessTask._
 
-class MSSQLConfig(
-    val user: js.UndefOr[String] = js.undefined,
-    val password: js.UndefOr[String] = js.undefined,
-    val server: js.UndefOr[String] = js.undefined,
-    val database: js.UndefOr[String] = js.undefined,
-    val port: js.UndefOr[Int] = js.undefined,
-    val domain: js.UndefOr[String] = js.undefined,
-    val connectionTimeout: js.UndefOr[Int] = js.undefined,
-    val requestTimeout: js.UndefOr[Int] = js.undefined,
-    val parseJSON: js.UndefOr[Boolean] = js.undefined,
-    val stream: js.UndefOr[Boolean] = js.undefined,
-    val pool: js.UndefOr[PoolOptions] = js.undefined,
-    val options: js.UndefOr[RawOptions] = js.undefined
-) extends js.Object
-
-class PoolOptions(
-    val max: js.UndefOr[Int] = js.undefined,
-    val min: js.UndefOr[Int] = js.undefined,
-    val idleTimeoutMillis: js.UndefOr[Int] = js.undefined,
-    val acquireTimeoutMillis: js.UndefOr[Int] = js.undefined,
-    val fifo: js.UndefOr[Boolean] = js.undefined,
-    val priorityRange: js.UndefOr[Int] = js.undefined,
-    val autostart: js.UndefOr[Boolean] = js.undefined
-    // ...more should go here...
-) extends js.Object
-
-@js.native
-@JSImport("mssql", JSImport.Namespace)
-object MSSQL extends js.Object {
-  def connect(config: RawOptions): js.Promise[Pool] = js.native
-}
-
-@js.native
-trait Pool extends js.Object {
-  def request(): Query = js.native
-}
-
-@js.native
-trait Query extends js.Object with IEventEmitter {
-  def input(p: String, t: Int, value: js.Any): Query = js.native
-  var stream: js.UndefOr[Boolean]                    = js.native
-  def query(q: String): js.Object                    = js.native
-}
-
 object sources {
 
   import fs2.Task._
@@ -86,53 +43,62 @@ object sources {
     * Turn a Readable parser into a Stream of js.Object using
     * the callback `onData`. While `A` could be a Buffer or String,
     * it could also be a js.Object. `A` must reflect the callers
-    * understanding of what objects the Readable will produce.
+    * understanding of what objects the Readable will produce. You could use
+    * this over readable.iterator => fs2.Stream when you want to bubble
+    * up errors explicitly through the fs2 layer.
     */
-  def readableToStream[A](readable: Readable, qsize: Int = 1000)(implicit s: Strategy): Stream[Task, A] = {
-    val counter = new java.util.concurrent.atomic.AtomicInteger(1)
-    import scala.scalajs.runtime.wrapJavaScriptException
-    val F = Task.asyncInstance(Strategy.sequential) // mpilquist suggested sync enqueue1
+  def readableToStream[A](readable: io.scalajs.nodejs.stream.Readable, qsize: Int = 1000)(
+      implicit s: Strategy): Stream[Task, A] = {
+    val counter = new java.util.concurrent.atomic.AtomicInteger(-1)
+    //val F = Task.asyncInstance(Strategy.sequential) // mpilquist suggested sync enqueue1
     for {
       q <- Stream.eval(fs2.async.boundedQueue[Task, Option[Either[Throwable, A]]](qsize))
       _ <- Stream.eval(Task.delay {
-        readable.onData {
-          (data: A) =>
-            val x = counter.getAndIncrement()
-            //println(s"Readable: $x: $data") // immediate print when a data event occurs.
-            // Try 1 - run sync by using a sequential F above...
-            //F.unsafeRunAsync(q.enqueue1(Some(Right(data))))(_ => ()) // change to unsafeRunSync?
-            // Try 2 - pure async
-            q.enqueue1(Some(Right(data))).unsafeRunAsync {
-              _ match {
-                case Right(v) => (); //println(s"Readable: $x: $data added to queue.")
-                case Left(t)  => println(s"Error adding to queue ($x): $t")
-              }
+        readable.onData { (data: A) =>
+          val x = counter.getAndIncrement()
+          q.enqueue1(Some(Right(data))).unsafeRunAsync {
+            _ match {
+              case Right(v) => () //println(s"Readable: $x: $data added to queue.")
+              case Left(t)  => println(s"Error adding to queue, index ($x): $t")
             }
-          // Try 3 - looks like it ALWAYS hits an async boundary so "cb" is always called
-          // q.enqueue1(Some(Right(data))).unsafeRunSync() match {
-          //   case Right(v) => println(s"Readable: $x: $data added to queue.")
-          //   case Left(cb) => //println(s"cb: $x")
-          //      cb{ _ match {
-          //        case Right(v) => println(s"Hit async boundary: $x")
-          //        case Left(t) => println(s"Error inserting into queue: $x")
-          //     }}
-          // }
+          }
         }
         readable.onError { (e: io.scalajs.nodejs.Error) =>
           q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ())
         }
         readable.onEnd { () =>
-          println("READABLE COMPLETE (end)")
           q.enqueue1(None).unsafeRunAsync(_ => ())
         }
         readable.onClose { () =>
-          println("READABLE COMPLETE (close)")
           q.enqueue1(None).unsafeRunAsync(_ => ())
         }
-        //Stream.emit(()) //only needed if using Stream.suspend...
       }) // could use .attempt here but need to wrap js exception inside :-(
       record <- q.dequeue.unNoneTerminate through pipe.rethrow
     } yield record
+  }
+
+  /**
+    * Stream a file containing JSON objects separated by newlines. Newlines should be
+    * escaped inside JSON values. isArray = true implies that json objects inside
+    * are wrapped in an array and hence have commas separating the objects.
+    */
+  def JSONFileSource[A](file: String, isArray: Boolean = false)(implicit s: Strategy): Stream[Task, A] = {
+    Stream.bracket(Task.delay {
+      val source = if (!isArray) StreamJsonObjects.make() else StreamArray.make()
+      (source, Fs.createReadStream(file))
+    })(
+      p => { p._2.pipe(p._1.input); readableToStream[A](p._1.output) },
+      p => Task.delay(()) // rely on autoclose behavior
+    )
+  }
+
+  /** does not appear to work at all... */
+  private[dynamics] def JSONFileSource2[A](file: String)(implicit s: Strategy,
+                                                         ec: ExecutionContext): Stream[Task, A] = {
+    val source = StreamJsonObjects.make()
+    val x      = Fs.createReadStream(file)
+    x.pipe(source.input)
+    IteratorOps(source.output.iterator).toFS2Stream
   }
 
   val DefaultCSVParserOptions =
@@ -144,10 +110,12 @@ object sources {
     * The underlying CSV file is automatically opened and closed.
     */
   def CSVFileSource(file: String, csvParserOptions: ParserOptions)(implicit s: Strategy): Stream[Task, js.Object] = {
-    CSVFileSource_(file, csvParserOptions, readableToStream[js.Object](_: Readable))
+    CSVFileSource_(file, csvParserOptions, readableToStream[js.Object](_: io.scalajs.nodejs.stream.Readable))
   }
 
-  def CSVFileSource_(file: String, csvParserOptions: ParserOptions, f: Readable => Stream[Task, js.Object])(
+  def CSVFileSource_(file: String,
+                     csvParserOptions: ParserOptions,
+                     f: io.scalajs.nodejs.stream.Readable => Stream[Task, js.Object])(
       implicit s: Strategy): Stream[Task, js.Object] = {
     val create = Task.delay {
       val parser = CsvParse(csvParserOptions)
@@ -172,7 +140,7 @@ object sources {
 
   def CSVFileSourceBuffer_(file: String, csvParserOptions: ParserOptions = DefaultCSVParserOptions)(
       implicit e: ExecutionContext,
-      s: Strategy): Task[Seq[js.Object]] = {
+      s: Strategy): Task[scala.Iterable[js.Object]] = {
     import scala.scalajs.runtime.wrapJavaScriptException
     val p = scala.concurrent.Promise[Seq[js.Object]]()
     import collection.mutable.ListBuffer
@@ -194,40 +162,40 @@ object sources {
     p.future.toTask
   }
 
-  def queryToStream[A](query: Query, qsize: Int = 100)(implicit s: Strategy): Stream[Task, A] = {
+  /**
+    * Assuming the query has been set to streaming, stream the results.
+    */
+  def queryToStream[A](query: Query, qsize: Int = 1000)(implicit s: Strategy): Stream[Task, A] = {
     val F = Async[Task]
     for {
-      q <- Stream.eval(fs2.async.boundedQueue[Task, A](qsize))
-      _ <- Stream.suspend {
-        query.on("row", { (data: A) =>
-          F.unsafeRunAsync(q.enqueue1(data))(_ => ())
-        })
-        query.on("error", { (err: js.Error) =>
-          println(s"Error in MSSQL query processing: ${PrettyJson.render(err)}")
-          throw new JavaScriptException(err)
-        })
-        Stream.emit(())
-      }
-      a <- q.dequeue // returns stream that dequeues forever
+      q <- Stream.eval(fs2.async.boundedQueue[Task, Option[Either[Throwable, A]]](qsize))
+      _ <- Stream.eval(Task.delay {
+        query.on("row", (data: A) => q.enqueue1(Some(Right(data))).unsafeRunAsync(_ => ()))
+        query.on(
+          "error",
+          (e: io.scalajs.nodejs.Error) => q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ()))
+        query.on("end", (_: js.Any) => q.enqueue1(None).unsafeRunAsync(_ => ()))
+      })
+      a <- q.dequeue.unNoneTerminate through pipe.rethrow
     } yield a
   }
 
   /**
-    * A MSSQL source that executes a query.
-    * @see https://patriksimek.github.io/node-mssql/#promises
+    * A MSSQL source that executes a query. If you create your own coonnection
+    * pool then use `queryToStream` once you create your query request.
+    * @see https://www.npmjs.com/package/mssql#tedious connection string info.
     */
-  def MSSQLSource[A](qstr: String, config: RawOptions)(implicit s: Strategy): Stream[Task, A] = {
+  def MSSQLSource[A](qstr: String, config: RawOptions | String)(implicit s: Strategy): Stream[Task, A] = {
     def create() = MSSQL.connect(config).toTask.map { pool =>
       val query = pool.request()
       query.stream = true
       query.query(qstr)
       query
     }
-    Stream.bracket(create())({ q: Query =>
-      queryToStream(q)
-    }, { q: Query =>
-      Task.now(())
-    })
+    Stream.bracket(create())(
+      (q: Query) => queryToStream(q),
+      (q: Query) => Task.now(()) // close something?
+    )
   }
 
   /** Add a source string based on the record index position.

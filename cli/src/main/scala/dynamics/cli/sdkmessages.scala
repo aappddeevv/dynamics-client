@@ -56,10 +56,10 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
     filter(data, criteria)
 
   def list(): Action = Kleisli { config =>
-    val topts  = new TableOptions(border = Table.getBorderCharacters(config.tableFormat))
+    val topts  = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
     val header = Seq("#", "sdkmessageprocessingstepid", "name", "mode", "statecode", "statuscode")
     lift {
-      val filtered = unlift(getList().map(filter(_, config.filter)))
+      val filtered = unlift(getList().map(filter(_, config.common.filter)))
       val data =
         filtered.zipWithIndex.map {
           case (i, idx) =>
@@ -88,12 +88,12 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
 
     val doit = lift {
       val ids =
-        if (config.filter.size > 0) {
+        if (config.common.filter.size > 0) {
           val list     = unlift(getList())
-          val filtered = filter(list, config.filter)
+          val filtered = filter(list, config.common.filter)
           filtered.map(_.sdkmessageprocessingstepid.orEmpty).filterNot(_.isEmpty)
         } else
-          Seq(config.sdkMessagesId)
+          Seq(config.sdkMessage.id)
       unlift(Task.traverse(ids.toSeq.map(id => doOne(id, body, "Activated")))(identity))
     }
     doit.map(_ => ())
@@ -104,12 +104,12 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
 
     val doit = lift {
       val ids =
-        if (config.filter.size > 0) {
+        if (config.common.filter.size > 0) {
           val list     = unlift(getList())
-          val filtered = filter(list, config.filter)
+          val filtered = filter(list, config.common.filter)
           filtered.map(_.sdkmessageprocessingstepid.orEmpty).filterNot(_.isEmpty)
         } else
-          Seq(config.sdkMessagesId)
+          Seq(config.sdkMessage.id)
       unlift(Task.traverse(ids.toSeq.map(id => doOne(id, body, "Deactivated")))(identity))
     }
     doit.map(_ => ())

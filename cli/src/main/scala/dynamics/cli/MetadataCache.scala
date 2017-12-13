@@ -25,7 +25,6 @@ import io.scalajs.npm.chalk._
 import MonadlessTask._
 
 import dynamics.http._
-import EntityDecoder._
 import dynamics.client._
 import dynamics.client.implicits._
 import dynamics.common.implicits._
@@ -162,7 +161,7 @@ class MetadataCache(val context: DynamicsContext) {
   def getEntityDescription(entitySet: String): Task[Option[EntityDescription]] = {
     //println(s"getEntityDescription: $entitySet")
     val q = QuerySpec(filter = Some(s"EntitySetName eq '$entitySet'"))
-    dynclient.getOne[js.Object](q.url("EntityDefinitions"))(EntityDecoder.ValueWrapper[js.Object]).attempt.map {
+    dynclient.getOne[js.Object](q.url("EntityDefinitions"))(ValueWrapper[js.Object]).attempt.map {
       _ match {
         case Right(v) =>
           //println(s"HERE!: ${PrettyJson.render(v)}")
@@ -175,7 +174,7 @@ class MetadataCache(val context: DynamicsContext) {
   /** Semi-efficient lookup. */
   def getAttributeMetadataId(entitySet: String, attribute: String): Task[Option[String]] = {
     val eq = QuerySpec(filter = Some(s"EntitySetName eq '$entitySet'"), select = Seq("MetadataId"))
-    dynclient.getOne[js.Object](eq.url("EntityDefinitions"))(EntityDecoder.ValueWrapper[js.Object]).flatMap { obj =>
+    dynclient.getOne[js.Object](eq.url("EntityDefinitions"))(ValueWrapper[js.Object]).flatMap { obj =>
       val id = obj.asDyn.MetadataId.asString
       val aq = QuerySpec(select = Seq("MetadataId"))
         .withExpand(Expand("Attributes", filter = Some(s"LogicalName eq '$attribute'")))

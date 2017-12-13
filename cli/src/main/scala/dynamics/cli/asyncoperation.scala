@@ -26,12 +26,13 @@ import MonadlessTask._
 import dynamics.client._
 import dynamics.http._
 import dynamics.client.implicits._
+import dynamics.http.implicits._
 
 class AsyncOperationsCommand(val context: DynamicsContext) {
 
   import context._
 
-  implicit val dec = EntityDecoder.JsObjectDecoder[AsyncOperationOData]
+  implicit val dec = JsObjectDecoder[AsyncOperationOData]
 
   protected def getList(attrs: Seq[String] = Nil) = {
     val q = QuerySpec(select = attrs)
@@ -55,7 +56,7 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
     Kleisli { config =>
       getList(Seq("asyncoperationid", "name", "statuscode", "operationtype"))
         .map { res =>
-          filter(res, config.filter)
+          filter(res, config.common.filter)
         }
         .map((config, _))
     }
@@ -65,7 +66,7 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
       case (config, res) =>
         Task.delay {
           println("Async Operations")
-          val topts = new TableOptions(border = Table.getBorderCharacters(config.tableFormat))
+          val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
           val data =
             Seq(
               Seq("#", "asyncoperationid", "name", "statuscode", "operationtype", "executiontimespan").map(
@@ -134,16 +135,20 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
     import dynamics.etl._
     val updater = new UpdateProcessor(context)
     val updateone =
-      dynclient.update("asyncoperations", _: String, _: String, config.upsertPreventCreate, config.upsertPreventUpdate)
+      dynclient.update("asyncoperations",
+                       _: String,
+                       _: String,
+                       config.update.upsertPreventCreate,
+                       config.update.upsertPreventUpdate)
     val cancel = 3
 
-    println(s"""Cancel jobs based on name regex ${config.filter.mkString(", ")}""")
+    println(s"""Cancel jobs based on name regex ${config.common.filter.mkString(", ")}""")
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
 
     val runme = getListStream(Seq("asyncoperationid", "name", "statecode", "statuscode"))
       .filter(job => job.statecode.get != cancel && (job.statecode.get != 2 && job.statuscode.get != 22))
       .flatMap { job =>
-        val matches = filter(Seq(job), config.filter)
+        val matches = filter(Seq(job), config.common.filter)
         Stream.emits(matches)
       }
       .map(job =>
@@ -151,7 +156,7 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
       .map(updater.mkOne(_, "asyncoperationid", updateone))
       .map(Stream.eval(_).map(println))
 
-    concurrent.join(config.concurrency)(runme).run
+    concurrent.join(config.common.concurrency)(runme).run
   //.flatMap(_ => Task.delay(println(s"${counter.get} records processed.")))
   }
 

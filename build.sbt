@@ -11,6 +11,9 @@ scalaJSLinkerConfig ~= {
   _.withModuleKind(ModuleKind.CommonJSModule)
 }
 
+autoCompilerPlugins := true
+//addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
+
 //scalafmtVersion in ThisBuild := "1.3.0" // all projects
 
 lazy val licenseSettings = Seq(
@@ -46,7 +49,8 @@ lazy val commonSettings = Seq(
   libraryDependencies ++=
     (Dependencies.commonDependencies.value ++
       Dependencies.myJSDependencies.value),
-  addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4")
+  addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.4"),
+  addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
 )
 
 lazy val dynamicsSettings = buildSettings ++ commonSettings
@@ -55,8 +59,7 @@ lazy val root = project.in(file("."))
   .settings(dynamicsSettings)
   .settings(noPublishSettings)
   .settings(name := "dynamics-client")
-  .aggregate(http, client, common, etl, cli,
-    `cli-main`, docs)
+  .aggregate(http, client, common, etl, cli, `cli-main`, docs)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val common = project
@@ -66,7 +69,7 @@ lazy val common = project
 lazy val etl = project
   .settings(dynamicsSettings)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
-  .dependsOn(common)
+  .dependsOn(common, client, http)
 
 lazy val http = project
   .settings(dynamicsSettings)
@@ -84,6 +87,9 @@ lazy val cli = project
   .settings(dynamicsSettings)
   .dependsOn(client, common, etl)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
+  .settings(
+    unmanagedResourceDirectories in Compile += baseDirectory.value / "cli/src/main/js"
+  )
 
 lazy val `cli-main` = project
   .settings(dynamicsSettings)
@@ -109,11 +115,9 @@ lazy val docs = project
     micrositeAuthor := "aappddeevv",
     micrositeGithubRepo := "dynamics-client",
     micrositeGithubOwner :="aappddeevv",
-    micrositeGithubToken := Option(scala.sys.env("GITHUB_TOKEN")) orElse None,
+    micrositeGithubToken := sys.props.get("GITHUB_TOKEN"),
     micrositePushSiteWith := GitHub4s
   )
-
-addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 val npmBuild = taskKey[Unit]("fullOptJS then webpack")
 npmBuild := {

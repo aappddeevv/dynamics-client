@@ -23,12 +23,21 @@ trait ConnectionInfo extends js.Object {
   val renewalFraction: UndefOr[Int]         = js.native
 }
 
-/** General response envelope. Use A=_ if you do not
-  * care about the values.
+/**
+  * Use this when you *only* care about the `@odata.nextLink` link.
   */
 @js.native
-trait ValueArrayResponse[A] extends js.Object {
+trait NextLinkResponse[A] extends js.Object {
   @JSName("@odata.nextLink")
-  val nextLink: UndefOr[String]   = js.native
+  val nextLink: UndefOr[String] = js.native
+}
+
+/**
+  * General response envelope. Use A=_ if you do not care about the values.
+  * This is only used to process return bodies and find the "value" array
+  * that may, or may not be there.
+  */
+@js.native
+trait ValueArrayResponse[A] extends NextLinkResponse[A] {
   val value: UndefOr[js.Array[A]] = js.native
 }

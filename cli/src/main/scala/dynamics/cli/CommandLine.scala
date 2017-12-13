@@ -23,6 +23,9 @@ import io.scalajs.npm.winston
 import io.scalajs.npm.winston._
 import io.scalajs.npm.winston.transports._
 import cats.implicits._
+import monocle.Lens
+import monocle.macros.GenLens
+import monocle.macros.syntax.lens._
 
 import dynamics.common._
 import dynamics.client._
@@ -42,149 +45,192 @@ object CommandLine {
     }
   }
 
+  def withCmd(ac: AppConfig, command: String)    = ac.copy(common = ac.common.copy(command = command))
+  def withSub(ac: AppConfig, subcommand: String) = ac.copy(common = ac.common.copy(subcommand = subcommand))
+
   def general(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
 
+    note("Common options")
     opt[Unit]("debug")
       .text("Debug level logging")
       .hidden()
-      .action((x, c) => c.copy(debug = true))
-    opt[Int]("concurrency").text("General concurrency metric. Default is 4.").action((x, c) => c.copy(concurrency = x))
+      .action((x, c) => c.copy(common = c.common.copy(debug = true)))
+    opt[Int]("concurrency")
+      .text("General concurrency metric. Default is 4.")
+      .action((x, c) => c.copy(common = c.common.copy(concurrency = x)))
     opt[String]("logger-level")
       .hidden()
       .text("Logger level: trace, debug, info, warn or error. Overrides debug option.")
       .action { (x, c) =>
-        val newC = c.copy(loggerLevel = Some(x))
-        if (x.toUpperCase == "DEBUG") newC.copy(debug = true)
+        val newC = c.copy(common = c.common.copy(loggerLevel = Some(x)))
+        if (x.toUpperCase == "DEBUG") newC.copy(common = newC.common.copy(debug = true))
         else newC
       }
     opt[Int]("lcid")
       .text("Whenever language choices need to be made, use this LCID.")
-      .action((x, c) => c.copy(lcid = x))
+      .action((x, c) => c.copy(common = c.common.copy(lcid = x)))
     opt[String]("logfile")
       .text("Logger file.")
-      .action((x, c) => c.copy(logFile = x))
+      .action((x, c) => c.copy(common = c.common.copy(logFile = x)))
     opt[Unit]('v', "verbose")
       .text("Be verbose.")
+      .action((x, c) => c.copy(common = c.common.copy(verbose = true)))
     opt[Unit]('q', "quiet")
       .text("No extra output, just the results of the command.")
-      .action((x, c) => c.copy(quiet = true))
+      .action((x, c) => c.copy(common = c.common.copy(quiet = true)))
     opt[String]('c', "crm-config")
       .valueName("<file>")
       .text("CRM connection configuration file")
-      .action { (x, c) =>
-        c.copy(crmConfigFile = x)
-      }
+      .action((x, c) => c.copy(common = c.common.copy(crmConfigFile = x)))
     opt[String]("table-format")
       .valueName("honeywell|norc|ramac|void")
       .text("Change the table output format. void = no table adornments.")
-      .action((x, c) => c.copy(tableFormat = x))
+      .action((x, c) => c.copy(common = c.common.copy(tableFormat = x)))
     opt[Int]("num-retries")
       .text("Number of retries if a request fails. Default is 5.")
-      .action((x, c) => c.copy(numRetries = x))
+      .action((x, c) => c.copy(common = c.common.copy(numRetries = x)))
     opt[Int]("pause-between")
       .text("Pause between retries in seconds. Default is 10.")
-      .action((x, c) => c.copy(pauseBetween = x.seconds))
+      .action((x, c) => c.copy(common = c.common.copy(pauseBetween = x.seconds)))
       .validate(pause =>
         if (pause < 0 || pause > 60 * 5) failure("Pause must be between 0 and 300 seconds.") else success)
     opt[Int]("request-timeout")
       .text("Request timeout in millis. 1000millis = 1s")
-      .action((x, c) => c.copy(requestTimeOutInMillis = Some(x)))
+      .action((x, c) => c.copy(common = c.common.copy(requestTimeOutInMillis = Some(x))))
     opt[String]("metadata-cache-file")
       .text("Metadata cache file to use explicitly. Otherwise it is automatically located.")
-      .action((x, c) => c.copy(metadataCacheFile = Some(x)))
+      .action((x, c) => c.copy(common = c.common.copy(metadataCacheFile = Some(x))))
     opt[Unit]("ignore-metadata-cache")
       .text("Ignore any existing metadata cache. This will cause a new metadata download.")
-      .action((x, c) => c.copy(ignoreMetadataCache = true))
-    opt[Int]("batchsize").text("If batching is used, this is the batch size.").action((x, c) => c.copy(batchSize = x))
+      .action((x, c) => c.copy(common = c.common.copy(ignoreMetadataCache = true)))
+    opt[Int]("batchsize")
+      .text("If batching is used, this is the batch size.")
+      .action((x, c) => c.copy(common = c.common.copy(batchSize = x)))
     opt[String]("outputdir")
       .text("Output directory for any content output.")
-      .action((x, c) => c.copy(outputDir = x))
+      .action((x, c) => c.copy(common = c.common.copy(outputDir = x)))
     opt[String]("outputfile")
       .text("Output file.")
-      .action((x, c) => c.copy(outputFile = Some(x)))
+      .action((x, c) => c.copy(common = c.common.copy(outputFile = Some(x))))
 
   }
 
+  /**
+    * Instantiate then import the functions to use in your CLI definition.
+    */
   case class CliHelpers(protected val op: scopt.OptionParser[AppConfig]) {
     import op._
 
     def newline(n: Int = 1): Unit = (0 to n).foreach(_ => note("\n"))
 
+    def sub(n: String) = { note("\n"); cmd(n) }
+
     val mkOutputDir = () =>
       opt[String]("outputdir")
         .text("Output directory for downloads.")
-        .action((x, c) => c.copy(outputDir = x))
+        .action((x, c) => c.lens(_.common.outputDir).set(x))
 
     val mkNoClobber = () =>
-      opt[Unit]("noclobber").text("Do not overwrite existing file.").action((x, c) => c.copy(noclobber = true))
+      opt[Unit]("noclobber")
+        .text("Do not overwrite existing file.")
+        .action((x, c) => c.lens(_.common.noclobber).set(true))
 
     val mkFilterOptBase = () =>
       opt[Seq[String]]("filter")
         .unbounded()
-        .action((x, c) => c.copy(filter = c.filter ++ x))
+        .action((x, c) => c.lens(_.common.filter).modify(f => f ++ x))
 
     val mkFilterOpt = () =>
       opt[Seq[String]]("filter")
         .unbounded()
-        .text("Filter Web Resources with a regex. --filter can be repeated.")
-        .action((x, c) => c.copy(filter = c.filter ++ x))
+        .text("Filter with a regex. --filter can be repeated.")
+        .action((x, c) => c.lens(_.common.filter).modify(f => f ++ x))
 
     val mkFields = () =>
       opt[Seq[String]]("fields")
         .text("List of fields to retrieve. Use the Dynamics logical name.")
-        .action((x, c) => c.copy(fields = Some(x)))
+        .action((x, c) => c.lens(_.common.fields).set(Some(x)))
   }
 
   def metadata(op: scopt.OptionParser[AppConfig]): Unit = {
+    val h = CliHelpers(op)
+    import h.sub
     import op._
     cmd("metadata")
       .text("Report out on metadata.")
-      .action((x, c) => c.copy(command = "metadata"))
+      .action((x, c) => withCmd(c, "metadata"))
       .children(
-        cmd("list-entities").text("List all entities.").action((x, c) => c.copy(subcommand = "listentities")),
-        cmd("download-csdl")
+        sub("list-entities")
+          .text("List all entities and object type codes.")
+          .action((x, c) => withSub(c, "listentities")),
+        sub("download-csdl")
           .text("Download CSDL.")
-          .action((x, c) => c.copy(subcommand = "downloadcsdl"))
+          .action((x, c) => withSub(c, "downloadcsdl"))
           .children(
             arg[String]("output-file")
               .text("Output CSDL file.")
-              .action((x, c) => c.copy(metadataDownloadOutputFile = x))
+              .action((x, c) => c.lens(_.common.outputFile).set(Some(x)))
           ),
-        cmd("test").text("Run a metadata test.").action((x, c) => c.copy(subcommand = "test"))
+        sub("test")
+          .text("Run a metadata test.")
+          .hidden()
+          .action((x, c) => withSub(c, "test")),
+        note("Metadata download files are large and may take a while.")
       )
-    note("\n")
-    note("Metadata download files are large and may take a while.")
   }
 
   def whoami(op: scopt.OptionParser[AppConfig]): Unit = {
+    val h = CliHelpers(op)
+    import h.sub
     import op._
     cmd("whoami")
       .text("Print out WhoAmI information.")
-      .action((x, c) => c.copy(command = "whoami"))
+      .action((x, c) => withCmd(c, "whoami"))
+  }
+
+  def test(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    val h = CliHelpers(op)
+    import h.sub
+    cmd("test")
+      .text("Run some tests...secretly")
+      .hidden()
+      .action((x, c) => withCmd(c, "__test__"))
+      .children(
+        opt[String]("arg")
+          .text("arg to test routine")
+          .action((x, c) => c.lens(_.test.testArg).set(Some(x)))
+      )
   }
 
   def token(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
-
+    val h = CliHelpers(op)
+    import h.sub
     cmd("token")
       .text("Manage tokens.")
-      .action((x, c) => c.copy(command = "token"))
+      .action((x, c) => withCmd(c, "token"))
       .children(
-        cmd("get-one")
+        sub("get-one")
           .text("Get one token and output to a file.")
-          .action((x, c) => c.copy(subcommand = "getOne"))
+          .action((x, c) => withSub(c, "getOne"))
           .children(
-            opt[String]("outputfile").text("Output file. Will overwrite.").action((x, c) => c.copy(tokenOutputFile = x))
+            opt[String]("outputfile")
+              .text("Output file. Will overwrite.")
+              .action((x, c) => c.lens(_.common.outputFile).set(Some(x)))
           ),
-        cmd("get-many")
+        sub("get-many")
           .text("Get a token and output it as json to a file. Renew and overwrite automatically.")
-          .action((x, c) => c.copy(subcommand = "getMany"))
+          .action((x, c) => withSub(c, "getMany"))
           .children(
-            opt[String]("outputfile").text("Output file. Will overwrite.").action((x, c) => c.copy(tokenOutputFile = x))
-          )
+            opt[String]("outputfile")
+              .text("Output file. Will overwrite.")
+              .action((x, c) => c.lens(_.common.outputFile).set(Some(x)))
+          ),
+        note("Default token output file is crm-token.json.")
       )
-    note("Default token output file is crm-token.json.")
+
   }
 
   def update(op: scopt.OptionParser[AppConfig]): Unit = {
@@ -195,45 +241,58 @@ object CommandLine {
     cmd("update")
       .text(
         "Update dynamics records. An updated can also be an insert. Attribute processing order is drops, renames then keeps.")
-      .action((x, c) => c.copy(command = "update"))
+      .action((x, c) => withCmd(c, "update"))
       .children(
-        arg[String]("entity")
-          .text("Entity to update. Use the entity logical name which is usually lowercase.")
-          .action((x, c) => c.copy(updateEntity = x)),
-        arg[String]("inputfile")
-          .text("CSV data file.")
-          .action((x, c) => c.copy(updateDataInputCSVFile = x)),
-        opt[Boolean]("upsertpreventcreate")
-          .text("Prevent a create if the record to update is not present. Default is true.")
-          .action((x, c) => c.copy(upsertPreventCreate = x)),
-        opt[Boolean]("upsertpreventupdate")
-          .text("If you are inserting data using an update operation  and the record already exists, do not update. The default is false.")
-          .action((x, c) => c.copy(upsertPreventUpdate = x)),
-        opt[String]("pk")
-          .text("Name of PK in the data input. Defaults to id (case insensitive.")
-          .action((x, c) => c.copy(updatePKColumnName = x)),
-        opt[Seq[String]]("drops")
-          .text("Drop columns. Logical column names separate by commas. Can be specifed multiple times.")
-          .action((x, c) => c.copy(updateDrops = c.updateDrops ++ x)),
-        opt[Seq[String]]("keeps")
-          .text("Keep columns. Logical column names separate by commas. Can be specifed multiple times.")
-          .action((x, c) => c.copy(updateKeeps = c.updateKeeps ++ x)),
-        opt[Int]("take").text("Process only N records.").action((x, c) => c.copy(updateTake = Some(x))),
-        opt[Int]("drop").text("Drop first N records.").action((x, c) => c.copy(updateDrop = Some(x))),
-        opt[Seq[String]]("renames")
-          .text("Rename columns. Paris of oldname=newname, separate by commas. Can be specified multiple times.")
-          .action { (x, c) =>
-            val pairs = x.map(p => p.split('=')).map { a =>
-              if (a.size != 2 || (a(0).size == 0 || a(1).size == 0))
-                throw new IllegalArgumentException(s"Each rename pair of values must be separated by '=': $a.")
-              (a(0), a(1))
-            }
-            c.copy(updateRenames = c.updateRenames ++ pairs)
-          }
+        sub("entity")
+          .text("Update data in dynamics.")
+          .action((x, c) => withSub(c, "data"))
+          .children(
+            arg[String]("entity")
+              .text("Entity to update. Use the entity logical name which is usually lowercase.")
+              .action((x, c) => c.copy(update = c.update.copy(updateEntity = x))),
+            arg[String]("inputfile")
+              .text("JSON streaming data file. JSON records separated by newlines.")
+              .action((x, c) => c.copy(update = c.update.copy(updateDataInputCSVFile = x))),
+            opt[Boolean]("upsertpreventcreate")
+              .text("Prevent a create if the record to update is not present. Default is true.")
+              .action((x, c) => c.copy(update = c.update.copy(upsertPreventCreate = x))),
+            opt[Boolean]("upsertpreventupdate")
+              .text("If you are inserting data using an update operation  and the record already exists, do not update. The default is false.")
+              .action((x, c) => c.copy(update = c.update.copy(upsertPreventUpdate = x))),
+            opt[String]("pk")
+              .text("Name of PK in the data input. Defaults to id (case insensitive.")
+              .action((x, c) => c.copy(update = c.update.copy(updatePKColumnName = x))),
+            opt[Seq[String]]("drops")
+              .text("Drop columns. Logical column names separate by commas. Can be specifed multiple times.")
+              .action((x, c) => c.copy(update = c.update.copy(updateDrops = c.update.updateDrops ++ x))),
+            opt[Seq[String]]("keeps")
+              .text("Keep columns. Logical column names separate by commas. Can be specifed multiple times.")
+              .action((x, c) => c.copy(update = c.update.copy(updateKeeps = c.update.updateKeeps ++ x))),
+            opt[Int]("take")
+              .text("Process only N records.")
+              .action((x, c) => c.copy(update = c.update.copy(updateTake = Some(x)))),
+            opt[Int]("drop")
+              .text("Drop first N records.")
+              .action((x, c) => c.copy(update = c.update.copy(updateDrop = Some(x)))),
+            opt[Seq[String]]("renames")
+              .text("Rename columns. Paris of oldname=newname, separate by commas. Can be specified multiple times.")
+              .action { (x, c) =>
+                val pairs = x.map(p => p.split('=')).map { a =>
+                  if (a.size != 2 || (a(0).size == 0 || a(1).size == 0))
+                    throw new IllegalArgumentException(s"Each rename pair of values must be separated by '=': $a.")
+                  (a(0), a(1))
+                }
+                c.copy(update = c.update.copy(updateRenames = c.update.updateRenames ++ pairs))
+              },
+            note(
+              "This is command is really only useful for updating/inserting data exported using the export command."),
+            note("Both configuration data or Dynamics entity in json format can be used. Processing performance is good even for large datasets.")
+          ),
+        sub("test")
+          .text("Test some update stuff")
+          .action((x, c) => withSub(c, "test"))
+          .hidden()
       )
-    note("This is command is really only useful for updating/inserting data exported using the export command.")
-    note(
-      "Both configuration data or Dynamics entity in json format can be used. Processing performance is good even for large datasets.")
   }
 
   def entity(op: scopt.OptionParser[AppConfig]): Unit = {
@@ -243,84 +302,89 @@ object CommandLine {
 
     val formattedValues = opt[Unit]("include-formatted-values")
       .text("Include formmated values in the output. This increases the size significantly.")
-      .action((x, c) => c.copy(exportIncludeFormattedValues = true))
+      .action((x, c) => c.lens(_.export.exportIncludeFormattedValues).set(true))
 
     val top = opt[Int]("top")
       .text("Top N records.")
-      .action((x, c) => c.copy(exportTop = Option(x)))
+      .action((x, c) => c.lens(_.export.exportTop).set(Option(x)))
 
     val skip = opt[Int]("skip")
       .text("Skip N records.")
-      .action((x, c) => c.copy(exportSkip = Option(x)))
+      .action((x, c) => c.lens(_.export.exportSkip).set(Option(x)))
 
     val maxPageSize = opt[Int]("maxpagesize")
       .text(
         "Set the maximum number of entities returned per 'fetch'. If node crashes when exporting large entities, set this smaller than 5000.")
-      .action((x, c) => c.copy(exportMaxPageSize = Option(x)))
+      .action((x, c) => c.lens(_.export.exportMaxPageSize).set(Option(x)))
 
     cmd("entity")
       .text("Query/delete entity data from CRM using parts of a query that is assembled into a web api query.")
-      .action((x, c) => c.copy(command = "entity"))
+      .action((x, c) => withCmd(c, "entity"))
       .children(
-        cmd("export")
+        sub("export")
           .text("Export entity data.")
-          .action((x, c) => c.copy(subcommand = "export"))
+          .action((x, c) => withSub(c, "export"))
           .children(
             arg[String]("entity")
               .text("Entity to export. Use the entity set collection logical name (the plural name) which is usually all lowercase and pluralized (s or es appended).")
-              .action((x, c) => c.copy(exportEntity = x)),
+              .action((x, c) => c.lens(_.export.exportEntity).set(x)),
             opt[String]("fetchxml")
               .text("Fetch XML for query focused on entity.")
-              .action((x, c) => c.copy(exportFetchXml = Option(x))),
+              .action((x, c) => c.lens(_.export.exportFetchXml).set(Option(x))),
             top,
             skip,
             opt[String]("filter")
               .text("Filter criteria using web api format. Do not include $filter.")
-              .action((x, c) => c.copy(exportFilter = Option(x))),
+              .action((x, c) => c.lens(_.export.exportFilter).set(Option(x))),
             opt[Seq[String]]("orderby")
               .text("Order by criteria e.g. createdon desc. Attribute must be included for download if you are using select. Multiple order bys can be specified in same option, separate by commas.")
-              .action((x, c) => c.copy(exportOrderBy = x)),
+              .action((x, c) => c.lens(_.export.exportOrderBy).set(x)),
             opt[Unit]("raw")
               .text("Instead of dumping a CSV file, dump one raw json record so you can see what attributes are available. Add a dummy select field to satisfy CLI args.")
-              .action((x, c) => c.copy(exportRaw = true)),
+              .action((x, c) => c.lens(_.export.exportRaw).set(true)),
             opt[Seq[String]]("select")
               .text("Select criteria using web api format. Do not include $select.")
-              .action((x, c) => c.copy(exportSelect = x)),
+              .action((x, c) => c.lens(_.export.exportSelect).set(x)),
             maxPageSize,
             formattedValues
           ),
-        cmd("export-from-query")
+        sub("export-from-query")
           .text("Export entities from a raw web api query. Only raw json export is supported.")
-          .action((x, c) => c.copy(subcommand = "exportFromQuery"))
+          .action((x, c) => withSub(c, "exportFromQuery"))
           .children(
             arg[String]("query")
               .text("Web api format query string e.g. /contacts?$filter=...")
-              .action((x, c) => c.copy(entityQuery = x)),
-            opt[Unit]("wrap").text("Wrap the entire output in an array.").action((x, c) => c.copy(exportWrap = true)),
+              .action((x, c) => c.lens(_.export.entityQuery).set(x)),
+            opt[Unit]("wrap")
+              .text("Wrap the entire output in an array.")
+              .action((x, c) => c.lens(_.export.exportWrap).set(true)),
             formattedValues,
             maxPageSize,
             skip
           ),
-        cmd("count")
+        sub("count")
           .text("Count entities. Concurrency affects how many counters run simultaneously.")
-          .action((x, c) => c.copy(subcommand = "count"))
+          .action((x, c) => withSub(c, "count"))
           .children(
-            opt[Unit]("repeat").text("Repeat forever.").action((x, c) => c.copy(exportRepeat = true)),
+            opt[Unit]("repeat")
+              .text("Repeat forever.")
+              .action((x, c) => c.lens(_.export.exportRepeat).set(true)),
             mkFilterOptBase().required().text("List of entity names to count. Use entity logical names.")
           ),
-        cmd("delete-by-query")
+        sub("delete-by-query")
           .text("Delete entities based on a query. This is very dangerous to use. Query must return primary key at the very least.")
-          .action((x, c) => c.copy(subcommand = "deleteByQuery"))
+          .action((x, c) => withSub(c, "deleteByQuery"))
           .children(
             arg[String]("query")
               .text("Web api format query string e.g. /contacts?$select=...&$filter=...")
-              .action((x, c) => c.copy(entityQuery = x)),
+              .action((x, c) => c.lens(_.export.entityQuery).set(x)),
             arg[String]("entity")
               .text("Entity to delete. We need this to identify the primary key")
-              .action((x, c) => c.copy(exportEntity = x))
-          )
+              .action((x, c) => c.lens(_.export.exportEntity).set(x))
+          ),
+        note("""Skip must read records then skip them.""")
       )
-    note("""Skip must read records then skip them.""")
+
   }
 
   def importdata(op: scopt.OptionParser[AppConfig]): Unit = {
@@ -331,85 +395,83 @@ object CommandLine {
 
     cmd("importdata")
       .text("Import data using the CRM Data Import capability. Limited but still very useful.")
-      .action((x, c) => c.copy(command = "importdata"))
+      .action((x, c) => withCmd(c, "importdata"))
       .children(
-        cmd("list-imports")
+        sub("list-imports")
           .text("List all imports.")
-          .action((x, c) => c.copy(subcommand = "listimports")),
-        cmd("list-importfiles")
+          .action((x, c) => withSub(c, "listimports")),
+        sub("list-importfiles")
           .text("List all import filess.")
-          .action((x, c) => c.copy(subcommand = "listimportfiles")),
-        cmd("bulkdelete")
+          .action((x, c) => withSub(c, "listimportfiles")),
+        sub("bulkdelete")
           .text("Delete an import by the import id.")
-          .action((x, c) => c.copy(subcommand = "bulkdelete"))
+          .action((x, c) => withSub(c, "bulkdelete"))
           .children(
             arg[String]("jobname")
               .text("Job name. This will appear in system jobs.")
-              .action((x, c) => c.copy(importDataDeleteJobName = x)),
+              .action((x, c) => c.lens(_.importdata.importDataDeleteJobName).set(x)),
             arg[String]("importid")
               .text("Import id of import that loaded the data you want to delete.")
-              .action((x, c) => c.copy(importDataDeleteImportId = x)),
+              .action((x, c) => c.lens(_.importdata.importDataDeleteImportId).set(x)),
             opt[String]("startat")
               .text("Start time in GMT offset. Use -5 for EST e.g. 2017-01-01T11:00:00Z is 6am EST. Default is 3 minutes from now.")
-              .action((x, c) => c.copy(importDataDeleteStartTime = Option(x))),
+              .action((x, c) => c.lens(_.importdata.importDataDeleteStartTime).set(Option(x))),
             opt[String]("queryjson")
               .text("Query expression in json format. It should be an array: [{q1}, {q2},...]")
-              .action((x, c) => c.copy(importDataDeleteQueryJson = Option(x))),
+              .action((x, c) => c.lens(_.importdata.importDataDeleteQueryJson).set(Option(x))),
             opt[String]("recurrence")
               .text("Recurrence pattern using RFC2445. Default is to run once, empty string.")
-              .action((x, c) => c.copy(importDataDeleteRecurrencePattern = Option(x)))
+              .action((x, c) => c.lens(_.importdata.importDataDeleteRecurrencePattern).set(Option(x)))
           ),
-        cmd("delete")
+        sub("delete")
           .text("Delete imports")
-          .action((x, c) => c.copy(subcommand = "delete"))
+          .action((x, c) => withSub(c, "delete"))
           .children(
             mkFilterOpt().required()
           ),
-        cmd("import")
+        sub("import")
           .text("Import data.")
-          .action((x, c) => c.copy(subcommand = "import"))
+          .action((x, c) => withSub(c, "import"))
           .children(
             arg[String]("<inputfile file>")
               .text("CSV data file.")
-              .action((x, c) => c.copy(importDataInputFile = x)),
+              .action((x, c) => c.lens(_.importdata.importDataInputFile).set(x)),
             arg[String]("<importmap file>")
               .text("Import map name, must already be loaded in CRM.")
-              .action((x, c) => c.copy(importDataImportMapName = x)),
+              .action((x, c) => c.lens(_.importdata.importDataImportMapName).set(x)),
             opt[String]('n', "name")
               .text("Set the job name. A name is derived otherwise.")
-              .action((x, c) => c.copy(importDataName = Option(x))),
+              .action((x, c) => c.lens(_.importdata.importDataName).set(Option(x))),
             opt[Int]("polling-interval")
               .text("Polling interval in seconds for job completion tracking. Default is 60 seconds.")
-              .action((x, c) => c.copy(importDataPollingInterval = x))
+              .action((x, c) => c.lens(_.importdata.importDataPollingInterval).set(x))
               .validate(x =>
                 if (x < 1 || x > 60) failure("Polling frequency must be between 1 and 60 seconds.") else success),
             opt[Unit]("update")
               .text("Import data in update mode. Default is create mode. I don't think this works.")
-              .action((x, c) => c.copy(importDataCreate = false)),
+              .action((x, c) => c.lens(_.importdata.importDataCreate).set(false)),
             opt[Boolean]("dupedetection")
               .text("Enable disable duplication detectiond. Default is disabled!.")
-              .action((x, c) => c.copy(importDataEnableDuplicateDetection = x))
+              .action((x, c) => c.lens(_.importdata.importDataEnableDuplicateDetection).set(x))
           ),
-        cmd("resume")
+        sub("resume")
           .text("Resume a data import at the last processing stage.")
-          .action((x, c) => c.copy(subcommand = "resume"))
+          .action((x, c) => withSub(c, "resume"))
           .children(
             opt[String]("importid")
               .text("importid to resume on.")
               .required()
-              .action((x, c) => c.copy(importDataResumeImportId = x)),
+              .action((x, c) => c.lens(_.importdata.importDataResumeImportId).set(x)),
             opt[String]("importfileid")
               .text("importfiled to resume on.")
               .required()
-              .action((x, c) => c.copy(importDataResumeImportFileId = x))
-          )
+              .action((x, c) => c.lens(_.importdata.importDataResumeImportFileId).set(x))
+          ),
+        note("A log file may be created based on the import data file (NOT IMPLEMENTED YET)."),
+        note("You can upload an import map using the cli command 'importmap upload'."),
+        note("If your cli is cutoff from the server, resume the processing using the 'importdata resume' command."),
+        note("For bulk delete query json syntax see: https://msdn.microsoft.com/en-us/library/mt491192.aspx"),
       )
-    note("\n")
-    note("A log file may be created based on the import data file (NOT IMPLEMENTED YET).")
-    note("You can upload an import map using the cli command 'importmap upload'.")
-    note("If your cli is cutoff from the server, resume the processing using the 'importdata resume' command.")
-    note("\n")
-    note("For bulk delete query json syntax see: https://msdn.microsoft.com/en-us/library/mt491192.aspx")
   }
 
   def importmaps(op: scopt.OptionParser[AppConfig]): Unit = {
@@ -419,92 +481,96 @@ object CommandLine {
 
     cmd("importmaps")
       .text("Manage import maps")
-      .action((x, c) => c.copy(command = "importmaps"))
+      .action((x, c) => withCmd(c, "importmaps"))
       .children(
         note("\n"),
-        cmd("list")
+        sub("list")
           .text("List import maps.")
-          .action((x, c) => c.copy(subcommand = "list")),
+          .action((x, c) => withSub(c, "list")),
         mkFilterOptBase().text("Filter on import map names and descriptions."),
-        cmd("download")
+        sub("download")
           .text("Download import maps.")
-          .action((x, c) => c.copy(subcommand = "download"))
+          .action((x, c) => withSub(c, "download"))
           .children(
             mkNoClobber(),
             mkOutputDir()
           ),
-        cmd("upload")
+        sub("upload")
           .text("Upload a map.")
-          .action((x, c) => c.copy(subcommand = "upload"))
+          .action((x, c) => withSub(c, "upload"))
           .children(
             arg[String]("<file>...")
               .text("Upload files.")
               .unbounded()
-              .action((x, c) => c.copy(importMapUploadFilename = c.importMapUploadFilename :+ x)),
-            opt[Unit]("noclobber")
-              .text("Do not delete then upload map if it already exists. Default is false.")
-              .action((x, c) => c.copy(importMapNoClobber = true))
+              .action((x, c) => c.lens(_.importdata.importMapUploadFilename).modify(f => f :+ x)),
+            mkNoClobber()
           )
       )
   }
 
   def solutions(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
+    val h = CliHelpers(op)
+    import h.sub
     cmd("solutions")
       .text("Manage solutions.")
-      .action((x, c) => c.copy(command = "solutions"))
+      .action((x, c) => withCmd(c, "solutions"))
       .children(
         note("\n"),
-        cmd("list")
+        sub("list")
           .text("List solutions")
-          .action((x, c) => c.copy(subcommand = "list")),
-        cmd("upload")
+          .action((x, c) => withSub(c, "list")),
+        sub("upload")
           .text("Upload a solution.")
-          .action((x, c) => c.copy(subcommand = "upload"))
+          .action((x, c) => withSub(c, "upload"))
           .children(
             arg[String]("solution")
               .text("Solution file. Typically with . zip extension.")
-              .action((x, c) => c.copy(solutionUploadFile = x)),
+              .action((x, c) => c.lens(_.solution.solutionUploadFile).set(x)),
             opt[String]("config-file")
               .text("Config file in json format.")
-              .action((x, c) => c.copy(solutionJsonConfigFile = Option(x))),
+              .action((x, c) => c.lens(_.solution.solutionJsonConfigFile).set(Option(x))),
             opt[Unit]("skip-publishing-workflows")
               .text("Publish workflows.")
-              .action((x, c) => c.copy(solutionPublishWorkflows = false))
+              .action((x, c) => c.lens(_.solution.solutionPublishWorkflows).set(false))
           ),
-        cmd("export")
+        sub("export")
           .text("Export a solution.")
-          .action((x, c) => c.copy(subcommand = "export"))
+          .action((x, c) => withSub(c, "export"))
           .children(
             arg[String]("solution")
               .text("Solution name.")
-              .action((x, c) => c.copy(solutionName = x)),
+              .action((x, c) => c.lens(_.solution.solutionName).set(x)),
             opt[String]("config-file")
               .text("Config file in json format.")
-              .action((x, c) => c.copy(solutionJsonConfigFile = Option(x))),
+              .action((x, c) => c.lens(_.solution.solutionJsonConfigFile).set(Option(x))),
             opt[Unit]("managed")
               .text("Export as managed solution.")
-              .action((x, c) => c.copy(solutionExportManaged = true))
+              .action((x, c) => c.lens(_.solution.solutionExportManaged).set(true))
           ),
-        cmd("delete")
+        sub("delete")
           .text("Delete a solution")
-          .action((x, c) => c.copy(subcommand = "delete"))
+          .action((x, c) => withSub(c, "delete"))
           .children(
-            arg[String]("solution").text("Solution unique name").action((x, c) => c.copy(solutionName = x))
+            arg[String]("solution")
+              .text("Solution unique name")
+              .action((x, c) => c.lens(_.solution.solutionName).set(x))
           )
       )
   }
 
   def publishers(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
+    val h = CliHelpers(op)
+    import h.sub
     cmd("publishers")
       .text("Manage publishers.")
-      .action((x, c) => c.copy(command = "publishers"))
+      .action((x, c) => withCmd(c, "publishers"))
       .children(
         note("\n"),
-        cmd("list")
+        sub("list")
           .text("List publishers.")
-          .action((x, c) => c.copy(subcommand = "list"))
+          .action((x, c) => withSub(c, "list"))
       )
   }
 
@@ -515,34 +581,34 @@ object CommandLine {
 
     cmd("systemjobs")
       .text("Manage system jobs.")
-      .action((x, c) => c.copy(command = "asyncoperations"))
+      .action((x, c) => withSub(c, "asyncoperations"))
       .children(
         note("\n"),
-        cmd("list")
+        sub("list")
           .text("List operations.")
-          .action((x, c) => c.copy(subcommand = "list"))
+          .action((x, c) => withSub(c, "list"))
           .children(mkFilterOpt()),
-        cmd("delete-completed")
+        sub("delete-completed")
           .text("Delete completed system jobs.")
-          .action((x, c) => c.copy(subcommand = "deleteCompleted")),
-        cmd("delete-canceled")
+          .action((x, c) => withSub(c, "deleteCompleted")),
+        sub("delete-canceled")
           .text("Delete canceled system jobs.")
-          .action((x, c) => c.copy(subcommand = "deleteCanceled")),
-        cmd("delete-failed")
+          .action((x, c) => withSub(c, "deleteCanceled")),
+        sub("delete-failed")
           .text("Delete failed system jobs.")
-          .action((x, c) => c.copy(subcommand = "deleteFailed")),
-        cmd("delete-waiting")
+          .action((x, c) => withSub(c, "deleteFailed")),
+        sub("delete-waiting")
           .text("Delete waiting system jobs.")
-          .action((x, c) => c.copy(subcommand = "deleteWaiting")),
-        cmd("delete-waiting-for-resources")
+          .action((x, c) => withSub(c, "deleteWaiting")),
+        sub("delete-waiting-for-resources")
           .text("Delete waiting system jobs.")
-          .action((x, c) => c.copy(subcommand = "deleteWaitingForResources")),
-        cmd("delete-inprogress")
+          .action((x, c) => withSub(c, "deleteWaitingForResources")),
+        sub("delete-inprogress")
           .text("Delete in-progress system jobs.")
-          .action((x, c) => c.copy(subcommand = "deleteInProgress")),
-        cmd("cancel")
+          .action((x, c) => withSub(c, "deleteInProgress")),
+        sub("cancel")
           .text("Cancel some system jobs based on a name regex.")
-          .action((x, c) => c.copy(subcommand = "cancel"))
+          .action((x, c) => withSub(c, "cancel"))
           .children(
             mkFilterOpt().required()
           )
@@ -556,43 +622,47 @@ object CommandLine {
 
     cmd("workflows")
       .text("Manage workflows.")
-      .action((x, c) => c.copy(command = "workflows"))
+      .action((x, c) => withCmd(c, "workflows"))
       .children(
         note("\n"),
-        cmd("list").text("List workflows.").action((x, c) => c.copy(subcommand = "list")).children(mkFilterOpt()),
-        cmd("execute")
+        sub("list")
+          .text("List workflows.")
+          .action((x, c) => withSub(c, "list"))
+          .children(mkFilterOpt()),
+        sub("execute")
           .text("Execute a workflow against the results of a query. A cache can be used.")
-          .action((x, c) => c.copy(subcommand = "execute"))
+          .action((x, c) => withSub(c, "execute"))
           .children(
             arg[String]("id")
               .text("Id of workflow to execute. Use the one with type=1 => template.")
-              .action((x, c) => c.copy(workflowIds = c.workflowIds :+ x)),
+              .action((x, c) => c.lens(_.workflow.workflowIds).modify(ids => ids :+ x)),
             arg[String]("odataquery")
               .text("Use an OData query to select entities to execute against.")
-              .action((x, c) => c.copy(workflowODataQuery = Some(x))),
+              .action((x, c) => c.lens(_.workflow.workflowODataQuery).set(Some(x))),
             opt[String]("pk")
               .text("Id column name for the entity.")
               .required()
-              .action((x, c) => c.copy(workflowPkName = x))
+              .action((x, c) => c.lens(_.workflow.workflowPkName).set(x))
               .required(),
             opt[Unit]("batch").text("Run this batch.")
-              action ((x, c) => c.copy(workflowBatch = true)),
-            opt[Unit]("cache").text("Use a local cache.").action((x, c) => c.copy(workflowCache = true)),
+              action ((x, c) => c.lens(_.workflow.workflowBatch).set(true)),
+            opt[Unit]("cache")
+              .text("Use a local cache.")
+              .action((x, c) => c.lens(_.workflow.workflowCache).set(true)),
             opt[String]("cache-file")
               .text("Cache file to use. Otherwise it is automatically named based on the pk.")
-              .action((x, c) => c.copy(workflowCacheFilename = Some(x)))
+              .action((x, c) => c.lens(_.workflow.workflowCacheFilename).set(Some(x))),
+            note(
+              "The ODataQuery should return the id of the entity e.g. '/contacts?$select=contactid'  --pk contactid.")
           ),
-        note("\n"),
-        note("The ODataQuery should return the id of the entity e.g. '/contacts?$select=contactid'  --pk contactid."),
-        note("\n"),
-        cmd("change-activation")
+        sub("change-activation")
           .text("Change activation of a workflow.")
-          .action((x, c) => c.copy(subcommand = "changeactivation"))
+          .action((x, c) => withSub(c, "changeactivation"))
           .children(
             opt[Seq[String]]("id")
               .text("Ids of workflow to activate. Obtain from using 'list'. Comma separated or repeat option.")
               .unbounded()
-              .action((x, c) => c.copy(workflowIds = c.workflowIds ++ x)),
+              .action((x, c) => c.lens(_.workflow.workflowIds).modify(ids => ids ++ x)),
             //opt[Seq[String]]("names").
             //  text("Names of workflows. Comma separated or repeat option.").
             //  unbounded().
@@ -600,12 +670,12 @@ object CommandLine {
             mkFilterOpt(),
             arg[Boolean]("activate")
               .text("true of false to activate/deactivate.")
-              .action((x, c) => c.copy(workflowActivate = x))
-          )
+              .action((x, c) => c.lens(_.workflow.workflowActivate).set(x))
+          ),
+        note(
+          "A workflow is typically very slow to run. The best option is to not run it again if its already been run."),
+        note("A simple cache can be optionally used to skip the entities that the workflow has already run against.")
       )
-    note("\n")
-    note("A workflow is typically very slow to run. The best option is to not run it again if its already been run.")
-    note("A simple cache can be optionally used to skip the entities that the workflow has already run against.")
 
   }
 
@@ -616,11 +686,11 @@ object CommandLine {
 
     cmd("optionsets")
       .text("OptionSet management.")
-      .action((x, c) => c.copy(command = "optionsets"))
+      .action((x, c) => withCmd(c, "optionsets"))
       .children(
-        cmd("list")
+        sub("list")
           .text("List global option sets.")
-          .action((x, c) => c.copy(subcommand = "list"))
+          .action((x, c) => withSub(c, "list"))
           .children(mkFilterOpt())
       )
   }
@@ -632,24 +702,28 @@ object CommandLine {
 
     cmd("sdkmessages")
       .text("Manage SDK messages.")
-      .action((x, c) => c.copy(command = "sdkmessageprocessingsteps"))
+      .action((x, c) => withCmd(c, "sdkmessageprocessingsteps"))
       .children(
-        cmd("list")
+        sub("list")
           .text("List SDK messages processing step.")
-          .action((x, c) => c.copy(subcommand = "list"))
+          .action((x, c) => withSub(c, "list"))
           .children(mkFilterOpt()),
-        cmd("deactivate")
+        sub("deactivate")
           .text("Deactivate a SDK message by id or a filter.")
-          .action((x, c) => c.copy(subcommand = "deactivate"))
+          .action((x, c) => withSub(c, "deactivate"))
           .children(
-            opt[String]("crmid").text("Id to deactivate.").action((x, c) => c.copy(sdkMessagesId = x)),
+            opt[String]("crmid")
+              .text("Id to deactivate.")
+              .action((x, c) => c.lens(_.sdkMessage.id).set(x)),
             mkFilterOpt()
           ),
-        cmd("activate")
+        sub("activate")
           .text("Activate a SDK message by id or a filter.")
-          .action((x, c) => c.copy(subcommand = "activate"))
+          .action((x, c) => withSub(c, "activate"))
           .children(
-            opt[String]("crmid").text("Id to deactivate.").action((x, c) => c.copy(sdkMessagesId = x)),
+            opt[String]("crmid")
+              .text("Id to deactivate.")
+              .action((x, c) => c.lens(_.sdkMessage.id).set(x)),
             mkFilterOpt()
           )
       )
@@ -657,23 +731,26 @@ object CommandLine {
 
   def plugins(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
+    val h = CliHelpers(op)
+    import h.sub
     cmd("plugins")
       .text("Upload a plugin assembly's content.")
-      .action((x, c) => c.copy(command = "plugins"))
+      .action((x, c) => withCmd(c, "plugins"))
       .children(
-        cmd("upload")
+        sub("upload")
           .text("Upload assembly (.dll) content to an existing plugin")
-          .action((x, c) => c.copy(subcommand = "upload"))
+          .action((x, c) => withSub(c, "upload"))
           .children(
             arg[String]("source")
               .text("Plugin dll file location. Plugin name default is the file basename.")
-              .action((x, c) => c.copy(pluginConfig = c.pluginConfig.copy(source = Some(x)))),
+              .action((x, c) => c.copy(plugin = c.plugin.copy(source = Some(x)))),
             opt[Unit]("watch")
               .text("Watch for changes and upload when the file is changed.")
-              .action((x, c) => c.copy(pluginConfig = c.pluginConfig.copy(watch = true)))
-          ))
-    note("Assembly plugin registration information should be in [source name].json.")
-    note("Currently, this function can only replace an existing plugin assembly's content.")
+              .action((x, c) => c.copy(plugin = c.plugin.copy(watch = true)))
+          ),
+        note("Assembly plugin registration information should be in [source name].json."),
+        note("Currently, this function can only replace an existing plugin assembly's content.")
+      )
   }
 
   def webresources(op: scopt.OptionParser[AppConfig]): Unit = {
@@ -683,32 +760,30 @@ object CommandLine {
 
     cmd("webresources")
       .text("Manage Web Resources.")
-      .action((x, c) => c.copy(command = "webresources"))
+      .action((x, c) => withCmd(c, "webresources"))
       .children(
         note("\n"),
-        cmd("list")
+        sub("list")
           .text("List web resources")
-          .action((x, c) => c.copy(subcommand = "list"))
+          .action((x, c) => withSub(c, "list"))
           .children(
             mkFilterOpt()
           ),
-        note("\n"),
-        cmd("delete")
+        sub("delete")
           .text("Delete a webresource by its unique name.")
-          .action((x, c) => c.copy(subcommand = "delete"))
+          .action((x, c) => withSub(c, "delete"))
           .children(
             mkFilterOpt(),
             opt[Unit]("nopublish")
               .text("Do not publish the deletion. Default is to publish.")
-              .action((x, c) => c.copy(webResourceDeletePublish = false)),
+              .action((x, c) => c.lens(_.webResource.webResourceDeletePublish).set(false)),
             arg[String]("name")
               .text("Regex for Web Resource unique names. Can be repeated. Be very careful with your regexs.")
-              .action((x, c) => c.copy(webResourceDeleteNameRegex = c.webResourceDeleteNameRegex :+ x))
+              .action((x, c) => c.lens(_.webResource.webResourceDeleteNameRegex).modify(f => f :+ x))
           ),
-        note("\n"),
-        cmd("download")
+        sub("download")
           .text("Download Web Resources and save them to the filesystem. If there are path separators in the name, create filesystem directories as needed.")
-          .action((x, c) => c.copy(subcommand = "download"))
+          .action((x, c) => withSub(c, "download"))
           .children(
             mkFilterOpt(),
             mkOutputDir(),
@@ -724,121 +799,88 @@ object CommandLine {
              .action((x,c) => c.copy(webResourceDownloadStripPrefix =true))
            */
           ),
-        note("\n"),
-        cmd("upload")
+        sub("upload")
           .text("Upload web resources and optionally publish.")
-          .action((x, c) => c.copy(subcommand = "upload"))
+          .action((x, c) => withCmd(c, "upload"))
           .children(
             arg[String]("source")
               .unbounded()
               .text("Globs for Web Resource(s). To pull an entire directory, use dir/* where dir is usually a publisher prefix.")
-              .action((x, c) => c.copy(webResourceUploadSource = c.webResourceUploadSource :+ x)),
+              .action((x, c) => c.lens(_.webResource.webResourceUploadSource).modify(f => f :+ x)),
             opt[String]("prefix")
               .text("Give a source file as a path locally, Use prefix to identify the start of the resource name--almost always the publisher prefix.")
-              .action((x, c) => c.copy(webResourceUploadPrefix = Option(x))),
+              .action((x, c) => c.lens(_.webResource.webResourceUploadPrefix).set(Option(x))),
             opt[Unit]("nopublish")
               .text("Do not publish the uploaded Web Resources after uploading. Default is to publish.")
-              .action((x, c) => c.copy(webResourceUploadPublish = false)),
+              .action((x, c) => c.lens(_.webResource.webResourceUploadPublish).set(false)),
             opt[Unit]("noclobber")
               .text("Do not overwrite existing Web Resources. Default is false, overwrite.")
-              .action((x, c) => c.copy(webResourceUploadNoclobber = true)),
+              .action((x, c) => c.lens(_.webResource.webResourceUploadNoclobber).set(true)),
             opt[String]('s', "unique-solution-name")
               .text("Solution unique name for new resources that are registered. Solution must already exist. Defaults to 'Default' if none provided.")
-              .action((x, c) => c.copy(webResourceUploadSolution = x)),
+              .action((x, c) => c.lens(_.webResource.webResourceUploadSolution).set(x)),
             opt[Unit]("noregister")
               .text("Do not register a new Web Resource with the solution if the resource does not already exist. Default is it register.")
-              .action((x, c) => c.copy(webResourceUploadRegister = false)),
+              .action((x, c) => c.lens(_.webResource.webResourceUploadRegister).set(false)),
             opt[String]('t', "type")
               .text("Resource type 'extension' (e.g. js or png) if not inferrable from resource name. Will override the filenames prefix for all resources to upload that must be created.")
-              .action((x, c) => c.copy(webResourceUploadType = Option(x))),
+              .action((x, c) => c.lens(_.webResource.webResourceUploadType).set(Option(x))),
             opt[Unit]("watch")
               .text("Watch source for changes and upload changed files.")
-              .action((x, c) => c.copy(webResourceUploadWatch = true)),
+              .action((x, c) => c.lens(_.webResource.webResourceUploadWatch).set(true)),
             opt[String]("ignore")
               .text("When in watch mode, a regex patterns to ignore when watching. Can be repeated.")
               .unbounded()
-              .action((x, c) => c.copy(webResourceUploadWatchIgnore = c.webResourceUploadWatchIgnore :+ x))
+              .action((x, c) => c.lens(_.webResource.webResourceUploadWatchIgnore).modify(f => f :+ x))
           ),
-        note("\n"),
         note(
           "Sources are glob patterns. If the glob expands to a single resource, the source points to the resource directly and target is the full path in dynamics. Web Resources actually have a flat namespace so directories become slashes in the final name. Web Resources with spaces or hyphens in their names cannot be uploaded. New Web Resources must be associated a solution. Use --prefix to indicate where a OS path should be split in order to generate the resource name which always starts with a publisher prefix. Given a OS path of /tmp/new_/blah.js, --prefix new_ will compute a resource name of new/blah.js. If the resource is /tmp/new_blah.js, --prefix new_ or no prefix will use only the filename (basename.prefix) as the resource name. A webresource cannot be deleted if it is being used, you will get a server error. Remove the webresoruce as a dependency then try to delete it.")
       )
   }
 
-  def dumpraw(op: scopt.OptionParser[AppConfig]): Unit = {
-    import op._
-    val helpers = CliHelpers(op)
-    import helpers._
+  /** All base options. */
+  val stdOps: Seq[scopt.OptionParser[AppConfig] => Unit] = Seq(
+    entity,
+    general,
+    importdata,
+    importmaps,
+    metadata,
+    optionsets,
+    plugins,
+    publishers,
+    sdkmessages,
+    solutions,
+    systemjobs,
+    test,
+    token,
+    update,
+    webresources,
+    whoami,
+    workflows,
+  )
 
-    cmd("dumpraw")
-      .text("Dump the raw JSON response for a Web Resource")
-      .action((x, c) => c.copy(subcommand = "dumpraw"))
-      .children(
-        mkFilterOpt(),
-        arg[String]("outputfile")
-          .text("Output file")
-          .action((x, c) => c.copy(webResourceDumpRawOutputFile = x))
-      )
-  }
-
-  /** Command line parser using scopt. */
-  def addAllOptions(op: scopt.OptionParser[AppConfig]): Unit = {
+  /** Add head and help to a list of options, which by default is all base commands. */
+  def addAllOptions(op: scopt.OptionParser[AppConfig],
+                    addme: Seq[scopt.OptionParser[AppConfig] => Unit] = stdOps): Unit = {
     import op._
-    val helpers = CliHelpers(op)
-    import helpers._
 
     head("dynamics", "0.1.0")
-    general(op);
-    note("\n")
-    metadata(op)
-    note("\n")
-    whoami(op)
-    note("\n")
-    token(op)
-    note("\n")
-    update(op)
-    note("\n")
-    entity(op)
-    note("\n")
-    importdata(op)
-    note("\n")
-    importmaps(op)
-    note("\n")
-    solutions(op)
-    note("\n")
-    publishers(op)
-    note("\n")
-    systemjobs(op)
-    note("\n")
-    workflows(op)
-    note("\n")
-    optionsets(op)
-    note("\n")
-    sdkmessages(op)
-    note("\n")
-    webresources(op)
-    note("\n")
-    dumpraw(op)
-    note("\n")
-    plugins(op)
-    note("\n")
-    help("help").text("dynamics command line tool")
-
-    opt[Unit]("test")
-      .text("Run some tests...secretly")
-      .hidden()
-      .action((x, c) => c.copy(command = "__test__"))
-      .children(
-        opt[String]("arg")
-          .text("arg to test routine")
-          .action((x, c) => c.copy(testArg = Some(x)))
-      )
+    addme.foreach { o =>
+      o(op)
+    }
+    version("version")
+      .abbr("v")
+      .text("Print version")
+    help("help")
+      .abbr("h")
+      .text("dynamics command line tool")
   }
 
-  /** Read connection info from file in json format.
-    * If there is an error, cannot read the file or if no password in the
+  /**
+    * Read connection info from file in json format.
+    * If there is an error, cannot read the file or if there is no password in the
     * config file or the enviroment variable DYNAMICS_PASSWORD,
-    * return error string.
+    * return an error string.
     */
   def readConnectionInfo(file: String): Either[String, ConnectionInfo] = {
     import scala.util.{Try, Success, Failure}
@@ -857,6 +899,9 @@ object CommandLine {
     }
   }
 
+  /**
+    * Read the connection information or exit the application.
+    */
   def readConnectionInfoOrExit(file: String): ConnectionInfo = {
     readConnectionInfo(file) match {
       case Right(c) => c

@@ -25,9 +25,7 @@ import dynamics.common.syntax.jsdynamic._
 import dynamics.http
 import http._
 import client.implicits._
-import http.EntityEncoder._
-import http.EntityDecoder._
-import http.syntax.all._
+import http.implicits._
 import NPMTypes._
 
 object ImportMapUtils {
@@ -58,9 +56,9 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
   import ImportMapActions._
   import context._
 
-  implicit val dec1 = EntityDecoder.JsObjectDecoder[ExportMappingsImportMapResponse]
-  implicit val dec2 = EntityDecoder.JsObjectDecoder[ImportMapOData]
-  implicit val enc  = EntityEncoder.JsObjectEncoder[ImportMappingsImportMap]
+  implicit val dec1 = JsObjectDecoder[ExportMappingsImportMapResponse]
+  implicit val dec2 = JsObjectDecoder[ImportMapOData]
+  implicit val enc  = JsObjectEncoder[ImportMappingsImportMap]
 
   def getList() = {
     val query = "/importmaps"
@@ -82,28 +80,29 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
 
   def download(): Action = Kleisli { config =>
     {
-      getList().map(filter(_, config.filter)).map { _.map(imap => (imap.importmapid, imap.name)) }.flatMap { ids =>
-        Task
-          .traverse(ids) {
-            case (id, name) =>
-              dynclient
-                .executeAction[js.Dynamic]("Microsoft.Dynamics.CRM.ExportMappingsImportMap",
-                                           Entity.fromString("{ ExportIds: false }"),
-                                           Some(("importmaps", id)))(EntityDecoder.JSONDecoder)
-                .flatMap { jsdyn =>
-                  val resp = jsdyn.asInstanceOf[ExportMappingsImportMapResponse]
-                  val path = Utils.pathjoin(config.outputDir, s"${name}.xml")
-                  val doit: Task[Unit] =
-                    if (config.noclobber && Utils.fexists(path))
-                      Task.delay(println(s"Importmap download file $path exists and noclobber is set."))
-                    else
-                      Utils
-                        .writeToFile(path, resp.MappingsXml)
-                        .map(_ => println(s"Wrote importmap file: $path"))
-                  doit
-                }
-          }
-          .map(_ => ()) // just to make it return the right value, Unit
+      getList().map(filter(_, config.common.filter)).map { _.map(imap => (imap.importmapid, imap.name)) }.flatMap {
+        ids =>
+          Task
+            .traverse(ids) {
+              case (id, name) =>
+                dynclient
+                  .executeAction[js.Dynamic]("Microsoft.Dynamics.CRM.ExportMappingsImportMap",
+                                             Entity.fromString("{ ExportIds: false }"),
+                                             Some(("importmaps", id)))(JSONDecoder)
+                  .flatMap { jsdyn =>
+                    val resp = jsdyn.asInstanceOf[ExportMappingsImportMapResponse]
+                    val path = Utils.pathjoin(config.common.outputDir, s"${name}.xml")
+                    val doit: Task[Unit] =
+                      if (config.common.noclobber && Utils.fexists(path))
+                        Task.delay(println(s"Importmap download file $path exists and noclobber is set."))
+                      else
+                        Utils
+                          .writeToFile(path, resp.MappingsXml)
+                          .map(_ => println(s"Wrote importmap file: $path"))
+                    doit
+                  }
+            }
+            .map(_ => ()) // just to make it return the right value, Unit
       }
     }
   }
@@ -111,8 +110,8 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
   def list(): Action = Kleisli { config =>
     {
       val cols = jsobj("3" -> jsobj(width = 60))
-      getList().map(filter(_, config.filter)).map { items =>
-        val topts = new TableOptions(border = Table.getBorderCharacters(config.tableFormat), columns = cols)
+      getList().map(filter(_, config.common.filter)).map { items =>
+        val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat), columns = cols)
         val data =
           Seq(Seq("#", "importmapid", "name", "targetentity", "description").map(Chalk.bold(_))) ++
             items.zipWithIndex.map {
@@ -189,7 +188,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
 
   /** Upload and optionally clobber an import map. */
   def upload(): Action = Kleisli { config =>
-    upload(config.importMapUploadFilename, config.importMapNoClobber)
+    upload(config.importdata.importMapUploadFilename, config.common.noclobber)
   }
 
 }

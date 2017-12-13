@@ -4,6 +4,8 @@ import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 
 object Dependencies {
 
+  val monocleVersion = "1.4.0"
+
   /** Dependencies that are jvm/js */
   val commonDependencies = Def.setting(Seq(
     "com.github.scopt"       %%% "scopt"       % "latest.version",
@@ -24,7 +26,9 @@ object Dependencies {
     "io.scalajs.npm" %%% "xml2js" % "0.4.0",
     "com.github.cb372" %%% "scalacache-core" % "0.10.0",
     "org.scala-js" %%% "scalajs-java-time" % "latest.version",
-    "org.scala-sbt" % "test-interface" % "1.0"
+    "org.scala-sbt" % "test-interface" % "1.0",
+    "com.github.julien-truffaut" %%%  "monocle-core"  % monocleVersion,
+    "com.github.julien-truffaut" %%%  "monocle-macro" % monocleVersion,
   ))
 
   /** js only libraries */

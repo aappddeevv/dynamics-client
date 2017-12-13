@@ -29,7 +29,7 @@ import fs2helpers._
 trait EntityEncoder[A] { self =>
 
   /** Encode the body. Headers may be dependent on the body so they
-    * are returned at the same time.
+    * are returned at the same time to be added to the request.
     */
   def encode(a: A): (Entity, HttpHeaders)
 
@@ -38,9 +38,9 @@ trait EntityEncoder[A] { self =>
   }
 }
 
-object EntityEncoder extends EntityEncoderInstances {
+object EntityEncoder {
 
-  /** Summon a EntityDecoder. */
+  /** Summon a EntityDecoder from implicit scope. */
   def apply[A](implicit enc: EntityEncoder[A]) = enc
 }
 

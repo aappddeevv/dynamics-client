@@ -79,33 +79,38 @@ object OData {
     if (str == "") None
     else Some(str)
   }
-
-  implicit val multipartEntityEncoder: EntityEncoder[Multipart] = new EntityEncoder[Multipart] {
-    def encode(m: Multipart) =
-      (Multipart.render(m),
-       HttpHeaders.empty ++ Map("Content-Type" -> Seq(Multipart.MediaType, "boundary=" + m.boundary.value)))
-  }
-
 }
 
 /** Boundary marker for batch or changesets. */
 final case class Boundary(value: String) extends AnyVal
 
-object Boundary {
+object Boundary extends RenderConstants {
   private[dynamics] def generate(): String = java.util.UUID.randomUUID.toString
 
   /** Make a boundary with a random UUID. */
   def mkBoundary(prefix: String = "boundary_"): Boundary = Boundary(prefix + generate())
+
+  def renderBoundary(boundary: Boundary, close: Boolean): String = {
+    val sb = new StringBuilder()
+    sb.append(CRLF + "--" + boundary.value)
+    if (close) sb.append("--")
+    sb.append(CRLF)
+    sb.toString()
+  }
 }
 
-/** One part of a multipart. */
+/**
+  * One part of a multipart request. There are only two subtypes, one
+  * for a request directly in the multipart message and the other for
+  * a changeset. Deletes, updates and inserts must be in a changeset.
+  */
 sealed trait Part {
   def xtra: HttpHeaders
 }
 
 /** Single request. Either standalone or in a changeset. Content-Type and Content-Transfer-Encoding
-  * is added to each part prior to the request being written. They can be overriden and added to
-  * using xtra.
+  * is added to each part prior to the request being written. Headers in request can be overriden and
+  * added to using xtra.
   * @paarm request HttpRequest
   * @param xtra Extra headers after the boundary but not in the actual request.
   */
@@ -122,30 +127,31 @@ final case class ChangeSet(parts: Seq[SinglePart], boundary: Boundary, xtra: Htt
     extends Part
 
 /** Renders to empty. */
-final object EmptyPart extends Part { val xtra = HttpHeaders.empty }
+private[dynamics] final object EmptyPart extends Part { val xtra = HttpHeaders.empty }
 
 object Part {
   //val empty: Part = EmptyPart()
   def mkChangeset(parts: Seq[SinglePart], b: Boundary = Boundary.mkBoundary("changeset_")) = ChangeSet(parts, b)
+
+  /** An empty part. */
+  val empty = EmptyPart
 }
 
-/** Multipart composed of individual requests and changesets.
-  * @param parts Sequence of single sequests or changesets.
+/**
+  * Multipart composed of a list of parts: individual requests and changesets.
+  * Despite its name, it does not inherit from Part.
+  * @param parts Sequence of Parts.
   * @param boundary Batch boundary.
   */
-final case class Multipart(parts: Seq[Part], boundary: Boundary)
+final case class Multipart(parts: Seq[Part], boundary: Boundary = Boundary.mkBoundary())
 
-object Multipart {
+trait RenderConstants {
   val MediaType = "multipart/mixed"
   val CRLF      = "\r\n"
+}
 
-  def renderBoundary(boundary: Boundary, close: Boolean): String = {
-    val sb = new StringBuilder()
-    sb.append(CRLF + "--" + boundary.value)
-    if (close) sb.append("--")
-    sb.append(CRLF)
-    sb.toString()
-  }
+object Multipart extends RenderConstants {
+  import Boundary.renderBoundary
 
   /**
     * Render a batch boundary for each part, render each part, render the closing batch boundary.

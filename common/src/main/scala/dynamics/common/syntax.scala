@@ -108,9 +108,7 @@ trait JSCallbackSyntaxNPM {
   implicit def jsCallbackOpsSyntaxNPM[A](f: JSCallbackNPM[A])(implicit s: Strategy) = JSCallbackOpsNPM(f)
 }
 
-/** These are not all implicits. FIXME */
-trait MiscImplicits {
-  import scala.scalajs.runtime.wrapJavaScriptException
+trait JsObjectInstances {
 
   /** Show JSON in its rawness form. Use PrettyJson. for better looking JSON. */
   implicit def showJsObject[A <: js.Object] = Show.show[A] { obj =>
@@ -118,6 +116,11 @@ trait MiscImplicits {
     sb.append(Utils.pprint(obj))
     sb.toString
   }
+}
+
+/** These are not all implicits. FIXME */
+trait JsPromiseSyntax {
+  import scala.scalajs.runtime.wrapJavaScriptException
 
   /** Convert a js.Promise to a fs2.Task. */
   implicit class RichPromise[A](p: js.Promise[A]) {
@@ -151,6 +154,15 @@ trait FutureSyntax {
   implicit def futureToTask[A](f: Future[A])(implicit s: Strategy, ec: ExecutionContext) = FutureOps[A](f)
 }
 
+case class IteratorOps[A](val iter: scala.Iterator[A])(implicit s: Strategy, ec: ExecutionContext) {
+  def toFS2Stream[A] = Stream.unfold(iter)(i => if (i.hasNext) Some((i.next, i)) else None)
+}
+
+trait IteratorSyntax {
+  implicit def toIteratorOps[A](iter: scala.Iterator[A])(implicit s: Strategy, ec: ExecutionContext) =
+    IteratorOps[A](iter)
+}
+
 // Add each individual syntax trait to this
 trait AllSyntax
     extends JsDynamicSyntax
@@ -159,6 +171,8 @@ trait AllSyntax
     with JsObjectSyntax
     with JsAnySyntax
     with FutureSyntax
+    with IteratorSyntax
+    with JsPromiseSyntax
 
 // Add each individal syntax trait to this
 object syntax {
@@ -169,8 +183,15 @@ object syntax {
   object jsobject      extends JsObjectSyntax
   object jsany         extends JsAnySyntax
   object future        extends FutureSyntax
+  object iterator      extends IteratorSyntax
+  object jsPromise     extends JsPromiseSyntax
 }
 
-trait AllImplicits extends MiscImplicits
+trait AllInstances extends JsObjectInstances
 
-object implicits extends AllImplicits with AllSyntax
+object instances {
+  object all      extends AllInstances
+  object jsObject extends JsObjectInstances
+}
+
+object implicits extends AllSyntax with AllInstances

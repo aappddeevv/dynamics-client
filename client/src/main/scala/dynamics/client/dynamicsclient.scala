@@ -21,7 +21,12 @@ import cats.syntax.show._
 import dynamics.common._
 import fs2helpers._
 import dynamics.http._
+import dynamics.http.instances.entityEncoder._
+import dynamics.http.instances.entityDecoder._
 
+/**
+  * See https://msdn.microsoft.com/en-us/library/mt770385.aspx
+  */
 @js.native
 trait ErrorOData extends js.Object {
   val code: js.UndefOr[String]                = js.undefined
@@ -29,6 +34,9 @@ trait ErrorOData extends js.Object {
   val innererror: js.UndefOr[InnerErrorOData] = js.undefined
 }
 
+/**
+  * See https://msdn.microsoft.com/en-us/library/mt770385.aspx
+  */
 @js.native
 trait InnerErrorOData extends js.Object {
   @JSName("type")
@@ -70,7 +78,8 @@ object DynamicsServerError {
 
 }
 
-/** Combines a message, an optional DynamicsServerError, an optional underlying
+/**
+  * Combines a message, an optional DynamicsServerError, an optional underlying
   * error and the Status of the http call.
   */
 sealed abstract class DynamicsError extends RuntimeException {
@@ -140,7 +149,7 @@ case class DynamicsOptions(
   */
 case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo, debug: Boolean = false)
     extends LazyLogger
-    with DynamicsHttpClientRequests {
+    with DynamicsClientRequests {
 
   // resolved when instantiated...
   protected implicit val e: ExecutionContext = implicitly[ExecutionContext]
@@ -225,7 +234,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
              upsertPreventCreate: Boolean = false,
              upsertPreventUpdate: Boolean = false,
              opts: DynamicsOptions = DefaultDynamicsOptions): Task[String] = {
-    val request = mkUpdateRequest(entitySet, id, body, upsertPreventCreate, upsertPreventUpdate, opts)
+    val request = mkUpdateRequest(entitySet, id, body, upsertPreventCreate, upsertPreventUpdate, opts, base)
     //HttpRequest(Method.PATCH, s"/$entitySet($id)", body = Entity.fromString(body), headers = toHeaders(opts) ++ h )
     http.fetch[String](request) {
       case Status.Successful(resp) => Task.now(id)
@@ -241,7 +250,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
                      body: String,
                      opts: DynamicsOptions = DefaultDynamicsOptions): Task[String] = {
     val newOpts = opts.copy(prefers = opts.prefers.copy(includeRepresentation = Some(false)))
-    create[String](entityCollection, body, newOpts)(EntityDecoder.ReturnedIdDecoder)
+    create[String](entityCollection, body, newOpts)(ReturnedIdDecoder)
   }
 
   /** Create an entity. If return=representation then the decoder can decode the body with entity content.
@@ -315,7 +324,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
                 navProperty: String,
                 toEntitySet: String,
                 toEntityId: String): Task[Boolean] = {
-    val request = mkAssociateRequest(fromEntitySet, fromEntityId, navProperty, toEntitySet, toEntityId)
+    val request = mkAssociateRequest(fromEntitySet, fromEntityId, navProperty, toEntitySet, toEntityId, base)
     http.fetch(request) {
       case Status.Successful(resp) => Task.now(true)
       case failedResponse =>
@@ -330,7 +339,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
                    fromEntityId: String,
                    navProperty: String,
                    to: Option[(String, String)]): Task[Boolean] = {
-    val request = mkDisassocatiateRequest(fromEntitySet, fromEntityId, navProperty, to)
+    val request = mkDisassocatiateRequest(fromEntitySet, fromEntityId, navProperty, to, base)
     http.fetch(request) {
       case Status.Successful(resp) => Task.now(true)
       case failedResponse =>
@@ -403,104 +412,6 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     }
     // Flatten the seq chunks from each unfold iteration
     str.flatMap(Stream.emits)
-  }
-
-}
-
-trait DynamicsHttpClientRequests {
-
-  /** Base URL to help make requests when needed. */
-  def base: String
-
-  val DefaultBatchRequest = HttpRequest(Method.PUT, "/$batch")
-
-  def mkGetListRequest(url: String, opts: DynamicsOptions = DefaultDynamicsOptions) =
-    HttpRequest(Method.GET, url, headers = toHeaders(opts))
-
-  def mkCreateRequest(entitySet: String, body: String, opts: DynamicsOptions = DefaultDynamicsOptions) =
-    HttpRequest(Method.POST, s"/$entitySet", body = Entity.fromString(body), headers = toHeaders(opts))
-
-  /** Make a pure delete request. */
-  def mkDeleteRequest(entitySet: String, keyInfo: DynamicsId, opts: DynamicsOptions = DefaultDynamicsOptions) =
-    HttpRequest(Method.DELETE, s"/$entitySet(${keyInfo.render()})", headers = toHeaders(opts))
-
-  def mkGetOneRequest(url: String, opts: DynamicsOptions) =
-    HttpRequest(Method.GET, url, headers = toHeaders(opts))
-
-  def mkExecuteActionRequest(action: String,
-                             body: Entity,
-                             entitySetAndId: Option[(String, String)] = None,
-                             opts: DynamicsOptions = DefaultDynamicsOptions) = {
-    val url = entitySetAndId.map { case (c, i) => s"/$c($i)/$action" }.getOrElse(s"/$action")
-    HttpRequest(Method.POST, url, body = body, headers = toHeaders(opts))
-  }
-
-  def toHeaders(o: DynamicsOptions): HttpHeaders = {
-    val prefer = OData.render(o.prefers)
-    prefer.map(str => HttpHeaders("Prefer"        -> str)).getOrElse(HttpHeaders.empty) ++
-      o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty)
-  }
-
-  /** Not sure adding $base to the @odata.id is correct. */
-  def mkAssociateRequest(fromEntitySet: String,
-                         fromEntityId: String,
-                         navProperty: String,
-                         toEntitySet: String,
-                         toEntityId: String): HttpRequest = {
-    val url  = s"/${fromEntitySet}(${fromEntityId})/$navProperty/$$ref"
-    val body = s"""'data' : {'@odata.id': '$base/$toEntitySet($toEntityId)'}"""
-    HttpRequest(Method.PUT, url, body = Entity.fromString(body))
-  }
-
-  def mkDisassocatiateRequest(fromEntitySet: String,
-                              fromEntityId: String,
-                              navProperty: String,
-                              to: Option[(String, String)]): HttpRequest = {
-    val url = s"/$fromEntitySet($fromEntityId)/$navProperty/$$ref" +
-      to.map { case (eset, id) => s"?$$id=$base/$eset($id)" }.getOrElse("")
-    HttpRequest(Method.DELETE, url, body = Entity.empty)
-  }
-
-  def mkUpdateRequest[A](
-      entitySet: String,
-      id: String,
-      body: A,
-      upsertPreventCreate: Boolean = false,
-      upsertPreventUpdate: Boolean = false,
-      opts: DynamicsOptions = DefaultDynamicsOptions)(implicit enc: EntityEncoder[A]): HttpRequest = {
-    val (b, xtra) = enc.encode(body)
-    val h: HttpHeaders =
-      if (upsertPreventCreate) HttpHeaders("If-Match" -> "*")
-      else if (upsertPreventUpdate) HttpHeaders("If-None-Match" -> "*")
-      else HttpHeaders.empty
-    val mustHave = HttpHeaders.empty ++ Map("Content-Type" -> Seq("application/json", "type=entry"))
-    HttpRequest(Method.PATCH, s"$base/$entitySet($id)", toHeaders(opts) ++ h ++ xtra ++ mustHave, b)
-  }
-
-  def mkExecuteFunctionRequest(function: String,
-                               parameters: Map[String, scala.Any] = Map.empty,
-                               entity: Option[(String, String)] = None) = {
-    // (parm, parmvalue)
-    val q: Seq[(String, String)] = parameters.keys.zipWithIndex
-      .map(x => (x._1, x._2 + 1))
-      . // start from 1
-      map {
-        case (k, i) =>
-          parameters(k) match {
-            case s: String => (s"$k=@p$i", s"@p$i='$s'")
-            case x @ _     => (s"$k=@p$i", s"@p$i=$x")
-          }
-      }
-      .toSeq
-
-    val pvars        = q.map(_._1).mkString(",")
-    val pvals        = (if (q.size > 0) "?" else "") + q.map(_._2).mkString("&")
-    val functionPart = s"/$function($pvars)$pvals"
-
-    val entityPart = entity.map(p => s"${p._1}(${p._2})").getOrElse("")
-
-    val url = s"/$entityPart$functionPart"
-    HttpRequest(Method.GET, url)
   }
 
 }

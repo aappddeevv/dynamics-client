@@ -52,7 +52,7 @@ object MainHelpers extends LazyLogger {
         process.exit(1)
         zero
       } { c =>
-        c.copy(connectInfo = readConnectionInfoOrExit(c.crmConfigFile))
+        c.copy(common = c.common.copy(connectInfo = readConnectionInfoOrExit(c.common.crmConfigFile)))
       }
 
     val start = process.hrtime()
@@ -61,8 +61,9 @@ object MainHelpers extends LazyLogger {
       println(msg)
       //println(s"${BuildInfo.toString}")
       println(s"node version: ${process.version}")
-      println(s"Dynamics user: ${config.connectInfo.username.getOrElse("username not provided")}")
-      println(s"Dynamics endpoint: ${config.connectInfo.dataUrl.getOrElse("data endpoint not provided directly")}")
+      println(s"Dynamics user: ${config.common.connectInfo.username.getOrElse("username not provided")}")
+      println(
+        s"Dynamics endpoint: ${config.common.connectInfo.dataUrl.getOrElse("data endpoint not provided directly")}")
       println()
     }
 
@@ -85,7 +86,8 @@ object MainHelpers extends LazyLogger {
 
     // Determine the action.
     val action: Action =
-      (moreCommands.flatMap(_(config, context)) orElse config.actionSelector.flatMap(_(config, context)))
+      (moreCommands.flatMap(_(config, context)) orElse
+        config.common.actionSelector.flatMap(_(config, context)))
         .getOrElse(NoArgAction(println(s"No actions registered to select from.")))
 
     // Run the action, then cleanup, then print messages/errors
@@ -146,24 +148,24 @@ object MainHelpers extends LazyLogger {
     * returns a Some.
     */
   val defaultActionSelector: ActionSelector = (config, context) =>
-    Some(config.command match {
+    Some(config.common.command match {
       case "webresources" =>
         val ops = new WebResourcesCommand(context)
-        ops.get(config.subcommand)
+        ops.get(config.common.subcommand)
 
       case "solutions" =>
         val ops = new SolutionActions(context)
-        ops.get(config.subcommand)
+        ops.get(config.common.subcommand)
 
       case "publishers" =>
         val ops = new PublisherActions(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "list" => ops.list()
         }
 
       case "asyncoperations" =>
         val ops = new AsyncOperationsCommand(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "list"                      => ops.list()
           case "deleteCompleted"           => ops.deleteCompleted()
           case "deleteCanceled"            => ops.deleteCanceled()
@@ -175,7 +177,7 @@ object MainHelpers extends LazyLogger {
         }
       case "workflows" =>
         val ops = new WorkflowActions(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "list"             => ops.list()
           case "execute"          => ops.executeWorkflow()
           case "changeactivation" => ops.changeActivation()
@@ -183,7 +185,7 @@ object MainHelpers extends LazyLogger {
 
       case "importmaps" =>
         val ops = new ImportMapActions(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "list"     => ops.list()
           case "download" => ops.download()
           case "upload"   => ops.upload()
@@ -191,37 +193,40 @@ object MainHelpers extends LazyLogger {
 
       case "importdata" =>
         val ops = new ImportDataActions(context)
-        ops.get(config.subcommand)
+        ops.get(config.common.subcommand)
 
       case "update" =>
         val ops = new UpdateActions(context)
-        ops.update()
+        config.common.subcommand match {
+          case "data" => ops.update
+          case "test" => ops.test
+        }
       case "whoami" =>
         val ops = new WhoAmIActions(context)
         ops.whoami()
       case "metadata" =>
         val ops = new MetadataActions(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "listentities" => ops.listEntities()
           case "downloadcsdl" => ops.downloadCSDL()
           case "test"         => ops.test()
         }
       case "sdkmessageprocessingsteps" =>
         val ops = new SDKMessageProcessingStepsActions(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "list"       => ops.list()
           case "activate"   => ops.activate()
           case "deactivate" => ops.deactivate()
         }
       case "token" =>
         val ops = new TokenActions(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "getOne"  => ops.getOne();
           case "getMany" => ops.getMany();
         }
       case "entity" =>
         val ops = new EntityActions(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "export"          => ops.export()
           case "count"           => ops.count()
           case "exportFromQuery" => ops.exportFromQuery()
@@ -229,12 +234,12 @@ object MainHelpers extends LazyLogger {
         }
       case "optionsets" =>
         val ops = new OptionSetsActions(context)
-        config.subcommand match {
+        config.common.subcommand match {
           case "list" => ops.list()
         }
       case "plugins" =>
         val ops = new PluginActions(context)
-        ops.get(config.subcommand)
+        ops.get(config.common.subcommand)
       case "__test__" =>
         val ops = new TestCommand(context)
         ops.runTest()

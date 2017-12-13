@@ -97,10 +97,10 @@ class OptionSetsActions(context: DynamicsContext) extends LazyLogger {
   }
 
   def list(): Action = Kleisli { config =>
-    val topts  = new TableOptions(border = Table.getBorderCharacters(config.tableFormat))
+    val topts  = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
     val header = Seq("#", "Name", "Description")
     lift {
-      val filtered = unlift(getList().map(filter(_, config.filter)))
+      val filtered = unlift(getList().map(filter(_, config.common.filter)))
       val data =
         filtered.zipWithIndex.map {
           case (i, idx) =>
@@ -108,7 +108,7 @@ class OptionSetsActions(context: DynamicsContext) extends LazyLogger {
             Seq(idx.toString,
                 i.Name,
                 i.Description.toOption
-                  .flatMap(findByLCID(config.lcid, _))
+                  .flatMap(findByLCID(config.common.lcid, _))
                   .filterNot(_ == null)
                   .map(_.Label)
                   .getOrElse(""))

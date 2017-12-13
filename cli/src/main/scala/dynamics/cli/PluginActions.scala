@@ -104,7 +104,7 @@ class PluginActions(val context: DynamicsContext) {
           println(s"Error: Plugin names must be unique and already exist: ${msg}")
         case Right(assembly) =>
           val dll = unlift(base64FromFile(source))
-          if (assembly.content == dll)
+          if (assembly.content.map(_ == dll).getOrElse(false))
             println("Content is the same. No updated performed.")
           else {
             val r = update(assembly.pluginassemblyid.getOrElse(""), assembly.name.getOrElse(""), dll)
@@ -118,7 +118,7 @@ class PluginActions(val context: DynamicsContext) {
 
   def watch(config: AppConfig) = {
     import dynamics.common.FSWatcher.{add, unlink, change, error}
-    val source = config.pluginConfig.source.getOrElse("")
+    val source = config.plugin.source.getOrElse("")
     // chokidar requires a .close() call
     val str2 = Stream.bracket(
       Task.delay(chokidar.watch(source, new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
@@ -146,8 +146,8 @@ class PluginActions(val context: DynamicsContext) {
   }
 
   val upload = Action { config =>
-    if (config.pluginConfig.watch) watch(config)
-    else runOnce(config.pluginConfig.source)
+    if (config.plugin.watch) watch(config)
+    else runOnce(config.plugin.source)
   }
 
   def get(command: String): Action =

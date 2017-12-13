@@ -28,9 +28,11 @@ common = {
     })],
     resolve: {
         alias: {
-            Provided: path.resolve(__dirname, './cli/src/main/resources'),
-            app: path.resolve(__dirname, './cli/src/main/scala/dynamics/cli')
+            Provided: path.resolve(__dirname, "./cli/src/main/resources"),
+            app: path.resolve(__dirname, "./cli/src/main/scala/dynamics/cli"),
+            JS: path.resolve(__dirname, "./cli/src/main/js")
         },
+        // we can place absolute referenced packages here
         modules: [path.resolve(__dirname, "./cli/src/main/resources"), "node_modules"]
     },
     module: {

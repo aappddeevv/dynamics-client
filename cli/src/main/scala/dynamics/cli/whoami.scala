@@ -17,16 +17,16 @@ import scala.concurrent._
 import fs2._
 import cats._
 import cats.data._
-//import cats.implicits._
 import io.scalajs.npm.chalk._
 import MonadlessTask._
 
 import dynamics.http._
+import dynamics.http.instances.entityDecoder._
 
 class WhoAmIActions(context: DynamicsContext) {
 
   import context._
-  implicit val WhoAmIDecoder = EntityDecoder.JsObjectDecoder[WhoAmI]
+  implicit val WhoAmIDecoder = JsObjectDecoder[WhoAmI]
 
   def whoami(): Action =
     Kleisli { config =>

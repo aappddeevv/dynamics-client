@@ -23,6 +23,9 @@ import scala.collection.mutable
 import dynamics.common._
 import fs2helpers._
 
+/**
+  * Helper objects to make creating DecodeResults easier. DecodeResult is a complex type.
+  */
 object DecodeResult {
   def apply[A](fa: Task[Either[DecodeFailure, A]]): DecodeResult[A] = EitherT(fa)
   def success[A](a: Task[A]): DecodeResult[A]                       = DecodeResult(a.map(Either.right(_)))
@@ -32,6 +35,9 @@ object DecodeResult {
   def fail[A]: DecodeResult[A]                                      = failure(Task.now(MessageBodyFailure("Intentionally failed.")))
 }
 
+/**
+  *  Decode a Message to a DecodeResult.
+  */
 @implicitNotFound("Cannot find instance of EntityDecoder[${T}].")
 trait EntityDecoder[T] { self =>
 
@@ -66,26 +72,34 @@ trait EntityDecoder[T] { self =>
 
 }
 
-object EntityDecoder extends EntityDecoderInstances {
+object EntityDecoder {
 
-  /** Summon an entity decoder using implicits. */
+  /** Summon an entity decoder using implicits e.g. `val decoder = EntityDecoder[js.Object]` */
   def apply[T](implicit ev: EntityDecoder[T]): EntityDecoder[T] = ev
 
-  /** Lift function to create a decoder. */
+  /**
+    * Lift function to create a decoder. You can use another EntityDecoder
+    * as the arguent.
+    */
   def instance[T](run: Message => DecodeResult[T]): EntityDecoder[T] =
     new EntityDecoder[T] {
       def decode(response: Message) = run(response)
     }
 }
 
+/**
+  * Some EntityDecoder instances specific to the type you want to "output" from
+  * the decoding process.
+  */
 trait EntityDecoderInstances {
 
   private val reg = """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""".r
 
-  /** A decoder that only looks at the header for an OData-EntityId (case-insensitive)
-    * value and returns that, otherwise, fail the decode. To ensure that
-    * the id is returned in the header, you must make sure that return=representation
-    * is not set in the Prefer headers.
+  /**
+    * A decoder that only looks at the header for an OData-EntityId (case-insensitive)
+    * value and returns that, otherwise fail. To ensure that the id is returned in the header,
+    * you must make sure that return=representation is *not* set in the Prefer headers when
+    * the HTTP call is issued.
     */
   val ReturnedIdDecoder: EntityDecoder[String] = EntityDecoder { msg =>
     (msg.headers.get("OData-EntityId") orElse msg.headers.get("odata-entityid"))
@@ -114,6 +128,10 @@ trait EntityDecoderInstances {
     }
   }
 
+  /**
+    * Decode the body as json and cast to A instead of JSONDecoder which casts
+    * the body to js.Dynamic.
+    */
   def JsObjectDecoder[A <: js.Object](implicit s: Strategy): EntityDecoder[A] =
     JSONDecoder.map(_.asInstanceOf[A])
 
@@ -133,23 +151,24 @@ trait EntityDecoderInstances {
     }
 
   /**
-    * If its js.Object decode, check for value array and grab that element,
-    * if no value array, decode via cast. Otherwise return a DecodeResult.failure.
+    * Check for value array and if there is a value array return the first element.
+    * Otherwise cast the entire response to A directly and return it. Either way,
+    * return a single value of type `T`.
+    *
     * If you are assuming a different underlying decode approach to the raw
     * http body, you need to write your own wrapper to detect the "value" array
     * and decide how to decode based on its presence. That's because its assumed
     * in this function that we will decode to a js.Object first to check for the
-    * value array in the response body.
+    * value array in the response body. This should really be called
+    * `FirstElementOfValueArrayIfThereIsOneOrCastWholeMessage`.
     */
-  def ValueWrapper[A <: js.Object](implicit s: Strategy): EntityDecoder[A] = {
-    val dec = JsObjectDecoder[ValueArrayResponse[A]].flatMapR[A] { arrresp =>
+  def ValueWrapper[A <: js.Object](implicit s: Strategy) =
+    JsObjectDecoder[ValueArrayResponse[A]].flatMapR[A] { arrresp =>
       // if no "value" array, assume its safe to cast to a single A
       arrresp.value.fold(DecodeResult.success(arrresp.asInstanceOf[A]))({ arr =>
         if (arr.size > 0) DecodeResult.success(arr(0))
         else DecodeResult.failure(OnlyOneExpected(s"found ${arr.size}"))
       })
     }
-    EntityDecoder.instance(dec(_))
-  }
 
 }

@@ -10,6 +10,7 @@ import dynamics.common.implicits._
 
 import scala.scalajs.js
 import js._
+import js.annotation._
 import js.Dynamic.{literal => jsobj}
 import JSConverters._
 import scala.concurrent._
@@ -32,6 +33,7 @@ import io.scalajs.nodejs.events.IEventEmitter
 import io.scalajs.util.PromiseHelper.Implicits._
 import io.scalajs.nodejs.fs._
 import io.scalajs.npm.csvparse._
+import io.scalajs.nodejs.process
 
 import fs2helpers._
 import dynamics.http._
@@ -40,6 +42,7 @@ import etl._
 import etl.sources._
 import dynamics.client._
 import dynamics.client.implicits._
+import dynamics.http.implicits._
 
 /**
   * Can run a generic update operation but requires data in a specific format. The format
@@ -53,59 +56,70 @@ class UpdateActions(val context: DynamicsContext) {
   import dynamics.common.syntax.all._
   import dynamics.etl._
 
-  def update(): Kleisli[Task, AppConfig, Unit] =
-    Kleisli { config =>
-      println("Update records")
-      val pkcol = config.updatePKColumnName
-      val updateone = dynclient.update(config.updateEntity,
-                                       _: String,
-                                       _: String,
-                                       config.upsertPreventCreate,
-                                       config.upsertPreventUpdate)
+  /** Run a quick stream test. */
+  val test = Action { config =>
+    val items = JSONFileSource[js.Object]("test.json")
+    val process = items.map { item =>
+      println(s"item: ${Utils.render(item)}")
+    }
 
-      val parserOpts = new ParserOptions(
+    Task
+      .delay(println("json streaming test"))
+      .flatMap { _ =>
+        process.run
+      }
+  }
+
+  val update = Action { config =>
+    println("Update records from a set of JSON objects")
+    val uc    = config.update
+    val pkcol = uc.updatePKColumnName
+    val updateone =
+      dynclient.update(uc.updateEntity, _: String, _: String, uc.upsertPreventCreate, uc.upsertPreventUpdate)
+    /*
+    val parserOpts = new ParserOptions(
         columns = true,
         skip_empty_lines = true,
         trim = true
       )
-      //val records = CSVFileSource(config.updateDataInputCSVFile, parserOpts)
-      val records =
-        Stream.eval(CSVFileSourceBuffer_(config.etlDataInputFile, DefaultCSVParserOptions)).flatMap(Stream.emits(_))
+     */
+    //val records = CSVFileSource(config.updateDataInputCSVFile, parserOpts)
+    //val records = CSVFileSource(config.etl.etlDataInputFile, DefaultCSVParserOptions)
+    val records = JSONFileSource[js.Object](config.etl.etlDataInputFile)
+    val updater = new UpdateProcessor(context)
+    val counter = new java.util.concurrent.atomic.AtomicInteger(0)
+    val runme =
+      records
+        .through(DropTake(uc.updateDrop.getOrElse(0), uc.updateTake.getOrElse(Int.MaxValue)))
+        .through(toInput())
+        .map { a =>
+          counter.getAndIncrement(); a
+        }
+        .through(log[InputContext[js.Object]] { ic =>
+          if (config.common.debug) println(s"Input: $ic\n${PrettyJson.render(ic.input)}")
+        })
+        .through(mkPipe(FilterAttributes(uc.updateDrops, uc.updateRenames, uc.updateKeeps)))
+        .through(LogTransformResult[js.Object, js.Object]())
+        .through(EmitResultDataWithTag[js.Object, js.Object]())
+        .map { p =>
+          InputContext(p._1, p._2)
+        }
+        .through(_ map { ic =>
+          updater.mkOne(ic, uc.updatePKColumnName, updateone)
+        })
+        .map(Stream.eval(_).map(println))
 
-      val updater = new UpdateProcessor(context)
-      val counter = new java.util.concurrent.atomic.AtomicInteger(0)
-
-      val runme =
-        records
-          .through(DropTake(config.updateDrop.getOrElse(0), config.updateTake.getOrElse(Int.MaxValue)))
-          .through(toInput())
-          .map { a =>
-            counter.getAndIncrement(); a
-          }
-          .through(log[InputContext[js.Object]] { ic =>
-            if (config.debug) println(s"Input: $ic\n${PrettyJson.render(ic.input)}")
-          })
-          .through(mkPipe(FilterAttributes(config.updateDrops, config.updateRenames, config.updateKeeps)))
-          .through(LogTransformResult[js.Object, js.Object]())
-          .through(EmitResultDataWithTag[js.Object, js.Object]())
-          .map { p =>
-            InputContext(p._1, p._2)
-          }
-          .through(_ map { ic =>
-            updater.mkOne(ic, config.updatePKColumnName, updateone)
-          })
-          .map(Stream.eval(_).map(println))
-
-      concurrent
-        .join(config.concurrency)(runme)
-        .run
-        .flatMap(_ => Task.delay(println(s"${counter.get} input records processed.")))
-    }
+    concurrent
+      .join(config.common.concurrency)(runme)
+      .run
+      .flatMap(_ => Task.delay(println(s"${counter.get} input records processed.")))
+  }
 
 }
 
-/** Processes CRM entities. All remote action is delayed until
-  * the returned effect is run.
+/**
+  * Processes CRM entities. All remote action is delayed until the returned
+  * effect is run.
   *
   * Add flexible ways to managed errors and return values
   */
@@ -119,8 +133,8 @@ class UpdateProcessor(val context: DynamicsContext) {
   import context._
 
   /**
-    *  Returning None means the pk was not found in the js object. Only handles
-    *  single value PKs. Removes pk if found. Mutates input object.
+    * Returning None means the pk was not found in the js object. Only handles
+    * single value PKs. Removes pk if found. Mutates input object.
     */
   def findIdAndMkBody(pkcol: String, j: js.Dictionary[String]): Option[(String, String)] = {
     val pk = j.get(pkcol).filterNot(_.isEmpty)
@@ -128,19 +142,10 @@ class UpdateProcessor(val context: DynamicsContext) {
     pk.map { (_, JSON.stringify(j.asInstanceOf[js.Object])) }
   }
 
-  /*
-  def update(input: IndexedSeq[js.Object], pkcol: String,
-    update: (String, String) => Task[String], upsertPreventCreate: Boolean = false): Task[String] = {
-    if(input.size == 1)
-      mkOne(input(0), pkcol, update)
-    else
-      mkBatch(input, pkcol, update)
-  }
-   */
-
   import DynamicsError._
 
-  /** Run an update based on an input js.Object record and print a result.
+  /**
+    * Run an update based on an input js.Object record and print a result.
     * @param source Record source identifier, typically a string like "Record 3".
     * @param pkcol PK attribute name in input record. Must be a single valued PK.
     * @param record js.Object record. The PK will be removed for the update.
@@ -214,6 +219,19 @@ class UpdateProcessor(val context: DynamicsContext) {
           //case Left(t) =>
           s"Error processing batch: $label: [${js.Date()}]\n${t.toString()}\n" + t.value.show
       }
+    }
+  }
+}
+
+object UpdateActions {
+
+  type Config = (DynamicsContext, CommonConfig, UpdateConfig, ETLConfig)
+
+  val fromConfig: Kleisli[Option, Config, Action] = Kleisli { config =>
+    val uactions = new UpdateActions(config._1)
+    config._2.command match {
+      case "update" => Some(uactions.update)
+      case _        => None
     }
   }
 

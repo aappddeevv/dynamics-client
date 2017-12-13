@@ -40,13 +40,14 @@ object DynamicsContext {
       implicit val s   = Strategy.fromExecutionContext(e)
       implicit val sch = Scheduler.default
 
-      val fetchOpts = NodeFetchClientOptions(timeoutInMillis = config.requestTimeOutInMillis.getOrElse(0))
+      val fetchOpts = NodeFetchClientOptions(timeoutInMillis = config.common.requestTimeOutInMillis.getOrElse(0))
 
       val httpclient: Client =
-        (RetryClient.pause(config.numRetries, config.pauseBetween) andThen
-          ADAL(config.connectInfo))(NodeFetchClient.newClient(config.connectInfo, config.debug, opts = fetchOpts))
+        (RetryClient.pause(config.common.numRetries, config.common.pauseBetween) andThen
+          ADAL(config.common.connectInfo))(
+          NodeFetchClient.newClient(config.common.connectInfo, config.common.debug, opts = fetchOpts))
 
-      implicit val dynclient = DynamicsClient(httpclient, config.connectInfo, config.debug)
+      implicit val dynclient = DynamicsClient(httpclient, config.common.connectInfo, config.common.debug)
 
       def close() = httpclient.dispose
     }
