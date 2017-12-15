@@ -10,10 +10,9 @@ import js._
 import scala.concurrent._
 import duration._
 import fs2._
-import fs2.util._
 import cats._
 import cats.data._
-import fs2.interop.cats._
+import cats.effect._
 
 import dynamics.common._
 import dynamics.client._
@@ -25,7 +24,6 @@ class TestCommand(context: DynamicsContext) {
   import etl.sources._
   import etl.jsdatahelpers._
   import dynamics.common.syntax.all._
-  import Task._
 
   val data = JSON.parse("""
 {
@@ -72,8 +70,8 @@ class TestCommand(context: DynamicsContext) {
     //   map(_ => println(s"${counter.get} records processed."))
 
     implicit val c = new ScalaCacheNodeCache(new NodeCache())
-    c.put("key", Task.now(Some(10)), None)
-    val x = c.get[Task[Option[Int]]]("key")
+    c.put("key", IO(Some(10)), None)
+    val x = c.get[IO[Option[Int]]]("key")
     x.foreach(_.foreach(y => println(s"x: $y")))
     //println(s"x: ${x}")
 
@@ -82,7 +80,7 @@ class TestCommand(context: DynamicsContext) {
     xc.foreach { anInt =>
       println(s"test1: $anInt")
     }
-    Task.fromFuture(xc).map(_ => ())
+    IO.fromFuture(Eval.always(xc)).map(_ => ())
 
   // val mc = new MetadataCache(context)
   // val t  = mc.getObjectTypeCode("spruce_interviews").map(println)

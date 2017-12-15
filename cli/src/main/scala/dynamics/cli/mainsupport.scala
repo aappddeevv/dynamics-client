@@ -17,12 +17,12 @@ import js.DynamicImplicits
 import js.Dynamic.{literal => lit}
 import scala.util.{Try, Success, Failure}
 import fs2._
-import fs2.util._
 import scala.concurrent.duration._
 import io.scalajs.npm.winston
 import io.scalajs.npm.winston._
 import io.scalajs.npm.winston.transports._
 import cats.implicits._
+import cats.effect._
 
 import dynamics.common._
 import dynamics.client._
@@ -102,7 +102,7 @@ object MainHelpers extends LazyLogger {
   /** Process an Attempt (Either) from an Action run.
     * @param start Start time information array from `process.hrtime`.
     */
-  def actionPostProcessor[A](noisy: Boolean, start: Array[Int]): fs2.util.Attempt[A] => Unit =
+  def actionPostProcessor[A](noisy: Boolean, start: Array[Int]): Either[Throwable, A] => Unit =
     _ match {
       case Right(_) =>
         val delta = processhack.hrtime(start)

@@ -6,6 +6,9 @@ package dynamics
 package http
 
 import fs2._
+import cats._
+import cats.effect._
+import cats.implicits._
 
 object OData {
 
@@ -32,7 +35,7 @@ object OData {
                            includeLookupLogicalNames: Option[Boolean] = None,
                            includeAssociatedNavigationProperties: Option[Boolean] = None)
 
-  /** Quiet prefer options */
+  /** Quiet prefer options. */
   val QuietPreferOptions = PreferOptions(
     includeRepresentation = Some(false),
     includeFormattedValues = Some(false),
@@ -156,11 +159,11 @@ object Multipart extends RenderConstants {
   /**
     * Render a batch boundary for each part, render each part, render the closing batch boundary.
     */
-  def render(m: Multipart): Task[String] = {
+  def render(m: Multipart): IO[String] = {
     val partsAsTasks = m.parts.map { p =>
       renderPart(p).map(rest => renderBoundary(m.boundary, false) + rest)
     }
-    Task.traverse(partsAsTasks)(identity).map(all => all.mkString("") + renderBoundary(m.boundary, true))
+    partsAsTasks.toList.sequence.map(all => all.mkString("") + renderBoundary(m.boundary, true))
   }
 
   val StandardPartHeaders = HttpHeaders("Content-Transfer-Encoding" -> "binary", "Content-Type" -> "application/http")
@@ -170,7 +173,7 @@ object Multipart extends RenderConstants {
     * TODO: THere may be an extra space between a changeset boundary and the start of
     * a changeset item's boundary header.
     */
-  def renderPart(p: Part): Task[String] = {
+  def renderPart(p: Part): IO[String] = {
     p match {
       case SinglePart(req, xtra) =>
         val partHeaders = StandardPartHeaders ++ xtra
@@ -206,11 +209,10 @@ object Multipart extends RenderConstants {
             p.copy(request = p.request.copy(headers = p.request.headers ++ newCT), xtra = p.xtra ++ withContentId)
           renderPart(modified).map(rest => renderBoundary(b, false) + rest)
         }
-        Task
-          .traverse(partsAsTasks)(identity)
+        partsAsTasks.toList.sequence
           .map(all => HttpHeaders.render(partHeaders) + CRLF + all.mkString("") + renderBoundary(b, true))
       case EmptyPart =>
-        Task.now("")
+        IO.pure("")
     }
   }
 }

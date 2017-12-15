@@ -11,7 +11,8 @@ import js._
 import scala.util.{Try, Failure}
 import scala.concurrent._
 import fs2._
-import fs2.util._
+import cats._
+import cats.effect._
 
 import dynamics.common._
 
@@ -35,8 +36,8 @@ private[dynamics] object ADALHelpers {
                                        resource: String,
                                        username: String,
                                        password: String,
-                                       applicationId: String)(implicit s: Strategy): Task[TokenInfo] = {
-    Task.async { (cb: Either[Throwable, TokenInfo] => Unit) =>
+                                       applicationId: String)(implicit ec: ExecutionContext): IO[TokenInfo] = {
+    IO.async { (cb: Either[Throwable, TokenInfo] => Unit) =>
       ctx.acquireTokenWithUsernamePassword(
         resource,
         username,
@@ -64,7 +65,7 @@ private[dynamics] object ADALHelpers {
   * it is attempted to derive them from username (the demain part) and using a default authority hostname
   * `https://login.windows.net`. If acquireTokenResource is undefined, dataUrl is tried in its place.
   */
-class AuthManager(info: ConnectionInfo)(implicit s: Strategy, scheduler: Scheduler) extends LazyLogger {
+class AuthManager(info: ConnectionInfo)(implicit ehandler: ApplicativeError[IO,Throwable], scheduler: Scheduler) extends LazyLogger {
 
   require(
     info.username.isDefined &&
@@ -74,7 +75,6 @@ class AuthManager(info: ConnectionInfo)(implicit s: Strategy, scheduler: Schedul
 
   import fs2._
   import async._
-  import time._
   import fs2helpers._
   import java.util.concurrent.{TimeUnit => TU}
   import scala.concurrent.duration._
@@ -97,7 +97,7 @@ class AuthManager(info: ConnectionInfo)(implicit s: Strategy, scheduler: Schedul
   }
 
   /** Get a token wrapped in an effect. */
-  def getToken(ctx: AuthenticationContext): Task[TokenInfo] =
+  def getToken(ctx: AuthenticationContext)(implicit ec: ExecutionContext): IO[TokenInfo] =
     ADALHelpers.acquireTokenWithUsernamePassword(ctx,
                                                  tokenResource.get,
                                                  info.username.get,
@@ -114,11 +114,11 @@ class AuthManager(info: ConnectionInfo)(implicit s: Strategy, scheduler: Schedul
   import retry.Success.either
 
   /** Get a token but use the specified retry policy. */
-  def getTokenWithRetry(ctx: AuthenticationContext, policy: Policy)(implicit e: ExecutionContext): Task[TokenInfo] = {
-    Task.fromFuture(policyWithException(policy)(getToken(ctx).attempt.unsafeRunAsyncFuture)).flatMap { e =>
+  def getTokenWithRetry(ctx: AuthenticationContext, policy: Policy)(implicit e: ExecutionContext): IO[TokenInfo] = {
+    IO.fromFuture(Eval.always(policyWithException(policy)(getToken(ctx).attempt.unsafeToFuture()))).flatMap { e =>
       e match {
-        case Right(ti) => Task.now(ti)
-        case Left(t)   => Task.fail(t)
+        case Right(ti) => IO.pure(ti)
+        case Left(t)   => ehandler.raiseError(t)
       }
     }
   }
@@ -128,18 +128,17 @@ class AuthManager(info: ConnectionInfo)(implicit s: Strategy, scheduler: Schedul
 object AuthManager {
   import fs2._
   import async._
-  import time._
   import fs2helpers._
   import java.util.concurrent.{TimeUnit => TU}
   import scala.concurrent.duration._
-  import Task._
 
   private val _calc: TokenInfo => FiniteDuration =
     ti => { shortenDelay(delay = FiniteDuration(ti.expiresIn, TU.SECONDS)) }
 
   /** Stream of TokenInfo. Default is to renew at 95% of expiration time. */
-  def tokenStream(f: => Task[TokenInfo],
-                  calc: TokenInfo => FiniteDuration = _calc)(implicit F: Async[Task], s: Strategy, sch: Scheduler) =
-    unfoldEvalWithDelay[TokenInfo](F.map(F.attempt(f))(_.toOption), calc)
+  def tokenStream(f: => IO[TokenInfo],
+    calc: TokenInfo => FiniteDuration = _calc)
+    (implicit F: Async[IO], sch: Scheduler, ec: ExecutionContext) =
+    unfoldEvalWithDelay[IO, TokenInfo](F.map(F.attempt(f))(_.toOption), calc)
 
 }

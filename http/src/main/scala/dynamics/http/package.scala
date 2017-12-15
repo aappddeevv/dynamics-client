@@ -9,16 +9,17 @@ import scala.collection.mutable
 import cats._
 import cats.data._
 import fs2._
+import cats.effect._
 
 package object http {
 
-  type Service[A, B]      = Kleisli[Task, A, B]
+  type Service[A, B]      = Kleisli[IO, A, B]
   type Middleware         = Client => Client
   type HttpService        = Service[HttpRequest, HttpResponse]
-  type StreamingClient[A] = fs2.Pipe[Task, HttpRequest, Task[A]]
+  type StreamingClient[A] = fs2.Pipe[IO, HttpRequest, IO[A]]
 
   /** Non-streaming but good enough for our needs. */
-  type Entity = Task[String]
+  type Entity = IO[String]
 
   /** Basic headers are a dict of strings. */
   type HttpHeaders = collection.immutable.Map[String, Seq[String]]
@@ -27,6 +28,6 @@ package object http {
     * When decoding a response body, either you get an A
     * or a DecodeFailure. The Task may also carry an exception.
     */
-  type DecodeResult[A] = EitherT[Task, DecodeFailure, A]
+  type DecodeResult[A] = EitherT[IO, DecodeFailure, A]
 
 }

@@ -115,7 +115,7 @@ lazy val docs = project
     micrositeAuthor := "aappddeevv",
     micrositeGithubRepo := "dynamics-client",
     micrositeGithubOwner :="aappddeevv",
-    micrositeGithubToken := sys.props.get("GITHUB_TOKEN"),
+    micrositeGithubToken := sys.env.get("GITHUB_TOKEN"),
     micrositePushSiteWith := GitHub4s
   )
 

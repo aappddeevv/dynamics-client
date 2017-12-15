@@ -13,8 +13,11 @@ import io.scalajs.nodejs.path.Path
 import io.scalajs.nodejs.buffer.Buffer
 import fs._
 import path._
-import fs2.{Task, Strategy}
 import scala.concurrent._
+import cats.effect._
+import cats._
+import cats.data._
+import cats.implicits._
 
 object Utils {
 
@@ -119,10 +122,10 @@ object Utils {
     * contains path segments that do not exist.
     * @param path Path name, both path and file.
     * @param content String content.
-    * @return Unit if file written, otherwise a failed Task.
+    * @return Unit if file written, otherwise a failed IO.
     */
-  def writeToFile(path: String, content: String | Buffer)(implicit ec: ExecutionContext, s: Strategy): Task[Unit] = {
-    Task.fromFuture(Fse.outputFile(path, content))
+  def writeToFile(path: String, content: String | Buffer)(implicit ec: ExecutionContext): IO[Unit] = {
+    IO.fromFuture(Eval.always(Fse.outputFile(path, content)))
   }
 
   /** Write to file synchronously. */

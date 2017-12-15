@@ -16,12 +16,11 @@ import JSConverters._
 import scala.concurrent._
 import io.scalajs.util.PromiseHelper.Implicits._
 import fs2._
-import fs2.util._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
-import MonadlessTask._
+import MonadlessIO._
+import cats.effect._
 
 import io.scalajs.RawOptions
 import io.scalajs.npm.chalk._
@@ -37,7 +36,6 @@ import io.scalajs.nodejs.process
 
 import fs2helpers._
 import dynamics.http._
-import Task._
 import etl._
 import etl.sources._
 import dynamics.client._
@@ -63,8 +61,7 @@ class UpdateActions(val context: DynamicsContext) {
       println(s"item: ${Utils.render(item)}")
     }
 
-    Task
-      .delay(println("json streaming test"))
+    IO(println("json streaming test"))
       .flatMap { _ =>
         process.run
       }
@@ -85,7 +82,7 @@ class UpdateActions(val context: DynamicsContext) {
      */
     //val records = CSVFileSource(config.updateDataInputCSVFile, parserOpts)
     //val records = CSVFileSource(config.etl.etlDataInputFile, DefaultCSVParserOptions)
-    val records = JSONFileSource[js.Object](config.etl.etlDataInputFile)
+    val records = JSONFileSource[js.Object](config.etl.dataInputFile)
     val updater = new UpdateProcessor(context)
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
     val runme =
@@ -109,10 +106,9 @@ class UpdateActions(val context: DynamicsContext) {
         })
         .map(Stream.eval(_).map(println))
 
-    concurrent
-      .join(config.common.concurrency)(runme)
+    runme.join(config.common.concurrency)
       .run
-      .flatMap(_ => Task.delay(println(s"${counter.get} input records processed.")))
+      .flatMap(_ => IO(println(s"${counter.get} input records processed.")))
   }
 
 }
@@ -124,8 +120,8 @@ class UpdateActions(val context: DynamicsContext) {
   * Add flexible ways to managed errors and return values
   */
 abstract class EntityProcessor(entitySet: String, context: DynamicsContext) {
-  def mkOne[A](input: InputContext[A]): Task[String]
-  def mkBatch[A](inputs: Vector[InputContext[A]]): Task[String]
+  def mkOne[A](input: InputContext[A]): IO[String]
+  def mkBatch[A](inputs: Vector[InputContext[A]]): IO[String]
 }
 
 class UpdateProcessor(val context: DynamicsContext) {
@@ -152,14 +148,14 @@ class UpdateProcessor(val context: DynamicsContext) {
     * @param update Function to perform the update: (id, body).
     * @return Task unit (non-failed) whether success or failure of the update.
     */
-  def mkOne(input: InputContext[js.Object], pkcol: String, update: (String, String) => Task[String]): Task[String] = {
+  def mkOne(input: InputContext[js.Object], pkcol: String, update: (String, String) => IO[String]): IO[String] = {
     //println(s"mkOne: ${input.source}")
     findIdAndMkBody(pkcol, input.input.asInstanceOf[js.Dictionary[String]]) match {
       case (Some((id, body))) =>
         //println(s"DEBUG: $id, $body")
         update(id, body).attempt.map { updateOneResultReporter(input.source, id) apply _ }
       case (None) =>
-        Task.now(
+        IO.pure(
           s"${input.source}: No id found in input data. Unable to update.\nInput record: ${PrettyJson.render(input.input)}")
     }
   }
@@ -179,7 +175,7 @@ class UpdateProcessor(val context: DynamicsContext) {
   /** Run the updates but in batch mode. (id,body) => HttpRequest. */
   def mkBatch(inputs: Vector[InputContext[js.Object]],
               pkcol: String,
-              mkRequest: (String, String) => HttpRequest): Task[String] = {
+              mkRequest: (String, String) => HttpRequest): IO[String] = {
     val requests: Vector[(HttpRequest, String)] = inputs
       .map { input =>
         val data   = input.input
@@ -195,7 +191,7 @@ class UpdateProcessor(val context: DynamicsContext) {
   }
 
   /** Run the updates but in batch mode. Inputs are: (request, source identifier) */
-  def mkBatchFromRequests(requests: Vector[(HttpRequest, String)], useChangeSet: Boolean = true): Task[String] = {
+  def mkBatchFromRequests(requests: Vector[(HttpRequest, String)], useChangeSet: Boolean = true): IO[String] = {
     val reqs: Seq[SinglePart] = requests.map(_._1).map(SinglePart(_))
 
     val label: String = requests.map(_._2).toList match { // expensive just for a label

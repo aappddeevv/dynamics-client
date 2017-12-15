@@ -8,16 +8,14 @@ package etl
 import scala.scalajs.js
 import js._
 import js.Dynamic.{literal => jsobj}
-import js.annotation._
 import JSConverters._
 import scala.concurrent._
 import io.scalajs.util.PromiseHelper.Implicits._
 import fs2._
-import fs2.util._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
+import cats.effect._
 import scala.scalajs.runtime.wrapJavaScriptException
 
 import io.scalajs.RawOptions
@@ -33,11 +31,8 @@ import io.scalajs.npm.csvparse._
 import dynamics.common._
 import fs2helpers._
 import dynamics.common.implicits._
-import MonadlessTask._
 
 object sources {
-
-  import fs2.Task._
 
   /**
     * Turn a Readable parser into a Stream of js.Object using
@@ -48,21 +43,12 @@ object sources {
     * up errors explicitly through the fs2 layer.
     */
   def readableToStream[A](readable: io.scalajs.nodejs.stream.Readable, qsize: Int = 1000)(
-      implicit s: Strategy): Stream[Task, A] = {
+      implicit ec: ExecutionContext): Stream[IO, A] = {
     val counter = new java.util.concurrent.atomic.AtomicInteger(-1)
     //val F = Task.asyncInstance(Strategy.sequential) // mpilquist suggested sync enqueue1
     for {
-      q <- Stream.eval(fs2.async.boundedQueue[Task, Option[Either[Throwable, A]]](qsize))
-      _ <- Stream.eval(Task.delay {
-        readable.onData { (data: A) =>
-          val x = counter.getAndIncrement()
-          q.enqueue1(Some(Right(data))).unsafeRunAsync {
-            _ match {
-              case Right(v) => () //println(s"Readable: $x: $data added to queue.")
-              case Left(t)  => println(s"Error adding to queue, index ($x): $t")
-            }
-          }
-        }
+      q <- Stream.eval(fs2.async.boundedQueue[IO, Option[Either[Throwable, A]]](qsize))
+      _ <- Stream.eval(IO {
         readable.onError { (e: io.scalajs.nodejs.Error) =>
           q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ())
         }
@@ -72,8 +58,17 @@ object sources {
         readable.onClose { () =>
           q.enqueue1(None).unsafeRunAsync(_ => ())
         }
+        readable.onData { (data: A) =>
+          val x = counter.getAndIncrement()
+          q.enqueue1(Some(Right(data))).unsafeRunAsync {
+            _ match {
+              case Right(v) => () //println(s"Readable: $x: $data added to queue.")
+              case Left(t)  => println(s"Error adding to queue, index ($x): $t")
+            }
+          }
+        }
       }) // could use .attempt here but need to wrap js exception inside :-(
-      record <- q.dequeue.unNoneTerminate through pipe.rethrow
+      record <- q.dequeue.unNoneTerminate.rethrow
     } yield record
   }
 
@@ -82,42 +77,42 @@ object sources {
     * escaped inside JSON values. isArray = true implies that json objects inside
     * are wrapped in an array and hence have commas separating the objects.
     */
-  def JSONFileSource[A](file: String, isArray: Boolean = false)(implicit s: Strategy): Stream[Task, A] = {
-    Stream.bracket(Task.delay {
+  def JSONFileSource[A](file: String, isArray: Boolean = false)(implicit ec: ExecutionContext): Stream[IO, A] = {
+    Stream.bracket(IO {
       val source = if (!isArray) StreamJsonObjects.make() else StreamArray.make()
       (source, Fs.createReadStream(file))
     })(
       p => { p._2.pipe(p._1.input); readableToStream[A](p._1.output) },
-      p => Task.delay(()) // rely on autoclose behavior
+      p => IO(()) // rely on autoclose behavior
     )
   }
 
   /** does not appear to work at all... */
-  private[dynamics] def JSONFileSource2[A](file: String)(implicit s: Strategy,
-                                                         ec: ExecutionContext): Stream[Task, A] = {
+  private[dynamics] def JSONFileSource2[A](file: String)(implicit ec: ExecutionContext): Stream[IO, A] = {
     val source = StreamJsonObjects.make()
     val x      = Fs.createReadStream(file)
     x.pipe(source.input)
-    IteratorOps(source.output.iterator).toFS2Stream
+    Stream.fromIterator[IO,A](source.output.iterator[A])
   }
 
   val DefaultCSVParserOptions =
     new ParserOptions(columns = true, skip_empty_lines = true, trim = true, auto_parse = false)
 
   /**
-    * Create a Stream[Task, js.Object] from a
+    * Create a Stream[IO, js.Object] from a
     * file name and CSV options using csv-parse. Run `start` to start the OS reading.
     * The underlying CSV file is automatically opened and closed.
     */
-  def CSVFileSource(file: String, csvParserOptions: ParserOptions)(implicit s: Strategy): Stream[Task, js.Object] = {
+  def CSVFileSource(file: String, csvParserOptions: ParserOptions)(implicit ec: ExecutionContext):
+      Stream[IO, js.Object] = {
     CSVFileSource_(file, csvParserOptions, readableToStream[js.Object](_: io.scalajs.nodejs.stream.Readable))
   }
 
   def CSVFileSource_(file: String,
                      csvParserOptions: ParserOptions,
-                     f: io.scalajs.nodejs.stream.Readable => Stream[Task, js.Object])(
-      implicit s: Strategy): Stream[Task, js.Object] = {
-    val create = Task.delay {
+                     f: io.scalajs.nodejs.stream.Readable => Stream[IO, js.Object])(
+    implicit ec: ExecutionContext): Stream[IO, js.Object] = {
+    val create = IO {
       val parser = CsvParse(csvParserOptions)
       val f      = Fs.createReadStream(file)
       (f, parser)
@@ -130,7 +125,7 @@ object sources {
           rval
       }, {
         case (rstr, parser) =>
-          Task.delay {
+          IO {
             rstr.unpipe()
             rstr.close(_ => ())
           }
@@ -139,8 +134,7 @@ object sources {
   }
 
   def CSVFileSourceBuffer_(file: String, csvParserOptions: ParserOptions = DefaultCSVParserOptions)(
-      implicit e: ExecutionContext,
-      s: Strategy): Task[scala.Iterable[js.Object]] = {
+      implicit e: ExecutionContext): IO[scala.Iterable[js.Object]] = {
     import scala.scalajs.runtime.wrapJavaScriptException
     val p = scala.concurrent.Promise[Seq[js.Object]]()
     import collection.mutable.ListBuffer
@@ -159,25 +153,37 @@ object sources {
       p.failure(wrapJavaScriptException(e))
     }
     f.pipe(parser.asInstanceOf[Writable])
-    p.future.toTask
+    p.future.toIO
   }
 
   /**
     * Assuming the query has been set to streaming, stream the results.
     */
-  def queryToStream[A](query: Query, qsize: Int = 1000)(implicit s: Strategy): Stream[Task, A] = {
-    val F = Async[Task]
+  def queryToStream[A](query: Request, qsize: Int = 1000)(implicit ec: ExecutionContext): Stream[IO, A] = {
+    val F = Async[IO]
     for {
-      q <- Stream.eval(fs2.async.boundedQueue[Task, Option[Either[Throwable, A]]](qsize))
-      _ <- Stream.eval(Task.delay {
-        query.on("row", (data: A) => q.enqueue1(Some(Right(data))).unsafeRunAsync(_ => ()))
+      q <- Stream.eval(fs2.async.boundedQueue[IO, Option[Either[Throwable, A]]](qsize))
+      _ <- Stream.eval(IO {
         query.on(
-          "error",
-          (e: io.scalajs.nodejs.Error) => q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ()))
+          "error", (e: io.scalajs.nodejs.Error) =>
+          //q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunSync)
+          q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ()))
         query.on("end", (_: js.Any) => q.enqueue1(None).unsafeRunAsync(_ => ()))
+        query.on("row", (data: A) => q.enqueue1(Some(Right(data))).unsafeRunAsync(_ => ()))
       })
-      a <- q.dequeue.unNoneTerminate through pipe.rethrow
+      a <- q.dequeue.unNoneTerminate.rethrow
     } yield a
+  }
+
+  def MSSQLSourceRequest[A](qstr: String, config: js.Object | RawOptions | String)
+    (implicit ec: ExecutionContext): IO[common.Request] = {
+    def create() = MSSQL.connect(config).toIO.map { pool =>
+      val request = pool.request()
+      request.stream = true
+      request.query(qstr)
+      request
+    }
+    create()
   }
 
   /**
@@ -185,22 +191,23 @@ object sources {
     * pool then use `queryToStream` once you create your query request.
     * @see https://www.npmjs.com/package/mssql#tedious connection string info.
     */
-  def MSSQLSource[A](qstr: String, config: RawOptions | String)(implicit s: Strategy): Stream[Task, A] = {
-    def create() = MSSQL.connect(config).toTask.map { pool =>
-      val query = pool.request()
-      query.stream = true
-      query.query(qstr)
-      query
+  def MSSQLSource[A](qstr: String, config: js.Object | RawOptions | String, qsize: Int = 1000)
+    (implicit ec: ExecutionContext): Stream[IO, A] = {
+    def create() = MSSQL.connect(config).toIO.map { pool =>
+      val request = pool.request()
+      request.stream = true
+      request.query(qstr)
+      request
     }
     Stream.bracket(create())(
-      (q: Query) => queryToStream(q),
-      (q: Query) => Task.now(()) // close something?
+      (q: common.Request) => queryToStream[A](q, qsize),
+      (q: common.Request) => IO.pure(()) // close something?
     )
   }
 
   /** Add a source string based on the record index position.
     */
-  def toInput[A](startIndex: Int = 1): Pipe[Task, A, InputContext[A]] =
+  def toInput[A](startIndex: Int = 1): Pipe[IO, A, InputContext[A]] =
     _.zipWithIndex.map {
       case (rec, idx) =>
         val i = idx + startIndex

@@ -5,24 +5,9 @@
 package dynamics
 package http
 
-import scala.scalajs.js
-import js.{|, _}
-import scala.concurrent.{Future, ExecutionContext}
-import js.annotation._
-import fs2._
-import fs2.util._
-import cats._
-import cats.data._
-import cats.implicits._
-import fs2.interop.cats._
-import fs2.Task._
-
-import js.JSConverters._
-import scala.annotation.implicitNotFound
 import scala.collection.mutable
 
 import dynamics.common._
-import fs2helpers._
 
 /**
   * Unexpected status returned, the original request and response may be available.

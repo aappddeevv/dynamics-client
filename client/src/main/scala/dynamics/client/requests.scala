@@ -6,23 +6,11 @@ package dynamics
 package client
 
 import scala.scalajs.js
-import js.{|, _}
-import scala.concurrent.{Future, ExecutionContext}
 import js.annotation._
-import fs2._
-import fs2.util._
-import cats._
-import cats.data._
-import fs2.interop.cats._
-import fs2._
-import js.JSConverters._
-import cats.syntax.show._
 
 import dynamics.common._
-import fs2helpers._
 import dynamics.http._
 import dynamics.http.instances.entityEncoder._
-import dynamics.http.instances.entityDecoder._
 
 trait DynamicsClientRequests {
 
@@ -83,14 +71,14 @@ trait DynamicsClientRequests {
                          upsertPreventCreate: Boolean = false,
                          upsertPreventUpdate: Boolean = false,
                          opts: DynamicsOptions = DefaultDynamicsOptions,
-                         base: String)(implicit enc: EntityEncoder[A]): HttpRequest = {
+                         base: Option[String]=None)(implicit enc: EntityEncoder[A]): HttpRequest = {
     val (b, xtra) = enc.encode(body)
     val h: HttpHeaders =
       if (upsertPreventCreate) HttpHeaders("If-Match" -> "*")
       else if (upsertPreventUpdate) HttpHeaders("If-None-Match" -> "*")
       else HttpHeaders.empty
     val mustHave = HttpHeaders.empty ++ Map("Content-Type" -> Seq("application/json", "type=entry"))
-    HttpRequest(Method.PATCH, s"$base/$entitySet($id)", toHeaders(opts) ++ h ++ xtra ++ mustHave, b)
+    HttpRequest(Method.PATCH, s"${base.getOrElse("")}/$entitySet($id)", toHeaders(opts) ++ h ++ xtra ++ mustHave, b)
   }
 
   def mkExecuteFunctionRequest(function: String,

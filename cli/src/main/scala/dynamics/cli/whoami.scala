@@ -18,7 +18,8 @@ import fs2._
 import cats._
 import cats.data._
 import io.scalajs.npm.chalk._
-import MonadlessTask._
+import MonadlessIO._
+import cats.effect._
 
 import dynamics.http._
 import dynamics.http.instances.entityDecoder._
@@ -28,9 +29,7 @@ class WhoAmIActions(context: DynamicsContext) {
   import context._
   implicit val WhoAmIDecoder = JsObjectDecoder[WhoAmI]
 
-  def whoami(): Action =
-    Kleisli { config =>
-      {
+  def whoami() = Action  { config =>
         dynclient
           .executeFunction[WhoAmI]("WhoAmI")
           .map { who =>
@@ -40,8 +39,7 @@ Organization Unit Id: ${who.OrganizationId}
 UserId: ${who.UserId}""")
           }
           .flatMap { _ =>
-            Task.now(())
+            IO.pure(())
           }
       }
-    }
 }

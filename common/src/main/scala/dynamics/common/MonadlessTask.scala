@@ -6,8 +6,9 @@ package dynamics
 package common
 
 import io.monadless._
-import fs2._
+//import fs2._
 
+/*
 trait MonadlessTask extends Monadless[Task] {
 
   def collect[T](list: List[Task[T]]): Task[List[T]] =
@@ -26,19 +27,26 @@ trait MonadlessTask extends Monadless[Task] {
 }
 
 object MonadlessTask extends MonadlessTask
+ */
 
-import cats._
-import cats.data._
-import cats.implicits._
-import cats.effect._
+import _root_.cats._
+import _root_.cats.data._
+import _root_.cats.implicits._
+import _root_.cats.effect._
 
 trait MonadlessIO extends Monadless[IO] {
+
+  def ehandler: ApplicativeError[IO, Throwable]
+
   def collect[T](list: List[IO[T]]): IO[List[T]] = list.sequence
 
   def rescue[T](m: IO[T])(pf: PartialFunction[Throwable, IO[T]]): IO[T] =
-    //m.handleWith(pf) //m.recoverWith(pf)
     m.attempt.flatMap {
-      case Left(e)  => pf.lift(e) getOrElse IO.raiseError(e)
+      case Left(e)  => pf.lift(e) getOrElse ehandler.raiseError(e)
       case Right(a) => IO.pure(a)
     }
+}
+
+object MonadlessIO extends MonadlessIO {
+  val ehandler = ApplicativeError[IO, Throwable]
 }

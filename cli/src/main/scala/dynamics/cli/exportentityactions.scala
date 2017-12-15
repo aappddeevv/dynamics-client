@@ -25,12 +25,11 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
+import cats.effect._
 
 import dynamics.common._
 import dynamics.common.implicits._
 import dynamics.client._
-import MonadlessTask._
 import dynamics.http._
 import dynamics.client.syntax.queryspec._
 import dynamics.http.implicits._
@@ -121,25 +120,19 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     println(s"Deleting entities using query: ${config.export.entityQuery}")
     val edef = m.getEntityDefinition3(config.export.exportEntity)
 
-    val deletes =
+    val deletes: Stream[IO, Stream[IO, IO[(DynamicsId, Boolean)]]] =
       Stream.eval(edef).flatMap { ed =>
         dynclient
           .getListStream[js.Object](config.export.entityQuery)
           .map(jsobj => jsobj.asDict[String](ed.PrimaryId))
-          .map { a =>
-            counter.getAndIncrement(); a
-          }
+          .map { a => counter.getAndIncrement(); a }
           .map(id => deleteOne(ed.LogicalCollectionName, id))
           .map(Stream.emit(_))
       }
 
-    concurrent
-      .join(config.common.concurrency)(deletes)
+    deletes.join(config.common.concurrency)
       .run
-      .flatMap(_ =>
-        Task.delay {
-          println(s"Deleted ${counter.get()} records.")
-      })
+      .flatMap(_ => IO { println(s"Deleted ${counter.get()} records.") })
   }
 
   def exportFromQuery() = Action { config =>
@@ -149,30 +142,26 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
     val opts = DynamicsOptions(
       prefers = OData.PreferOptions(maxPageSize = config.export.exportMaxPageSize,
-                                    includeFormattedValues = Some(config.export.exportIncludeFormattedValues)))
+        includeFormattedValues = Some(config.export.exportIncludeFormattedValues)))
     val values =
       dynclient
         .getListStream[js.Object](config.export.entityQuery, opts)
         .drop(config.export.exportSkip.map(_.toLong).getOrElse(0))
 
     Stream
-      .bracket(Task.delay(Fs.createWriteStream(outputpath, null)))(
+      .bracket(IO(Fs.createWriteStream(outputpath, null)))(
         f => {
           if (config.export.exportWrap) f.write("[")
           values
             .map(Utils.render(_))
-            .to(_ map { jstr =>
-              {
-                f.write(jstr + (if (config.export.exportWrap) ",\n" else "\n"))
-              }
-            })
+            .to(_ map { jstr => f.write(jstr + (if (config.export.exportWrap) ",\n" else "\n"))})
         },
-        f => Task.delay(if (config.export.exportWrap) f.write("]")).flatMap(_ => f.endFuture().toTask)
+        f => IO(if (config.export.exportWrap) f.write("]")).flatMap(_ => f.endFuture().toIO)
       )
       .run
   }
 
-  def exportAll(config: AppConfig, q: QuerySpec): Task[Unit] = {
+  def exportAll(config: AppConfig, q: QuerySpec): IO[Unit] = {
     println(s"Export entity: ${config.export.exportEntity}")
     val url = q.url(config.export.exportEntity)
     val opts = DynamicsOptions(
@@ -184,7 +173,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     // either explicit from CLI or retrieve all of them by getting one record
     val columns =
       (
-        if (config.export.exportSelect.size > 0) Task.now(config.export.exportSelect)
+        if (config.export.exportSelect.size > 0) IO.pure(config.export.exportSelect)
         else getAllColumnNames(config, q)
       ).map(allcols => allcols.map(n => (n, n)))
 
@@ -218,14 +207,14 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
           () // sink sign is to return unit
         })
       },
-      streamer => Task.delay(streamer.end())
+      streamer => IO(streamer.end())
     )
 
     withSink.map(_ => () /*Fs.closeSync(f)*/ ).run // build Stream into a Task
   }
 
   /** Get column names by retrieving a single record. */
-  def getAllColumnNames(config: AppConfig, q: QuerySpec): Task[Seq[String]] = {
+  def getAllColumnNames(config: AppConfig, q: QuerySpec): IO[Seq[String]] = {
     val query = q.copy(top = Option(1), select = Nil)
     val url   = query.url(config.export.exportEntity)
     dynclient.getList[js.Object](url).map { records =>
@@ -234,10 +223,10 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     }
   }
 
-  def exportOne(config: AppConfig, q: QuerySpec): Task[Unit] = {
+  def exportOne(config: AppConfig, q: QuerySpec): IO[Unit] = {
     val query = q.copy(top = Option(1), select = Nil)
     val url   = query.url(config.export.exportEntity)
-    Task.delay(println(s"Dump one record in simple key-value format: ${config.export.exportEntity}")).flatMap { _ =>
+    IO(println(s"Dump one record in simple key-value format: ${config.export.exportEntity}")).flatMap { _ =>
       dynclient.getList[js.Object](url).map { records =>
         records.foreach(r => println(s"${PrettyJson.render(r)}"))
         ()
@@ -271,37 +260,29 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   /** Count entities. TODO: Use batch mode. */
   def count(): Action = Kleisli { config =>
+    import metadata._
     val m = new MetadataCache(context)
-
     def mkCountingStream(e: String, pk: String) =
       dynclient
         .getListStream[js.Object](s"/${e}?$$select=${pk}")
-        .map { _ =>
-          1
-        }
-        .sum
+        .as(1)
+        //.sum
+        .fold(0)(_ + _)
         .map(count => (e, count))
 
     val entityList = Stream
       .eval(m.getEntityList())
-      .flatMap(Stream.emits)
-      . // emit one by one
-      filter { entity =>
-        config.common.filter.contains(entity.LogicalName)
-      }
+      .flatMap(Stream.emits[EntityDescription])
+      .filter{entity => config.common.filter.contains(entity.LogicalName) }
       .map(entity => (entity.LogicalCollectionName, entity.PrimaryId))
 
     val counters = //Stream(("contacts",  "contactid")).
       entityList.map(p => mkCountingStream(p._1, p._2))
 
-    val runCounts = concurrent
-      .join(config.common.concurrency)(counters)
+    val runCounts = counters.join(config.common.concurrency)
       .runLog
       .map(_.sortBy(_._1))
-      .flatMap(results =>
-        Task.delay {
-          results.foreach(p => println(s"${p._1}, ${p._2}"))
-      })
+      .flatMap(results => IO { results.foreach(p => println(s"${p._1}, ${p._2}")) })
 
     if (config.export.exportRepeat) Stream.eval(runCounts).repeat.run
     else Stream.eval(runCounts).run

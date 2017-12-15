@@ -19,11 +19,11 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
+import cats.effect._
 
 import io.scalajs.npm.chalk._
-import MonadlessTask._
 
+import MonadlessIO._
 import dynamics.http._
 import dynamics.client._
 import dynamics.client.implicits._
@@ -137,7 +137,7 @@ class MetadataCache(val context: DynamicsContext) {
    }
    */
 
-  def getEntityList(): Task[Seq[EntityDescription]] = {
+  def getEntityList(): IO[Seq[EntityDescription]] = {
     val fields = Seq(
       "Description",
       "LogicalName",
@@ -158,7 +158,7 @@ class MetadataCache(val context: DynamicsContext) {
     }
   }
 
-  def getEntityDescription(entitySet: String): Task[Option[EntityDescription]] = {
+  def getEntityDescription(entitySet: String): IO[Option[EntityDescription]] = {
     //println(s"getEntityDescription: $entitySet")
     val q = QuerySpec(filter = Some(s"EntitySetName eq '$entitySet'"))
     dynclient.getOne[js.Object](q.url("EntityDefinitions"))(ValueWrapper[js.Object]).attempt.map {
@@ -172,7 +172,7 @@ class MetadataCache(val context: DynamicsContext) {
   }
 
   /** Semi-efficient lookup. */
-  def getAttributeMetadataId(entitySet: String, attribute: String): Task[Option[String]] = {
+  def getAttributeMetadataId(entitySet: String, attribute: String): IO[Option[String]] = {
     val eq = QuerySpec(filter = Some(s"EntitySetName eq '$entitySet'"), select = Seq("MetadataId"))
     dynclient.getOne[js.Object](eq.url("EntityDefinitions"))(ValueWrapper[js.Object]).flatMap { obj =>
       val id = obj.asDyn.MetadataId.asString
@@ -188,10 +188,10 @@ class MetadataCache(val context: DynamicsContext) {
   private def govKey(e: String, a: String) = "getOptionValues-" + e + "-" + a
 
   /** Only gets them if they are local to the entity...not global option sets. */
-  def getOptionValues(entitySet: String, attribute: String): Task[Seq[OptionValue]] = {
+  def getOptionValues(entitySet: String, attribute: String): IO[Seq[OptionValue]] = {
     val k = govKey(entitySet, attribute)
 
-    val valueOpt: Task[Option[Seq[OptionValue]]] = Task.delay { ucache.get[Seq[OptionValue]](k).toOption }
+    val valueOpt: IO[Option[Seq[OptionValue]]] = IO { ucache.get[Seq[OptionValue]](k).toOption }
 
     val getTask = lift {
       val eid = unlift(getEntityDescription(entitySet)).map(_.MetadataId)
@@ -216,7 +216,7 @@ class MetadataCache(val context: DynamicsContext) {
         result
       })
     }
-    valueOpt.flatMap(_.map(Task.now).getOrElse(getTask))
+    valueOpt.flatMap(_.map(IO.pure).getOrElse(getTask))
   }
 
   /** Given an entity set name, return the entity definition. */
@@ -233,7 +233,7 @@ class MetadataCache(val context: DynamicsContext) {
   }
 
   /** Get entity definition using logical name as the key. Use the entity logical name not the entity set name. */
-  def getEntityDefinition3(ename: String): Task[EntityDescription] = {
+  def getEntityDefinition3(ename: String): IO[EntityDescription] = {
     /*
 GET [Organization URI]/api/data/v8.2/
 EntityDefinitions(LogicalName='account')/Attributes(LogicalName='accountcategorycode')/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options),GlobalOptionSet($select=Options)
@@ -245,8 +245,8 @@ EntityDefinitions(LogicalName='account')/Attributes(LogicalName='accountcategory
 
   /** Given an entity set name and an attribute name, return the attribute type.
     */
-  def getAttributeTypeCode(ename: String, aname: String): Task[AttributeTypeCode] = {
-    getEntityDefinition2(ename).toTask.flatMap { ed =>
+  def getAttributeTypeCode(ename: String, aname: String): IO[AttributeTypeCode] = {
+    getEntityDefinition2(ename).toIO.flatMap { ed =>
       val q =
         QuerySpec(select = Seq("LogicalName", "EntitySetName"),
                   expand =
@@ -266,8 +266,8 @@ EntityDefinitions(LogicalName='account')/Attributes(LogicalName='accountcategory
     *
     * Customer entities: $filter=ObjectTypeCode gt 9999
     */
-  def getObjectTypeCode(ename: String): Task[Option[Int]] = {
-    getEntityDefinition2(ename).toTask.map { ed =>
+  def getObjectTypeCode(ename: String): IO[Option[Int]] = {
+    getEntityDefinition2(ename).toIO.map { ed =>
       ed.ObjectTypeCode.toOption
     }
   }

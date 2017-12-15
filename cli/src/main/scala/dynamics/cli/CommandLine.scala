@@ -17,12 +17,12 @@ import js.DynamicImplicits
 import js.Dynamic.{literal => lit}
 import scala.util.{Try, Success, Failure}
 import fs2._
-import fs2.util._
 import scala.concurrent.duration._
 import io.scalajs.npm.winston
 import io.scalajs.npm.winston._
 import io.scalajs.npm.winston.transports._
 import cats.implicits._
+import cats.effect._
 import monocle.Lens
 import monocle.macros.GenLens
 import monocle.macros.syntax.lens._
@@ -107,13 +107,15 @@ object CommandLine {
     opt[Int]("batchsize")
       .text("If batching is used, this is the batch size.")
       .action((x, c) => c.copy(common = c.common.copy(batchSize = x)))
+    opt[Unit]("batch")
+      .text("If set, try to run things using batch OData.")
+      .action((x,c) => c.lens(_.common.batch).set(true))
     opt[String]("outputdir")
       .text("Output directory for any content output.")
       .action((x, c) => c.copy(common = c.common.copy(outputDir = x)))
     opt[String]("outputfile")
       .text("Output file.")
       .action((x, c) => c.copy(common = c.common.copy(outputFile = Some(x))))
-
   }
 
   /**
@@ -508,6 +510,58 @@ object CommandLine {
       )
   }
 
+ def etl(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    cmd("etl")
+      .text("Run a searchone etl program.")
+      .action((x, c) => withCmd(c, "etl"))
+      .children(
+        arg[String]("etlid")
+          .text("Select the specific etl program to run.")
+          .action((x, c) => c.lens(_.etl.name).set(x)),
+        opt[String]("inputfile")
+          .text("Input CSV file.")
+          .action((x, c) => c.lens(_.etl.dataInputFile).set(x)),
+        opt[String]("etl-params")
+          .text("ETL parameters file.")
+          .action((x, c) => c.lens(_.etl.paramsFile).set(Option(x))),
+        opt[Int]("etl-verbosity")
+          .text("Verbosity for ETL logging. Default is 0 or off.")
+          .action((x, c) => c.lens(_.etl.verbosity).set(x)),
+        opt[Int]("take")
+          .text("Process only N records.")
+          .action((x, c) => c.lens(_.etl.take).set(Some(x))),
+        opt[Int]("drop")
+          .text("Drop first N records.")
+          .action((x, c) => c.lens(_.etl.drop).set(Some(x))),
+        opt[Map[String, String]]("params")
+          .valueName("key1=val1,key2=val2...")
+          .text("Provide parameters using key-value syntax.")
+          .action((x, c) => c.lens(_.etl.cliParameters).set(x)),
+        opt[Int]("maxpagesize")
+          .text("Set the maximum number of entities returned per 'fetch'. If node crashes when exporting large entities, set this smaller than 5000.")
+          .action((x, c) => c.lens(_.etl.maxPageSize).set(Option(x))),
+        opt[Unit]("batch")
+          .text("Use batch interface. See batchsize.")
+          .action((x, c) => c.lens(_.etl.batch).set(true)),
+        opt[Unit]("dryrun")
+          .text("Do not perform final remote operation. Allows user to check processing flow.")
+          .action((x, c) => c.lens(_.etl.dryRun).set(true)),
+        opt[String]("query")
+          .text("Query to run against a DB.")
+          .action((x, c) => c.lens(_.etl.query).set(Some(x))),
+        opt[String]("query-file")
+          .text("File that holds a query to run.")
+          .action((x, c) => c.lens(_.etl.queryFile).set(Some(x))),
+        opt[String]("connection-url")
+          .text("Connecition URL.")
+          .action((x, c) => c.lens(_.etl.connectionUrl).set(Some(x))),
+        opt[String]("connection-file")
+          .text("Connecition file. See https://www.npmjs.com/package/mssql#connection-pools for json format.")
+          .action((x, c) => c.lens(_.etl.connectionFile).set(Some(x))),
+      )
+  }
+
   def solutions(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     val h = CliHelpers(op)
@@ -857,6 +911,7 @@ object CommandLine {
     webresources,
     whoami,
     workflows,
+    etl,
   )
 
   /** Add head and help to a list of options, which by default is all base commands. */

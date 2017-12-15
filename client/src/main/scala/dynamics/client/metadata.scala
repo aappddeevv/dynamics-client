@@ -7,6 +7,7 @@ package dynamics
 package client
 
 import fs2._
+import cats.effect._
 
 case class OptionPair(Label: String, Value: Int)
 
@@ -16,8 +17,7 @@ case class OptionPair(Label: String, Value: Int)
 case class Metadata(client: DynamicsClient) {
 
   /** Fetch option set from server. */
-  def getOptionSet(entityName: String, attribute: String): Task[Seq[OptionPair]] = {
-    Task.now(Seq())
-  }
+  def getOptionSet(entityName: String, attribute: String): IO[Seq[OptionPair]] =
+    IO.pure(Seq())
 
 }

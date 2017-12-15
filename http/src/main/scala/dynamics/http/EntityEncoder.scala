@@ -6,16 +6,13 @@ package dynamics
 package http
 
 import scala.scalajs.js
-import js.{|, _}
 import scala.concurrent.{Future, ExecutionContext}
 import js.annotation._
 import fs2._
-import fs2.util._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
-import fs2.Task._
+import cats.effect._
 
 import js.JSConverters._
 import scala.annotation.implicitNotFound
@@ -47,17 +44,17 @@ object EntityEncoder {
 trait EntityEncoderInstances {
 
   implicit val StringEncoder: EntityEncoder[String] = new EntityEncoder[String] {
-    def encode(a: String) = (Task.now(a), HttpHeaders.empty)
+    def encode(a: String) = (IO.pure(a), HttpHeaders.empty)
   }
 
   /** scalajs specific */
   implicit val JsDynamicEncoder: EntityEncoder[js.Dynamic] = new EntityEncoder[js.Dynamic] {
-    def encode(a: js.Dynamic) = (Task.now(JSON.stringify(a)), HttpHeaders.empty)
+    def encode(a: js.Dynamic) = (IO.pure(js.JSON.stringify(a)), HttpHeaders.empty)
   }
 
   /** scalajs specific */
   def JsObjectEncoder[A <: js.Object]: EntityEncoder[A] = new EntityEncoder[A] {
-    def encode(a: A) = (Task.now(JSON.stringify(a)), HttpHeaders.empty)
+    def encode(a: A) = (IO.pure(js.JSON.stringify(a)), HttpHeaders.empty)
   }
 
   /** Implicitly decode anything that is a subclass of js.Object. */
@@ -70,7 +67,7 @@ trait EntityEncoderInstances {
 
   /** play json */
   implicit val JsValueEncoder: EntityEncoder[JsValue] = new EntityEncoder[JsValue] {
-    def encode(a: JsValue) = (Task.now(Json.stringify(a)), HttpHeaders.empty)
+    def encode(a: JsValue) = (IO.pure(Json.stringify(a)), HttpHeaders.empty)
   }
 
 }
@@ -106,7 +103,7 @@ object EntityBody {
  }*/
 
 object Entity {
-  val empty: Entity = Task.now("")
+  val empty: Entity = IO.pure("")
 
-  def fromString(s: String): Entity = Task.now(s)
+  def fromString(s: String): Entity = IO.pure(s)
 }

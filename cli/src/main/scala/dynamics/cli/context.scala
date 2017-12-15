@@ -4,13 +4,13 @@
 
 package dynamics
 package cli
+import cats.effect.IO
 
 import client.DynamicsClient
 
 /** Context for running commands. */
 trait Context {
   implicit val e: scala.concurrent.ExecutionContext
-  implicit val s: fs2.Strategy
   implicit val sch: fs2.Scheduler
 }
 
@@ -19,10 +19,11 @@ trait DynamicsContext extends Context {
 
   /** Set your own LCID. Default is US English. */
   val LCID: Int = 1033
+
   implicit val dynclient: DynamicsClient
 
   /** Execute to close. */
-  def close(): fs2.Task[Unit]
+  def close(): IO[Unit]
 }
 
 object DynamicsContext {
@@ -37,7 +38,6 @@ object DynamicsContext {
     new DynamicsContext {
       import dynamics.client._
       implicit val e   = scala.concurrent.ExecutionContext.Implicits.global
-      implicit val s   = Strategy.fromExecutionContext(e)
       implicit val sch = Scheduler.default
 
       val fetchOpts = NodeFetchClientOptions(timeoutInMillis = config.common.requestTimeOutInMillis.getOrElse(0))
@@ -47,7 +47,8 @@ object DynamicsContext {
           ADAL(config.common.connectInfo))(
           NodeFetchClient.newClient(config.common.connectInfo, config.common.debug, opts = fetchOpts))
 
-      implicit val dynclient = DynamicsClient(httpclient, config.common.connectInfo, config.common.debug)
+      implicit val dynclient: DynamicsClient =
+        DynamicsClient(httpclient, config.common.connectInfo, config.common.debug)
 
       def close() = httpclient.dispose
     }

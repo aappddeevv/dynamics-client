@@ -18,9 +18,10 @@ import cats._
 import cats.data._
 import cats.implicits._
 import io.scalajs.npm.chalk._
+import cats.effect._
 
 import dynamics.common._
-import MonadlessTask._
+import MonadlessIO._
 import dynamics.client._
 import dynamics.http._
 import dynamics.common.syntax.jsdynamic._
@@ -42,7 +43,7 @@ class ImportDataActions(val context: DynamicsContext) {
   implicit val dec10                 = JsObjectDecoder[BulkDeleteResponse]
 
   type WaitTuple   = (Int, String, AsyncOperationOData) // status, msg, data
-  type WaitHandler = PartialFunction[fs2.util.Attempt[AsyncOperationOData], Option[WaitTuple]]
+  type WaitHandler = PartialFunction[Either[Throwable, AsyncOperationOData], Option[WaitTuple]]
 
   /** Looks for statecode = 3. If job not found, returns None. */
   def waitHandler(id: String): WaitHandler = {
@@ -60,12 +61,12 @@ class ImportDataActions(val context: DynamicsContext) {
 
   def waitForJobStream(jobid: String,
                        delta: FiniteDuration = 10.seconds,
-                       handler: WaitHandler): Stream[Task, WaitTuple] =
-    fs2helpers.unfoldEvalWithDelay[WaitTuple]({
+                       handler: WaitHandler): Stream[IO, WaitTuple] =
+    fs2helpers.unfoldEvalWithDelay[IO,WaitTuple]({
       dynclient.getOneWithKey[AsyncOperationOData]("asyncoperations", jobid).attempt.map { handler(_) }
     }, _ => delta)
 
-  def waitForJobStreamPrint(jobid: String, delta: FiniteDuration = 10.seconds): Task[Unit] = {
+  def waitForJobStreamPrint(jobid: String, delta: FiniteDuration = 10.seconds): IO[Unit] = {
     waitForJobStream(jobid, delta, waitHandler(jobid)).zipWithPrevious.map {
       _ match {
         case (None, curr)                               => println(curr._2)
@@ -75,7 +76,7 @@ class ImportDataActions(val context: DynamicsContext) {
     }
   }.run
 
-  def reportImportStatus(importid: String): Task[Unit] =
+  def reportImportStatus(importid: String): IO[Unit] =
     dynclient.getOneWithKey[ImportJson]("imports", importid).map { i =>
       val msg = AsyncOperation.ImportStatusCode
         .get(i.statuscode.getOrElse(-1))
@@ -126,7 +127,7 @@ class ImportDataActions(val context: DynamicsContext) {
       }
 
       if (!Utils.fexists(path))
-        Task.delay(println(s"File $path is not accessible for importing."))
+        IO(println(s"File $path is not accessible for importing."))
       else
         lift {
           println("Creating import.")
@@ -192,7 +193,7 @@ class ImportDataActions(val context: DynamicsContext) {
     }
   }
 
-  def reportImportFileBasicStats(ifileid: String, debug: Boolean = false): Task[Unit] = {
+  def reportImportFileBasicStats(ifileid: String, debug: Boolean = false): IO[Unit] = {
     dynclient.getOneWithKey[ImportFileJson]("importfiles", ifileid).map { importrec =>
       if (debug) println(s"Importfile record: ${PrettyJson.render(importrec)}")
       println(s"Status       : ${importrec.statuscode}")
@@ -203,7 +204,7 @@ class ImportDataActions(val context: DynamicsContext) {
   }
 
   /** Return the jobid of the parsing job. */
-  def requestParsing(importid: String): Task[String] = {
+  def requestParsing(importid: String): IO[String] = {
     dynclient
       .executeAction[AsyncOperationOData]("Microsoft.Dynamics.CRM.ParseImport",
                                           Entity.fromString(""),
@@ -212,7 +213,7 @@ class ImportDataActions(val context: DynamicsContext) {
   }
 
   /** Return the jobid of the transform job. */
-  def requestTransform(importid: String): Task[String] = {
+  def requestTransform(importid: String): IO[String] = {
     dynclient
       .executeAction[AsyncOperationOData]("TransformImport",
                                           Entity.fromString(s"""{ "ImportId": "$importid"  }"""),
@@ -221,7 +222,7 @@ class ImportDataActions(val context: DynamicsContext) {
   }
 
   /** Return the jobid of the import job. */
-  def requestImport(importid: String): Task[String] = {
+  def requestImport(importid: String): IO[String] = {
     dynclient
       .executeAction[AsyncOperationOData]("Microsoft.Dynamics.CRM.ImportRecordsImport",
                                           Entity.fromString(""),
@@ -300,7 +301,7 @@ class ImportDataActions(val context: DynamicsContext) {
     )
     val deleteone = (id: String) =>
       dynclient.delete("imports", id).flatMap { id =>
-        Task.delay(println(s"[$id] Deleted on ${new Date().toISOString()}."))
+        IO(println(s"[$id] Deleted on ${new Date().toISOString()}."))
     }
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
 
@@ -333,7 +334,7 @@ class ImportDataActions(val context: DynamicsContext) {
     )
     dynclient.executeAction[BulkDeleteResponse](BulkDeleteAction, req.toEntity._1).flatMap { resp =>
       resp.JobId.fold({
-        Task.delay(println(s"No job id was returned to monitor."))
+        IO(println(s"No job id was returned to monitor."))
       })({ id =>
         println(s"Bulk delete job [${req.JobName}] id: ${resp.JobId}")
         waitForJobStreamPrint(id)

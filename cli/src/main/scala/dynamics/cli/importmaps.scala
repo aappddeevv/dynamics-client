@@ -17,6 +17,7 @@ import cats._
 import cats.data._
 import cats.implicits._
 import io.scalajs.npm.chalk._
+import cats.effect._
 
 import dynamics.common._
 import dynamics.client
@@ -69,7 +70,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
     Utils.filterForMatches(items.map(a => (a, Seq(a.name, a.description, a.importmapid))), filters)
 
   /** Get an import map's XML content. */
-  def getImportMapXml(importMapId: String): Task[String] = {
+  def getImportMapXml(importMapId: String): IO[String] = {
     import context._
     dynclient
       .executeAction[ExportMappingsImportMapResponse](ExportMappingsImportMapAction,
@@ -78,33 +79,31 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
       .map(_.MappingsXml)
   }
 
-  def download(): Action = Kleisli { config =>
-    {
-      getList().map(filter(_, config.common.filter)).map { _.map(imap => (imap.importmapid, imap.name)) }.flatMap {
-        ids =>
-          Task
-            .traverse(ids) {
-              case (id, name) =>
-                dynclient
-                  .executeAction[js.Dynamic]("Microsoft.Dynamics.CRM.ExportMappingsImportMap",
-                                             Entity.fromString("{ ExportIds: false }"),
-                                             Some(("importmaps", id)))(JSONDecoder)
-                  .flatMap { jsdyn =>
-                    val resp = jsdyn.asInstanceOf[ExportMappingsImportMapResponse]
-                    val path = Utils.pathjoin(config.common.outputDir, s"${name}.xml")
-                    val doit: Task[Unit] =
-                      if (config.common.noclobber && Utils.fexists(path))
-                        Task.delay(println(s"Importmap download file $path exists and noclobber is set."))
-                      else
-                        Utils
-                          .writeToFile(path, resp.MappingsXml)
-                          .map(_ => println(s"Wrote importmap file: $path"))
-                    doit
-                  }
-            }
-            .map(_ => ()) // just to make it return the right value, Unit
-      }
-    }
+  def download() = Action { config =>
+      getList()
+        .map(filter(_, config.common.filter))
+        .map { _.map(imap => (imap.importmapid, imap.name)) }
+        .flatMap { ids =>
+          ids.toList.traverse {
+            case (id, name) =>
+              dynclient
+                .executeAction[js.Dynamic]("Microsoft.Dynamics.CRM.ExportMappingsImportMap",
+                  Entity.fromString("{ ExportIds: false }"),
+                  Some(("importmaps", id)))(JSONDecoder)
+                .flatMap { jsdyn =>
+                  val resp = jsdyn.asInstanceOf[ExportMappingsImportMapResponse]
+                  val path = Utils.pathjoin(config.common.outputDir, s"${name}.xml")
+                  val doit: IO[Unit] =
+                    if (config.common.noclobber && Utils.fexists(path))
+                      IO(println(s"Importmap download file $path exists and noclobber is set."))
+                    else
+                      Utils
+                        .writeToFile(path, resp.MappingsXml)
+                        .map(_ => println(s"Wrote importmap file: $path"))
+                  doit
+                }
+          }.map(_ => ()) // just to make it return the right value, Unit
+        }
   }
 
   def list(): Action = Kleisli { config =>
@@ -126,7 +125,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
   }
 
   /** Import a map. Overwrites anything that already exists with the same name. */
-  def importImportMap(xmlContent: String): Task[ImportMapOData] = {
+  def importImportMap(xmlContent: String): IO[ImportMapOData] = {
     val payload = new ImportMappingsImportMap(MappingsXml = xmlContent)
     dynclient.executeAction[ImportMapOData](ImportMappingsImportMapAction, payload.toEntity._1)
   }
@@ -135,13 +134,13 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
   import dynamics.common.implicits._
 
   /** Upload a single import map. Potentially clobber it if it already exists. */
-  def uploadOne(file: String, noclobber: Boolean): Task[Unit] = {
+  def uploadOne(file: String, noclobber: Boolean): IO[Unit] = {
     // test to see if it already exists, if so, delete it?
     val contents: String             = Utils.slurp(file)
     val f: JSCallbackNPM[js.Dynamic] = Xml2js.parseString[js.Dynamic](contents, _)
 
-    val checkAndMaybeDelete: Task[(Boolean, String)] =
-      f.toTask.flatMap { mapdata =>
+    val checkAndMaybeDelete: IO[(Boolean, String)] =
+      f.toIO.flatMap { mapdata =>
         //println("JSON: " + Utils.render(mapdata.asJSObject))
         val mapname = mapdata.Map.`$`.Name.asString
         val qs      = QuerySpec(filter = Some(s"name eq '$mapname'"))
@@ -156,11 +155,11 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
             } else {
               // do not clobber!
               println("Command option noclobber is true so the import map on the server will not be changed.")
-              Task.now((false, mapname))
+              IO.pure((false, mapname))
             }
           } else {
             // nothing there!
-            Task.now((true, mapname))
+            IO.pure((true, mapname))
           }
         }
       }
@@ -174,16 +173,16 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
             logger.error(e.toString)
         }
       case (false, file) =>
-        Task.delay(println(s"Import map $file was not uploaded."))
+        IO(println(s"Import map $file was not uploaded."))
     })
   }
 
-  def upload(files: Seq[String], noclobber: Boolean = true): Task[Unit] = {
+  def upload(files: Seq[String], noclobber: Boolean = true): IO[Unit] = {
     val loads = files.map { f =>
       if (Utils.fexists(f)) uploadOne(f, noclobber)
-      else Task.delay(println(s"Import map $f is not accessible to upload."))
+      else IO(println(s"Import map $f is not accessible to upload."))
     }
-    Task.traverse(loads)(identity).map(_ => ())
+    loads.toList.sequence.map(_ => ())
   }
 
   /** Upload and optionally clobber an import map. */

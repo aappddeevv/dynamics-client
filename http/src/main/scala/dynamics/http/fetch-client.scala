@@ -10,12 +10,10 @@ import js.{|, _}
 import scala.concurrent.{Future, ExecutionContext}
 import js.annotation._
 import fs2._
-import fs2.util._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
-import fs2.Task._
+import cats.effect._
 import js.JSConverters._
 import scala.annotation.implicitNotFound
 import org.slf4j._
@@ -170,12 +168,13 @@ object NodeFetchClient extends LazyLogger {
   def newClient(info: ConnectionInfo,
                 debug: Boolean = false,
                 defaultHeaders: HttpHeaders = HttpHeaders.empty,
-                opts: NodeFetchClientOptions = DefaultNodeFetchClientOptions)(implicit ec: ExecutionContext,
-                                                                              strategy: Strategy,
-                                                                              scheduler: Scheduler): Client = {
+    opts: NodeFetchClientOptions = DefaultNodeFetchClientOptions)
+    (implicit ec: ExecutionContext,
+      ehandler: ApplicativeError[IO, Throwable],
+      scheduler: Scheduler): Client = {
 
     require(info.dataUrl.isDefined)
-    val donothing = Task.now(())
+    val donothing = IO.pure(())
 
     val base =
       if (info.dataUrl.get.endsWith("/")) info.dataUrl.get.dropRight(1)
@@ -195,7 +194,6 @@ object NodeFetchClient extends LazyLogger {
             logger.debug(s"FETCH BODY: ${bodyString}")
             logger.debug("FETCH FINAL HEADERS: " + HttpHeaders.render(mergedHeaders))
           }
-
           val fetchopts = new RequestOptions(
             body = bodyString,
             headers = mergedHeaders.mapValues(_.mkString(";")).toJSDictionary,
@@ -203,21 +201,21 @@ object NodeFetchClient extends LazyLogger {
             timeout = opts.timeoutInMillis,
             method = request.method.name
           )
-          fetch(url, fetchopts).toTask.attempt.flatMap {
+          fetch(url, fetchopts).toIO.attempt.flatMap {
             case Right(r) =>
               // convert headers as String -> Seq[String] to just String -> String, is this wrong?
               val headers: HttpHeaders = r.headers.raw().mapValues(_.toSeq).toMap
               //.asInstanceOf[js.Dictionary[Seq[String]]]
-              val hresp = HttpResponse(Status.lookup(r.status), headers, r.text().toTask)
+              val hresp = HttpResponse(Status.lookup(r.status), headers, r.text().toIO)
               val dr    = DisposableResponse(hresp, donothing)
               if (debug) {
                 logger.debug(s"FETCH RESPONSE: $dr")
                 //println(s"Raw headers: ${Utils.pprint(r.headers.raw2().asInstanceOf[js.Dynamic])}")
               }
-              Task.now(dr)
+              IO.pure(dr)
             case Left(e) =>
               logger.error(s"node-fetch failure: $e")
-              Task.fail(CommunicationsFailure("node fetch client", Some(e)))
+              ehandler.raiseError(CommunicationsFailure("node fetch client", Some(e)))
           }
       }
     })

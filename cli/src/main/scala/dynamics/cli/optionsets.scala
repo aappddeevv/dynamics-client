@@ -16,15 +16,13 @@ import js.JSConverters._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
 import js.Dynamic.{literal => jsobj}
-import MonadlessTask._
+import MonadlessIO._
+import cats.effect._
 
 import Utils._
 import dynamics.common.implicits._
 import dynamics.http._
-import EntityDecoder._
-import EntityEncoder._
 import dynamics.http.implicits._
 import dynamics.client.implicits._
 import dynamics.client._
@@ -86,13 +84,13 @@ class OptionSetsActions(context: DynamicsContext) extends LazyLogger {
       _ match {
         case Some(obj) =>
           dynclient.getOneWithKey[GlobalOptionSetDefinition](ENTITYSET, obj.MetadataId)
-        case _ => Task.now(None)
+        case _ => IO.pure(None)
       }
     }
   }
 
   /** Get the global option set with just one call. */
-  def findByName2(name: String): Task[GlobalOptionSetDefinition] = {
+  def findByName2(name: String): IO[GlobalOptionSetDefinition] = {
     dynclient.getOneWithKey[GlobalOptionSetDefinition](ENTITYSET, AltId("Name", name))
   }
 

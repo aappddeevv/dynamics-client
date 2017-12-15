@@ -9,10 +9,10 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
+import cats.effect._
 
 final case class DecodeResultOps[T](val dr: DecodeResult[T]) extends AnyVal {
-  def toTask: Task[T] = dr.fold(Task.fail, Task.now).flatten
+  def toIO: IO[T] = dr.fold(IO.raiseError, IO.pure).flatten
 }
 
 trait DecodeResultSyntax {

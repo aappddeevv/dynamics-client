@@ -15,9 +15,19 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
+import cats.effect._
 import io.scalajs.npm.chalk._
 import js.Dynamic.{literal => jsobj}
+
+final case class StreamOps[F[_], O](s: Stream[F, O]) {
+  def vectorChunkN(n: Int): Stream[F, Vector[O]] = s.segmentN(n).map(_.force.toVector)
+  def groupBy[O2](f: O => O2)(implicit eq: Eq[O2]): Stream[F, (O2, Vector[O])] =
+    s.groupAdjacentBy(f).map(p => (p._1, p._2.force.toVector))
+}
+
+trait StreamSyntax {
+  implicit def streamToStream[F[_], O](s: Stream[F, O]): StreamOps[F, O] = StreamOps(s)
+}
 
 final case class JsAnyOps(a: js.Any) {
   def asJsObj: js.Object        = a.asInstanceOf[js.Object]
@@ -85,7 +95,7 @@ object NPMTypes {
   type JSCallback[A]    = js.Function2[js.Error, A, scala.Any] => Unit
 
   /** This does not work as well as I thought it would... */
-  def callbackToTask[A](f: JSCallbackNPM[A])(implicit s: Strategy): Task[A] = JSCallbackOpsNPM(f).toTask
+  def callbackToIO[A](f: JSCallbackNPM[A])(implicit e: ExecutionContext): IO[A] = JSCallbackOpsNPM(f).toIO
 }
 
 import NPMTypes._
@@ -94,9 +104,9 @@ final case class JSCallbackOpsNPM[A](val f: JSCallbackNPM[A]) {
 
   import scala.scalajs.runtime.wrapJavaScriptException
 
-  /** Convert a standard (err, a) callback to a Task. */
-  def toTask(implicit s: Strategy) =
-    Task.async { (cb: (Either[Throwable, A] => Unit)) =>
+  /** Convert a standard (err, a) callback to a IO. */
+  def toIO(implicit e: ExecutionContext) =
+    IO.async { (cb: (Either[Throwable, A] => Unit)) =>
       f((err, a) => {
         if (err == null || js.isUndefined(err)) cb(Right(a))
         else cb(Left(wrapJavaScriptException(err)))
@@ -105,7 +115,7 @@ final case class JSCallbackOpsNPM[A](val f: JSCallbackNPM[A]) {
 }
 
 trait JSCallbackSyntaxNPM {
-  implicit def jsCallbackOpsSyntaxNPM[A](f: JSCallbackNPM[A])(implicit s: Strategy) = JSCallbackOpsNPM(f)
+  implicit def jsCallbackOpsSyntaxNPM[A](f: JSCallbackNPM[A])(implicit s: ExecutionContext) = JSCallbackOpsNPM(f)
 }
 
 trait JsObjectInstances {
@@ -122,10 +132,10 @@ trait JsObjectInstances {
 trait JsPromiseSyntax {
   import scala.scalajs.runtime.wrapJavaScriptException
 
-  /** Convert a js.Promise to a fs2.Task. */
+  /** Convert a js.Promise to a IO. */
   implicit class RichPromise[A](p: js.Promise[A]) {
-    def toTask(implicit S: Strategy): Task[A] = {
-      val t: Task[A] = Task.async { cb =>
+    def toIO(implicit ec: ExecutionContext): IO[A] = {
+      val t: IO[A] = IO.async { cb =>
         p.`then`[Unit](
           { (v: A) =>
             cb(Right(v))
@@ -146,20 +156,20 @@ trait JsPromiseSyntax {
   }
 }
 
-case class FutureOps[A](val f: Future[A])(implicit val s: Strategy, ec: ExecutionContext) {
-  def toTask: Task[A] = Task.fromFuture(f)
+case class FutureOps[A](val f: Future[A])(implicit ec: ExecutionContext) {
+  def toIO: IO[A] = IO.fromFuture(Eval.always(f))
 }
 
 trait FutureSyntax {
-  implicit def futureToTask[A](f: Future[A])(implicit s: Strategy, ec: ExecutionContext) = FutureOps[A](f)
+  implicit def futureToIO[A](f: Future[A])(implicit ec: ExecutionContext) = FutureOps[A](f)
 }
 
-case class IteratorOps[A](val iter: scala.Iterator[A])(implicit s: Strategy, ec: ExecutionContext) {
+case class IteratorOps[A](val iter: scala.Iterator[A])(implicit ec: ExecutionContext) {
   def toFS2Stream[A] = Stream.unfold(iter)(i => if (i.hasNext) Some((i.next, i)) else None)
 }
 
 trait IteratorSyntax {
-  implicit def toIteratorOps[A](iter: scala.Iterator[A])(implicit s: Strategy, ec: ExecutionContext) =
+  implicit def toIteratorOps[A](iter: scala.Iterator[A])(implicit ec: ExecutionContext) =
     IteratorOps[A](iter)
 }
 
@@ -173,6 +183,7 @@ trait AllSyntax
     with FutureSyntax
     with IteratorSyntax
     with JsPromiseSyntax
+with StreamSyntax
 
 // Add each individal syntax trait to this
 object syntax {
@@ -185,6 +196,7 @@ object syntax {
   object future        extends FutureSyntax
   object iterator      extends IteratorSyntax
   object jsPromise     extends JsPromiseSyntax
+  object stream extends StreamSyntax
 }
 
 trait AllInstances extends JsObjectInstances

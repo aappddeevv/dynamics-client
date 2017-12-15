@@ -18,7 +18,6 @@ import scala.util.{Try, Success, Failure}
 import io.scalajs.util.PromiseHelper.Implicits._
 import fs2._
 import fs2.async
-import fs2.util._
 import js.{Array => arr}
 import JSConverters._
 import Dynamic.{literal => jsobj}
@@ -26,11 +25,11 @@ import cats._
 import cats.data._
 import cats.implicits._
 import io.scalajs.npm.chalk._
-import fs2.interop.cats._
+import cats.effect._
 import scala.util.matching.Regex
 
 import dynamics.common._
-import MonadlessTask._
+import MonadlessIO._
 import dynamics.common.implicits._
 import dynamics.http._
 import dynamics.http.implicits._
@@ -73,7 +72,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
     Utils.filterForMatches(wr.map(a => (a, Seq(a.displayname, a.name, a.webresourceid))), filters)
 
   /** Combinator to obtain web resources automatically */
-  def withData: Kleisli[Task, AppConfig, (AppConfig, Seq[WebResourceOData])] =
+  def withData: Kleisli[IO, AppConfig, (AppConfig, Seq[WebResourceOData])] =
     Kleisli { config =>
       getList()
         .map { wr =>
@@ -82,7 +81,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
         .map((config, _))
     }
 
-  type WRKleisli = Kleisli[Task, (AppConfig, Seq[WebResourceOData]), Unit]
+  type WRKleisli = Kleisli[IO, (AppConfig, Seq[WebResourceOData]), Unit]
 
   /**
     *  List Web Resources but apply a filter.
@@ -104,7 +103,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
   def delete() = Action { config =>
     val deleteone = (name: String, id: String) =>
       dynclient.delete("webresourceset", id).flatMap { id =>
-        Task.delay(println(s"[${name}] Deleted."))
+        IO(println(s"[${name}] Deleted."))
     }
 
     lift {
@@ -117,7 +116,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
       if (filtered.length == 0)
         println(s"No Web Resources matched the regex arguments.")
 
-      val bunchOfDeletes: List[Task[Unit]] = filtered.map(wr => deleteone(wr.name, wr.webresourceid)).toList
+      val bunchOfDeletes: List[IO[Unit]] = filtered.map(wr => deleteone(wr.name, wr.webresourceid)).toList
 
       // Maybe publish everything after processing bunchOfDeletes
       unlift(
@@ -125,7 +124,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
           _ =>
             if (config.webResource.webResourceDeletePublish)
               publishXml(filtered.map(_.webresourceid)).map(_ => println("Published changes."))
-            else Task.now(())))
+            else IO.pure(())))
     }
   }
 
@@ -143,7 +142,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
             ()
           }
         }
-        Task.traverse(content)(identity).flatMap(_ => Task.now(()))
+        content.sequence.flatMap(_ => IO.pure(()))
       }
     }
 
@@ -163,15 +162,15 @@ class WebResourcesCommand(val context: DynamicsContext) {
             val origFilename = wr.name
             val filename     = Utils.pathjoin(config.common.outputDir, origFilename)
             val exists       = Utils.fexists(filename)
-            val downloadOrNot: Task[Unit] =
+            val downloadOrNot: IO[Unit] =
               if (exists && noclobber)
-                Task.delay { println("Web Resource $origFilename already downloaded and noclobber is set.") } else
+                IO { println("Web Resource $origFilename already downloaded and noclobber is set.") } else
                 writeToFile(filename, wr.content).flatMap(_ =>
-                  Task.delay(println(s"Saving Web Resource: $origFilename -> $filename")))
+                  IO(println(s"Saving Web Resource: $origFilename -> $filename")))
             unlift(downloadOrNot)
           }
         }
-        Task.traverse(downloads)(identity).flatMap(_ => Task.now(()))
+        downloads.toList.sequence.flatMap(_ => IO.pure(()))
       }
     }
 
@@ -183,20 +182,20 @@ class WebResourcesCommand(val context: DynamicsContext) {
     * @param base64Content Base64 encoded string.
     * @return Successful future if file written, otherwise a Future failure.
     */
-  def writeToFile(path: String, base64Content: String): Task[Unit] = {
+  def writeToFile(path: String, base64Content: String): IO[Unit] = {
     val binary = Buffer.from(base64Content, "base64")
-    Task.fromFuture(Fse.outputFile(path, binary))
+    IO.fromFuture(Eval.always(Fse.outputFile(path, binary)))
   }
 
   /** Read file, convert to baes64. */
-  def base64FromFile(path: String): Task[String] =
-    Task.delay {
+  def base64FromFile(path: String): IO[String] =
+    IO {
       var content = Fs.readFileSync(path)
       new Buffer(content).toString("base64")
     }
 
   def upload() = Action { config =>
-    val f: String => Task[Seq[WebResourceOData]] = getWRByName(_)
+    val f: String => IO[Seq[WebResourceOData]] = getWRByName(_)
     val sources = determineCreateOrUpdateActions(config.webResource.webResourceUploadSource flatMap interpretGlob,
                                                  config.webResource.webResourceUploadPrefix,
                                                  f,
@@ -204,33 +203,32 @@ class WebResourcesCommand(val context: DynamicsContext) {
     _process(config, sources)
   }
 
-  protected def log[A](prefix: String): Pipe[Task, A, A] = _.evalMap { a =>
-    Task.delay { println(s"$prefix> $a"); a }
+  protected def log[A](prefix: String): Pipe[IO, A, A] = _.evalMap { a =>
+    IO { println(s"$prefix> $a"); a }
   }
 
   //def watchAndUpload(config: AppConfig): (Stream[Task, Unit], Task[Unit])  = {
   def watchAndUpload() = Action { config =>
-    import Task._
     import dynamics.common.FSWatcher.{add, unlink, change, error}
 
-    val f: String => Task[Seq[WebResourceOData]] = getWRByName(_)
+    val f: String => IO[Seq[WebResourceOData]] = getWRByName(_)
 
     // create a stream of events that closes the chokidar watcher when completed
     val str2 = Stream.bracket(
-      Task.delay(chokidar.watch(config.webResource.webResourceUploadSource.toJSArray,
+      IO(chokidar.watch(config.webResource.webResourceUploadSource.toJSArray,
                                 new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
-      cwatcher => FSWatcherOps.toStream(cwatcher, Seq(add, unlink, change, error)),
-      cwatcher => Task.delay(cwatcher.close()))
+      cwatcher => FSWatcherOps.toStream[IO](cwatcher, Seq(add, unlink, change, error)),
+      cwatcher => IO(cwatcher.close()))
 
     // array of regexs
     val skips = config.webResource.webResourceUploadWatchIgnore.map(new Regex(_))
 
-    def identifyFileAction(p: (String, String)): Traversable[Task[FileAction]] = {
+    def identifyFileAction(p: (String, String)): Traversable[IO[FileAction]] = {
       val event = p._1
       val path  = p._2
 
       if (skips.map(_.findFirstIn(path).isDefined).filter(identity).length > 0) {
-        Seq(Task.now((NoAction(s"Path $path was identified to be skipped."), WebResourceFile(path, path))))
+        Seq(IO((NoAction(s"Path $path was identified to be skipped."), WebResourceFile(path, path))))
       } else
         event match {
           case "add" | "change" =>
@@ -247,10 +245,10 @@ class WebResourcesCommand(val context: DynamicsContext) {
               else (NoAction(s"No existing Web Resource with name $resourceName found."), WebResourceFile(path, path))
             }
             Seq(fileActionF)
-          case "error" => Seq(Task.delay((NoAction(path), WebResourceFile(path, path))))
+          case "error" => Seq(IO((NoAction(path), WebResourceFile(path, path))))
           case _ =>
             Seq(
-              Task.delay((NoAction(s"Event $event occurred but no action identified to take for $path."),
+              IO((NoAction(s"Event $event occurred but no action identified to take for $path."),
                           WebResourceFile(path, path))))
         }
     }
@@ -259,12 +257,11 @@ class WebResourcesCommand(val context: DynamicsContext) {
       .through(fs2helpers.log[(String, String)] { p =>
         println(format(p._2, s"Event: ${p._1} detected. Identifying action to take..."))
       })
-      .through(pipe.lift(identifyFileAction))
-      .through(pipe.lift(_process(config, _)))
+      .map(identifyFileAction)
+      .map(_process(config, _))
       .flatMap(Stream.eval(_))
 
-    Task
-      .delay(println("Watching for changes in web resources..."))
+    IO(println("Watching for changes in web resources..."))
       .flatMap(_ => estr.run)
   }
 
@@ -312,10 +309,10 @@ class WebResourcesCommand(val context: DynamicsContext) {
     */
   def determineCreateOrUpdateActions(files: Traversable[String],
                                      prefix: Option[String],
-                                     f: String => Task[Seq[WebResourceOData]],
+                                     f: String => IO[Seq[WebResourceOData]],
                                      defaultExt: Option[String] = None,
                                      isIllegal: String => Boolean = isIllegalName,
-                                     skip: String => Boolean = _ => false): Traversable[Task[FileAction]] = {
+                                     skip: String => Boolean = _ => false): Traversable[IO[FileAction]] = {
 
     files map { item =>
       val pathobj      = Path.parse(item)
@@ -332,9 +329,9 @@ class WebResourcesCommand(val context: DynamicsContext) {
       val skipit = skip(nameToCheck)
 
       if (skipit) {
-        Task.now((NoAction(s"Resource is to be skipped."), wrf))
+        IO.pure((NoAction(s"Resource is to be skipped."), wrf))
       } else if (badName) {
-        Task.now((NoAction(s"Resource name is not valid. Does it have spaces, dashes or underscores in it?"), wrf))
+        IO.pure((NoAction(s"Resource name is not valid. Does it have spaces, dashes or underscores in it?"), wrf))
       } else {
         f(wrf.resourceName).map { wrs =>
           if (wrs.length == 1) (Update(wrs(0).webresourceid), wrf)
@@ -351,21 +348,21 @@ class WebResourcesCommand(val context: DynamicsContext) {
   /**
     * Process each FileAction and optionally publish them.
     */
-  def _process(config: AppConfig, sources: Traversable[Task[FileAction]]): Task[Unit] = {
+  def _process(config: AppConfig, sources: Traversable[IO[FileAction]]): IO[Unit] = {
     //val publish = (id: String) => publishXml(dynclient, Seq(id))
     val create          = (data: String) => dynclient.createReturnId("webresourceset", data)
     val allowedToCreate = config.webResource.webResourceUploadRegister
     val shouldPublish   = config.webResource.webResourceUploadPublish
     val canAddToSoln    = config.webResource.webResourceUploadSolution != ""
 
-    def maybeAddToSoln(id: String, mkMsg: String => String = identity): Task[Unit] =
+    def maybeAddToSoln(id: String, mkMsg: String => String = identity): IO[Unit] =
       if (canAddToSoln)
         addToSolution(id, config.webResource.webResourceUploadSolution)
           .map(_ => ())
           .map(_ => println(mkMsg(s"Added to solution: ${config.webResource.webResourceUploadSolution}.")))
-      else Task.now(println(mkMsg(s"Added to solution: Default.")))
+      else IO.pure(println(mkMsg(s"Added to solution: Default.")))
 
-    val factions: Seq[Task[Option[String]]] = sources.toList map {
+    val factions: Seq[IO[Option[String]]] = sources.toList map {
       _ flatMap { action =>
         //println(s"Processing: $action")
         val item  = action._2
@@ -387,14 +384,13 @@ class WebResourcesCommand(val context: DynamicsContext) {
                 }
               }
             }
-            val unknownType: Task[Option[String]] =
-              Task
-                .delay(
+            val unknownType: IO[Option[String]] =
+              IO(
                   println(
                     format(item.fspath,
                            s"Unknown resource type " +
                              s"""[${item.ext.getOrElse("<no file extension>")}]""")))
-                .flatMap(_ => Task.now(None))
+                .flatMap(_ => IO.pure(None))
 
             rtype.fold(unknownType)(createit(_))
 
@@ -416,10 +412,10 @@ class WebResourcesCommand(val context: DynamicsContext) {
             } //:Task[Option[String]]
 
           case NoAction(msg) =>
-            Task.delay(println(format(item.fspath, s"$msg"))).map(_ => None)
+            IO(println(format(item.fspath, s"$msg"))).map(_ => None)
 
           case _ =>
-            Task.delay {
+            IO {
               println(
                 format(
                   item.fspath,
@@ -433,22 +429,21 @@ class WebResourcesCommand(val context: DynamicsContext) {
     }
 
     // Maybe publish all changes after processing all the file actions.
-    Task
-      .traverse(factions)(identity)
+    factions.toList.sequence
       .attempt
       .flatMap {
-        case Right(idOptList) => Task.now(idOptList)
+        case Right(idOptList) => IO.pure(idOptList)
         case Left(t: DynamicsError) =>
           println(s"Error trying to take action on webresources")
           println(t.show)
-          Task.now(Seq())
+          IO.pure(Seq())
       }
       .map { _.collect { case Some(id) => id } }
       . // strip None's from list
       flatMap { ids =>
       if (shouldPublish && ids.size > 0)
         publishXml(ids).map(_ => println(format("*", "Published changes.")))
-      else Task.delay(println(s"No publishing occurred."))
+      else IO(println(s"No publishing occurred."))
     }
   }
 

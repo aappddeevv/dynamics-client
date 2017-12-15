@@ -14,16 +14,14 @@ import js.JSConverters._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
 import js.Dynamic.{literal => jsobj}
+import cats.effect._
 
 import dynamics.common._
-import MonadlessTask._
+import MonadlessIO._
 import Utils._
 import dynamics.common.implicits._
 import dynamics.http._
-import EntityDecoder._
-import EntityEncoder._
 import dynamics.http.implicits._
 import dynamics.client.QuerySpec
 import dynamics.client.implicits._
@@ -76,7 +74,7 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
     }
   }
 
-  val doOne: (String, String, String) => Task[Unit] = (id, body, msg) =>
+  val doOne: (String, String, String) => IO[Unit] = (id, body, msg) =>
     dynclient.update(ENTITYSET, id, body).flatMap { str =>
       dynclient.getOneWithKey[SDKMessageProcessingStep](ENTITYSET, id).map { step =>
         println(s"$msg SDK message [${step.name}] with id ${id}")
@@ -94,7 +92,8 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
           filtered.map(_.sdkmessageprocessingstepid.orEmpty).filterNot(_.isEmpty)
         } else
           Seq(config.sdkMessage.id)
-      unlift(Task.traverse(ids.toSeq.map(id => doOne(id, body, "Activated")))(identity))
+      //unlift(IO.traverse(ids.toSeq.map(id => doOne(id, body, "Activated")))(identity))
+      unlift(ids.toList.map(id => doOne(id, body, "Activated")).sequence)
     }
     doit.map(_ => ())
   }
@@ -110,7 +109,7 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
           filtered.map(_.sdkmessageprocessingstepid.orEmpty).filterNot(_.isEmpty)
         } else
           Seq(config.sdkMessage.id)
-      unlift(Task.traverse(ids.toSeq.map(id => doOne(id, body, "Deactivated")))(identity))
+      unlift(ids.toList.map(id => doOne(id, body, "Deactivated")).sequence)
     }
     doit.map(_ => ())
 

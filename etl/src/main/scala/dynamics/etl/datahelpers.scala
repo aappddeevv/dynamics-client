@@ -11,11 +11,9 @@ import js.Dynamic.{literal => jsobj}
 import JSConverters._
 import scala.concurrent._
 import fs2._
-import fs2.util._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
 
 import dynamics.common._
 import dynamics.common.implicits._

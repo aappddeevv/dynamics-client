@@ -9,13 +9,12 @@ import scala.scalajs.js
 import js._
 import JSConverters._
 import io.scalajs.nodejs._
-import scala.concurrent._
+import scala.concurrent.duration._
 import io.scalajs.util.PromiseHelper.Implicits._
 import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
 import js.Dynamic.{literal => jsobj}
 
 import dynamics.common.implicits._

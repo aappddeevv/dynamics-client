@@ -14,11 +14,11 @@ import js.JSConverters._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
 import js.Dynamic.{literal => jsobj}
+import cats.effect._
 
 import common._
-import MonadlessTask._
+import MonadlessIO._
 import common.Utils._
 import common.implicits._
 import dynamics.http._ // nodejs has an http pkg
@@ -82,7 +82,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
   }
 
   /** Combinator to obtain web resources automatically */
-  protected def withData(): Kleisli[Task, AppConfig, (AppConfig, Seq[SolutionOData])] =
+  protected def withData(): Kleisli[IO, AppConfig, (AppConfig, Seq[SolutionOData])] =
     Kleisli { config =>
       {
         getList().map { wr =>
@@ -92,12 +92,12 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
       }
     }
 
-  protected def _list(): Kleisli[Task, (AppConfig, Seq[SolutionOData]), Unit] =
+  protected def _list(): Kleisli[IO, (AppConfig, Seq[SolutionOData]), Unit] =
     Kleisli {
       case (config, wr) =>
         val topts  = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
         val header = Seq("#", "solutionid", "name", "displayname", "version")
-        Task.delay {
+        IO {
           val data =
             wr.zipWithIndex.map {
               case (i, idx) =>
@@ -145,7 +145,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
 
     val dec = ValueWrapper[SolutionOData]
 
-    Task.delay(println(s"Export solution named ${config.solution.solutionName}.")).flatMap { _ =>
+    IO(println(s"Export solution named ${config.solution.solutionName}.")).flatMap { _ =>
       executeAction[ExportSolutionResponse](ExportSolutionAction, merged.toEntity._1).flatMap { filecontent =>
         val q = QuerySpec(filter = Some(s"uniquename eq '${merged.SolutionName}'"))
         getOne[SolutionOData](q.url("solutions"))(dec).flatMap { solninfo =>
@@ -161,8 +161,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
 
   def delete() = Action { config =>
     val dec = ValueWrapper[SolutionJS] // expect a single record
-    Task
-      .delay(println(s"Deleting solution with name ${config.solution.solutionName}."))
+    IO(println(s"Deleting solution with name ${config.solution.solutionName}."))
       .flatMap { _ =>
         val q = QuerySpec(filter = Some(s"uniquename eq '${config.solution.solutionName}'"))
         getOne(q.url("solutions"))(dec)
@@ -184,7 +183,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
       case "upload" => upload()
       case _ =>
         Action { _ =>
-          Task.delay(println(s"solutions command '${command}' not recognized"))
+          IO(println(s"solutions command '${command}' not recognized"))
         }
     }
 }

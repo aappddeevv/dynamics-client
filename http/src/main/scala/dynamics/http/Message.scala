@@ -6,23 +6,17 @@ package dynamics
 package http
 
 import scala.scalajs.js
-import js.{|, _}
-import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.ExecutionContext
 import js.annotation._
-import fs2._
-import fs2.util._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
-import fs2.Task._
-
+import cats.effect._
 import js.JSConverters._
 import scala.annotation.implicitNotFound
 import scala.collection.mutable
 
 import dynamics.common._
-import fs2helpers._
 
 /**
   * Basic HTTP client code based mostly on http4s.
@@ -37,9 +31,9 @@ trait MessageOps {
     * A decode exception is translated into
     * a failed Task. If the DecodeResult was already failed, that failure is kept.
     */
-  final def as[T](implicit decoder: EntityDecoder[T]): Task[T] =
+  final def as[T](implicit decoder: EntityDecoder[T], ehandler: ApplicativeError[IO, Throwable]): IO[T] =
     //attemptAs(decoder).fold(throw _, identity) // less efficient than below...
-    attemptAs(decoder).fold(Task.fail(_), _.pure[Task]).flatten
+    attemptAs(decoder).fold(ehandler.raiseError(_), _.pure[IO]).flatten
 }
 
 /**
@@ -106,11 +100,11 @@ case class HttpResponse(status: Status, headers: HttpHeaders, body: Entity) exte
   * A response that allows the response object to used then calls an effect
   * after its has been consumed.
   */
-case class DisposableResponse(response: HttpResponse, dispose: Task[Unit]) {
-  def apply[A](f: HttpResponse => Task[A]): Task[A] = {
+case class DisposableResponse(response: HttpResponse, dispose: IO[Unit]) {
+  def apply[A](f: HttpResponse => IO[A])(implicit ehandler: ApplicativeError[IO,Throwable]): IO[A] = {
     val task =
       try f(response)
-      catch { case e: Throwable => Task.fail(e) }
-    task.attempt.flatMap(result => dispose.flatMap(_ => result.fold[Task[A]](Task.fail, Task.now)))
+      catch { case e: Throwable => ehandler.raiseError(e) }
+    task.attempt.flatMap(result => dispose.flatMap(_ => result.fold[IO[A]](IO.raiseError, IO.pure)))
   }
 }

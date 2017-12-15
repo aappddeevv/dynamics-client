@@ -9,6 +9,7 @@ import scala.scalajs.js
 import js._
 import js.annotation._
 import io.scalajs.nodejs.events.IEventEmitter
+import cats.effect._
 
 class NodeCacheOptions(
     val stdTTL: UndefOr[Int] = js.undefined,
@@ -86,25 +87,25 @@ import io.scalajs.nodejs.fs.Fs
 import io.scalajs.nodejs.buffer.Buffer
 
 trait OfflineCache {
-  def close(): Task[Unit]
-  def flush(): Task[Unit]
+  def close(): IO[Unit]
+  def flush(): IO[Unit]
   def write_(k: String): Unit
   def contains_(k: String): Boolean
-  def write: Sink[Task, String]
-  def contains: Pipe[Task, String, (Boolean, String)]
+  def write: Sink[IO, String]
+  def contains: Pipe[IO, String, (Boolean, String)]
   def stats: (Int, Int) // writes, hits
 }
 
 case class NeverInCache() extends OfflineCache {
-  def close(): Task[Unit]           = Task.now(())
-  def flush(): Task[Unit]           = Task.now(())
+  def close(): IO[Unit]           = IO(())
+  def flush(): IO[Unit]           = IO(())
   def write_(k: String): Unit       = {}
   def contains_(k: String): Boolean = false
-  def write: Sink[Task, String] =
+  def write: Sink[IO, String] =
     _.evalMap { line =>
-      Task.now(())
+      IO.pure(())
     }
-  def contains: Pipe[Task, String, (Boolean, String)] =
+  def contains: Pipe[IO, String, (Boolean, String)] =
     _.map { line =>
       (false, line)
     }
@@ -116,11 +117,9 @@ case class LineCache(filename: String) extends OfflineCache {
   protected val counter = new java.util.concurrent.atomic.AtomicInteger(0)
   protected val hits    = new java.util.concurrent.atomic.AtomicInteger(0)
 
-  def close(): Task[Unit] = flush().map(_ => Fs.closeSync(fd))
+  def close(): IO[Unit] = flush().map(_ => Fs.closeSync(fd))
 
-  def flush(): Task[Unit] = Task.delay {
-    ()
-  }
+  def flush(): IO[Unit] = IO(())
 
   protected var cache: Set[String]        = Set()
   protected var fd: nodejs.FileDescriptor = _
@@ -148,11 +147,11 @@ case class LineCache(filename: String) extends OfflineCache {
     r
   }
 
-  def write: Sink[Task, String] = _.evalMap { key =>
-    Task.delay { write_(key); () }
+  def write: Sink[IO, String] = _.evalMap { key =>
+    IO { write_(key); () }
   }
 
-  def contains: Pipe[Task, String, (Boolean, String)] =
+  def contains: Pipe[IO, String, (Boolean, String)] =
     _.map { key =>
       if (contains_(key)) (true, key) else (false, key)
     }
@@ -167,7 +166,7 @@ case class LineCache(filename: String) extends OfflineCache {
 abstract class FileCache(fname: => String, ignore: => Boolean) {
 
   /** Get the content for the cache. */
-  protected def getContent(): Task[String]
+  protected def getContent(): IO[String]
 
   private var content: String = null
 
@@ -179,11 +178,11 @@ abstract class FileCache(fname: => String, ignore: => Boolean) {
   /** Return the offline cache potentially reading from disk or calling getContent().
     * The cache content is accessed/created when the return value is run.
     */
-  def get(): Task[String] = {
+  def get(): IO[String] = {
     if (content != null)
-      Task.now(content)
+      IO.pure(content)
     else if (Utils.fexists(fname) && !ignore && content == null) {
-      Task.delay {
+      IO {
         content = Utils.slurp(fname)
         content
       }

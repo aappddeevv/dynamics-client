@@ -15,9 +15,9 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
 import io.scalajs.npm.chalk._
 import js.Dynamic.{literal => jsobj}
+import cats.effect._
 
 import dynamics.common._
 import dynamics.common.implicits._
@@ -40,7 +40,7 @@ class PublisherActions(context: DynamicsContext) {
     r
   }
 
-  protected def withData(): Kleisli[Task, AppConfig, (AppConfig, Seq[PublisherOData])] =
+  protected def withData(): Kleisli[IO, AppConfig, (AppConfig, Seq[PublisherOData])] =
     Kleisli { config =>
       getList()
         .map { wr =>
@@ -49,10 +49,10 @@ class PublisherActions(context: DynamicsContext) {
         .map((config, _))
     }
 
-  protected def _list(): Kleisli[Task, (AppConfig, Seq[PublisherOData]), Unit] =
+  protected def _list(): Kleisli[IO, (AppConfig, Seq[PublisherOData]), Unit] =
     Kleisli {
       case (config, wr) =>
-        Task.delay {
+        IO {
           println("Publishers")
           val cols  = jsobj("5" -> jsobj(width = 40))
           val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat), columns = cols)

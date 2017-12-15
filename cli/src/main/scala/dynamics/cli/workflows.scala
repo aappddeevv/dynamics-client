@@ -16,10 +16,10 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
+import cats.effect._
 
 import dynamics.common._
-import MonadlessTask._
+import MonadlessIO._
 import dynamics.http._
 import dynamics.client._
 import dynamics.client.implicits._
@@ -70,6 +70,8 @@ class WorkflowActions(val context: DynamicsContext) {
   import context._
   import dynamics.common.implicits._
 
+  val ehandler = implicitly[ApplicativeError[IO,Throwable]]
+
   implicit val dec = JsObjectDecoder[WorkflowJson]
 
   protected def getList(attrs: Seq[String] = Nil) = {
@@ -77,7 +79,7 @@ class WorkflowActions(val context: DynamicsContext) {
     dynclient.getList[WorkflowJson](q.url("workflows"))
   }
 
-  protected def getListStream(attrs: Seq[String] = Nil): Stream[Task, WorkflowJson] = {
+  protected def getListStream(attrs: Seq[String] = Nil): Stream[IO, WorkflowJson] = {
     val q = QuerySpec(select = attrs)
     dynclient.getListStream[WorkflowJson](q.url("workflows"))
   }
@@ -86,17 +88,17 @@ class WorkflowActions(val context: DynamicsContext) {
     Utils.filterForMatches(r.map(a => (a, Seq(a.name.get, a.description.get))), filter)
 
   /** Get a single system job by its id. */
-  def getById(id: String): Task[WorkflowJson] = {
+  def getById(id: String): IO[WorkflowJson] = {
     dynclient.getOneWithKey[WorkflowJson]("workflows", id)
   }
 
-  def getByName(name: String): Task[WorkflowJson] = {
+  def getByName(name: String): IO[WorkflowJson] = {
     val q = QuerySpec(
       filter = Some(s"name eq '$name' and category eq 0")
     )
     dynclient.getList[WorkflowJson](q.url("workflows")).flatMap { r =>
-      if (r.size == 0) return Task.now(r(0))
-      else Task.fail(new IllegalArgumentException("More than one workflow has that name"))
+      if (r.size == 0) return IO.pure(r(0))
+      else ehandler.raiseError(new IllegalArgumentException("More than one workflow has that name"))
     }
   }
 
@@ -174,7 +176,7 @@ class WorkflowActions(val context: DynamicsContext) {
       .map(updater.mkOne(_, "workflowid", updateone))
       .map(Stream.eval(_).map(println))
 
-    concurrent.join(config.common.concurrency)(runme).run
+    runme.join(config.common.concurrency).run
   }
 
   /** Execute a workflow against the results of a query. */
@@ -193,7 +195,7 @@ class WorkflowActions(val context: DynamicsContext) {
       else NeverInCache()
 
     // single shot or batch, batch does not seem to work right now...
-    val finalStep: Pipe[Task, (String, Int), Task[String]] =
+    val finalStep: Pipe[IO, (String, Int), IO[String]] =
       if (!config.workflow.workflowBatch) {
         _ map { p =>
           val entityId = p._1
@@ -204,13 +206,13 @@ class WorkflowActions(val context: DynamicsContext) {
             .map(_ => s"Executed workflow against $entityId")
         }
       } else {
-        val pt1: Pipe[Task, (String, Int), (HttpRequest, String)] =
+        val pt1: Pipe[IO, (String, Int), (HttpRequest, String)] =
           _ map { p: (String, Int) =>
             val source  = s"Entity ${p._2}"
             val request = mkExecuteWorkflowRequest(workflowId, p._1)
             (request.copy(path = dynclient.base + request.path), source) // make full URL for odata patch
           }
-        val pt2: Pipe[Task, (HttpRequest, String), Task[String]] =
+        val pt2: Pipe[IO, (HttpRequest, String), IO[String]] =
           _.vectorChunkN(config.common.batchSize).map(updater.mkBatchFromRequests(_))
         pt1 andThen pt2
       }
@@ -230,11 +232,10 @@ class WorkflowActions(val context: DynamicsContext) {
       .through(finalStep)
       .map(Stream.eval(_).map(println))
 
-    concurrent
-      .join(config.common.concurrency)(runme)
+    runme.join(config.common.concurrency)
       .run
       .flatMap(_ =>
-        Task.delay {
+        IO {
           println(s"${inputs.get} input records.")
           if (config.workflow.workflowCache) println(s"${cache.stats} (writes, hits) in cache.")
           println(s"${counter.get} workflows initiated.")

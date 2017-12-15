@@ -6,33 +6,29 @@ package dynamics
 package http
 
 import scala.scalajs.js
-import js.{|, _}
-import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.ExecutionContext
 import js.annotation._
 import fs2._
-import fs2.util._
 import cats._
 import cats.data._
+import cats.effect._
 import cats.implicits._
-import fs2.interop.cats._
-import fs2.Task._
 import js.JSConverters._
 import scala.annotation.implicitNotFound
 import scala.collection.mutable
 
 import dynamics.common._
-import fs2helpers._
 
 /**
   * Helper objects to make creating DecodeResults easier. DecodeResult is a complex type.
   */
 object DecodeResult {
-  def apply[A](fa: Task[Either[DecodeFailure, A]]): DecodeResult[A] = EitherT(fa)
-  def success[A](a: Task[A]): DecodeResult[A]                       = DecodeResult(a.map(Either.right(_)))
-  def success[A](a: A): DecodeResult[A]                             = success(Task.now(a))
-  def failure[A](e: Task[DecodeFailure]): DecodeResult[A]           = DecodeResult(e.map(Either.left(_)))
-  def failure[A](e: DecodeFailure): DecodeResult[A]                 = failure(Task.now(e))
-  def fail[A]: DecodeResult[A]                                      = failure(Task.now(MessageBodyFailure("Intentionally failed.")))
+  def apply[A](fa: IO[Either[DecodeFailure, A]]): DecodeResult[A] = EitherT(fa)
+  def success[A](a: IO[A]): DecodeResult[A]                       = DecodeResult(a.map(Either.right(_)))
+  def success[A](a: A): DecodeResult[A]                             = success(IO.pure(a))
+  def failure[A](e: IO[DecodeFailure]): DecodeResult[A]           = DecodeResult(e.map(Either.left(_)))
+  def failure[A](e: DecodeFailure): DecodeResult[A]                 = failure(IO.pure(e))
+  def fail[A]: DecodeResult[A]                                      = failure(IO.pure(MessageBodyFailure("Intentionally failed.")))
 }
 
 /**
@@ -108,23 +104,23 @@ trait EntityDecoderInstances {
       .fold(DecodeResult.failure[String](MissingExpectedHeader("OData-EntityId")))(id => DecodeResult.success(id))
   }
 
-  implicit def TextDecoder(implicit s: Strategy): EntityDecoder[String] =
+  implicit def TextDecoder(implicit ec: ExecutionContext): EntityDecoder[String] =
     EntityDecoder { msg =>
       DecodeResult.success(msg.body)
     }
 
-  implicit def JSONDecoder(implicit s: Strategy): EntityDecoder[js.Dynamic] =
+  implicit def JSONDecoder(implicit ec: ExecutionContext): EntityDecoder[js.Dynamic] =
     new EntityDecoder[js.Dynamic] {
       def decode(msg: Message) =
-        DecodeResult.success(msg.body.map(JSON.parse(_)))
+        DecodeResult.success(msg.body.map(js.JSON.parse(_)))
     }
 
   /** Filter on JSON value. Create DecodeFailure if filter func returns false. */
   def JSONDecoderValidate(f: js.Dynamic => Boolean, failedMsg: String = "Failed validation.")(
-      implicit s: Strategy): EntityDecoder[js.Dynamic] = EntityDecoder { msg =>
+      implicit ec: ExecutionContext): EntityDecoder[js.Dynamic] = EntityDecoder { msg =>
     JSONDecoder.decode(msg).flatMap { v =>
-      if (f(v)) EitherT.right(Task.now(v))
-      else EitherT.left(Task.now(MessageBodyFailure(failedMsg)))
+      if (f(v)) EitherT.right(IO.pure(v))
+      else EitherT.left(IO.pure(MessageBodyFailure(failedMsg)))
     }
   }
 
@@ -132,10 +128,10 @@ trait EntityDecoderInstances {
     * Decode the body as json and cast to A instead of JSONDecoder which casts
     * the body to js.Dynamic.
     */
-  def JsObjectDecoder[A <: js.Object](implicit s: Strategy): EntityDecoder[A] =
+  def JsObjectDecoder[A <: js.Object](implicit ec: ExecutionContext): EntityDecoder[A] =
     JSONDecoder.map(_.asInstanceOf[A])
 
-  implicit def jsObjectDecoder[A <: js.Object](implicit s: Strategy) = JsObjectDecoder[A]
+  implicit def jsObjectDecoder[A <: js.Object](implicit ec: ExecutionContext) = JsObjectDecoder[A]
 
   /** Ignore the response. */
   implicit val void: EntityDecoder[Unit] = EntityDecoder { _ =>
@@ -162,7 +158,7 @@ trait EntityDecoderInstances {
     * value array in the response body. This should really be called
     * `FirstElementOfValueArrayIfThereIsOneOrCastWholeMessage`.
     */
-  def ValueWrapper[A <: js.Object](implicit s: Strategy) =
+  def ValueWrapper[A <: js.Object](implicit ec: ExecutionContext) =
     JsObjectDecoder[ValueArrayResponse[A]].flatMapR[A] { arrresp =>
       // if no "value" array, assume its safe to cast to a single A
       arrresp.value.fold(DecodeResult.success(arrresp.asInstanceOf[A]))({ arr =>

@@ -16,14 +16,12 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
+import cats.effect._
 import io.scalajs.npm.chalk._
 
 import dynamics.common._
-import MonadlessTask._
-
+import MonadlessIO._
 import dynamics.http._
-import EntityDecoder._
 import dynamics.client._
 import dynamics.client.implicits._
 import dynamics.common.implicits._
@@ -36,7 +34,7 @@ class MetadataActions(val context: DynamicsContext) {
 
   //val mc = new MetadataCache(context)
 
-  def getCSDL(): Task[String] = {
+  def getCSDL(): IO[String] = {
     val request =
       HttpRequest(Method.GET, "/$metadata", headers = HttpHeaders("Accept" -> "application/xml;charset=utf8"))
     dynclient.http.expect[String](request)
@@ -66,7 +64,7 @@ class MetadataActions(val context: DynamicsContext) {
 
   def downloadCSDL() = Action { config =>
     config.common.outputFile
-      .fold(Task.delay(println("An output file name is required for the downloaded CSDL.")))(ofile => {
+      .fold(IO(println("An output file name is required for the downloaded CSDL.")))(ofile => {
         println(s"Downloading CSDL to output file ${config.common.outputFile}")
         getCSDL().flatMap(Utils.writeToFile(ofile, _))
       })

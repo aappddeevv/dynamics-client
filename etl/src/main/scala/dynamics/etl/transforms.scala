@@ -10,7 +10,7 @@ import fs2._
 import cats._
 import cats.data._
 import cats.syntax.either._
-import fs2.interop.cats._
+import cats.effect._
 
 import dynamics.common._
 
@@ -33,7 +33,7 @@ case class Result[O](
                      /** Input identifier. */
                      source: String,
                      /** Output. One input could result in multiple outputs. Stream is an effect. */
-                     output: Stream[Task, O],
+                     output: Stream[IO, O],
                      /** Messages, if any */
                      messages: Seq[String] = Nil)
 
@@ -74,11 +74,11 @@ object Transform {
 
   /** Create an instance of Transform from f. */
   //def instance[I,O](f: InputContext[I] => Task[TransformResult[I,O]]): Transform[I,O] = Kleisli { f(_) }
-  def instance[I, O](f: InputContext[I] => Task[TransformResult[I, O]]): Transform[I, O] = Kleisli(f)
+  def instance[I, O](f: InputContext[I] => IO[TransformResult[I, O]]): Transform[I, O] = Kleisli(f)
 
   /** Identity transform. */
   def identity[A]: Transform[A, A] = instance { input: InputContext[A] =>
-    Task.delay(TransformResult.success(Result(input.source, Stream.emit(input.input))))
+    IO(TransformResult.success(Result(input.source, Stream.emit(input.input))))
   }
 }
 

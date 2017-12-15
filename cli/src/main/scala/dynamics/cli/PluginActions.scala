@@ -18,7 +18,6 @@ import scala.util.{Try, Success, Failure}
 import io.scalajs.util.PromiseHelper.Implicits._
 import fs2._
 import fs2.async
-import fs2.util._
 import js.{Array => arr}
 import JSConverters._
 import Dynamic.{literal => jsobj}
@@ -26,11 +25,11 @@ import cats._
 import cats.data._
 import cats.implicits._
 import io.scalajs.npm.chalk._
-import fs2.interop.cats._
 import scala.util.matching.Regex
+import cats.effect._
 
 import dynamics.common._
-import MonadlessTask._
+import MonadlessIO._
 import dynamics.common.implicits._
 import dynamics.http._
 import dynamics.http.implicits._
@@ -59,8 +58,8 @@ class PluginActions(val context: DynamicsContext) {
   import context._
 
   /** Read file, convert to baes64. */
-  def base64FromFile(path: String): Task[String] =
-    Task.delay {
+  def base64FromFile(path: String): IO[String] =
+    IO {
       val content = Fs.readFileSync(path)
       new Buffer(content).toString("base64")
     }
@@ -84,7 +83,7 @@ class PluginActions(val context: DynamicsContext) {
     }
   }
 
-  def getByName(name: String): Task[Either[String, PluginAssembly]] = {
+  def getByName(name: String): IO[Either[String, PluginAssembly]] = {
     val q = QuerySpec(filter = Some(s"name eq '${name}'"))
     lift {
       val records = unlift(dynclient.getList[PluginAssembly](q.url("pluginassemblies")))
@@ -121,27 +120,26 @@ class PluginActions(val context: DynamicsContext) {
     val source = config.plugin.source.getOrElse("")
     // chokidar requires a .close() call
     val str2 = Stream.bracket(
-      Task.delay(chokidar.watch(source, new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
-      cwatcher => FSWatcherOps.toStream[Task](cwatcher, Seq(add, change, unlink)),
-      cwatcher => Task.delay(cwatcher.close()))
+      IO(chokidar.watch(source, new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
+      cwatcher => FSWatcherOps.toStream[IO](cwatcher, Seq(add, change, unlink)),
+      cwatcher => IO(cwatcher.close()))
 
     val runme = str2
       .through(fs2helpers.log[(String, String)] { p =>
         println(format("Event detected", s"${p._1}: ${p._2}"))
       })
-      .through(pipe.lift { p =>
+      .map { p =>
         val event = p._1
         val path  = p._2
         event match {
           case "add" | "change" => runOnce(Option(path))
-          case "unlink"         => Task.delay(println(s"File removed: $source"))
-          case _                => Task.delay(println(s"Untracked event on file $source. No action taken."))
+          case "unlink"         => IO(println(s"File removed: $source"))
+          case _                => IO(println(s"Untracked event on file $source. No action taken."))
         }
-      })
+      }
       .flatMap(Stream.eval(_))
 
-    Task
-      .delay(println(s"Watching for changes at: ${source}"))
+    IO(println(s"Watching for changes at: ${source}"))
       .flatMap(_ => runme.run)
   }
 
@@ -155,7 +153,7 @@ class PluginActions(val context: DynamicsContext) {
       case "upload" => upload
       case _ =>
         Action { _ =>
-          Task.delay(println(s"plugins command '${command}' not recognized"))
+          IO(println(s"plugins command '${command}' not recognized"))
         }
     }
 }

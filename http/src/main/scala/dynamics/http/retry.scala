@@ -12,6 +12,8 @@ import fs2._
 import dynamics._
 import cats.data._
 import cats.syntax.show._
+import cats._
+import cats.effect._
 import retry._
 import org.slf4j._
 
@@ -49,22 +51,19 @@ object RetryClient extends LazyLogger {
       policy
   }
 
-  def pause(n: Int = 5, pause: FiniteDuration = 5.seconds, noisy: Boolean = true)(implicit e: ExecutionContext,
-                                                                                  s: Strategy): Middleware =
+  def pause(n: Int = 5, pause: FiniteDuration = 5.seconds, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
     client(Pause(n, pause), noisy)
 
-  def directly(n: Int = 5, noisy: Boolean = true)(implicit e: ExecutionContext, s: Strategy): Middleware =
+  def directly(n: Int = 5, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
     client(Directly(n), noisy)
 
-  protected def client(policy: retry.Policy, noisy: Boolean = true)(implicit e: ExecutionContext,
-                                                                    s: Strategy): Middleware = (c: Client) => {
+  protected def client(policy: retry.Policy, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware = (c: Client) => {
     implicit val success = notBad(noisy)
-
     val basePolicy = policyWithException(policy)
-
     val x: Service[HttpRequest, DisposableResponse] = Kleisli { req: HttpRequest =>
       {
-        Task.fromFuture(basePolicy(c.open(req).unsafeRunAsyncFuture))
+        IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeToFuture)))
+        //IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeRunAsyncFuture)))
         // Task.fromFuture(policy[DisposableResponse]{ () =>
         //   c.open(req).unsafeRunAsyncFuture
         // })

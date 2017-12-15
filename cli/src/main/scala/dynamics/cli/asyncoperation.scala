@@ -18,11 +18,11 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
-import fs2.interop.cats._
+import cats.effect._
 
 import dynamics.common._
 import dynamics.common.implicits._
-import MonadlessTask._
+import MonadlessIO._
 import dynamics.client._
 import dynamics.http._
 import dynamics.client.implicits._
@@ -39,7 +39,7 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
     dynclient.getList[AsyncOperationOData](q.url("asyncoperations"))
   }
 
-  protected def getListStream(attrs: Seq[String] = Nil): Stream[Task, AsyncOperationOData] = {
+  protected def getListStream(attrs: Seq[String] = Nil): Stream[IO, AsyncOperationOData] = {
     val q = QuerySpec(select = attrs)
     dynclient.getListStream[AsyncOperationOData](q.url("asyncoperations"))
   }
@@ -48,11 +48,11 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
     Utils.filterForMatches(r.map(a => (a, Seq(a.name.get))), filter)
 
   /** Get a single system job by its id. */
-  def getById(id: String)(implicit s: Strategy): Task[AsyncOperationOData] = {
+  def getById(id: String)(implicit ec: ExecutionContext): IO[AsyncOperationOData] = {
     dynclient.getOneWithKey[AsyncOperationOData]("asyncoperations", id)
   }
 
-  protected def withData(): Kleisli[Task, AppConfig, (AppConfig, Seq[AsyncOperationOData])] =
+  protected def withData(): Kleisli[IO, AppConfig, (AppConfig, Seq[AsyncOperationOData])] =
     Kleisli { config =>
       getList(Seq("asyncoperationid", "name", "statuscode", "operationtype"))
         .map { res =>
@@ -61,10 +61,10 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
         .map((config, _))
     }
 
-  protected def _list(): Kleisli[Task, (AppConfig, Seq[AsyncOperationOData]), Unit] =
+  protected def _list(): Kleisli[IO, (AppConfig, Seq[AsyncOperationOData]), Unit] =
     Kleisli {
       case (config, res) =>
-        Task.delay {
+        IO {
           println("Async Operations")
           val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
           val data =
@@ -99,7 +99,7 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
 
     val deleteone = (name: String, id: String) =>
       dynclient.delete("asyncoperations", id).flatMap { id =>
-        Task.delay(println(s"[${name}] Deleted on ${new Date().toISOString()}."))
+        IO(println(s"[${name}] Deleted on ${new Date().toISOString()}."))
     }
 
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
@@ -114,7 +114,9 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
         Stream.emits(vec) evalMap
           (item => deleteone(item.name.orEmpty, item.asyncoperationid.get)))
 
-    concurrent.join(5)(nAtATime).run.map(_ => println(s"${counter.get} records processed."))
+    nAtATime.join(5)
+      .run
+      .map(_ => println(s"${counter.get} records processed."))
   }
 
   def deleteCompleted(): Action           = deleteCompletedStream(30)
@@ -156,7 +158,7 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
       .map(updater.mkOne(_, "asyncoperationid", updateone))
       .map(Stream.eval(_).map(println))
 
-    concurrent.join(config.common.concurrency)(runme).run
+    runme.join(config.common.concurrency).run
   //.flatMap(_ => Task.delay(println(s"${counter.get} records processed.")))
   }
 
