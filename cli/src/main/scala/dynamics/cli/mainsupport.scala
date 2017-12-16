@@ -28,6 +28,7 @@ import dynamics.common._
 import dynamics.client._
 import dynamics.http._
 import Status._
+import dynamics.client.implicits._
 
 import CommandLine._
 import Utils._
@@ -97,8 +98,6 @@ object MainHelpers extends LazyLogger {
     }
   }
 
-  import DynamicsError._
-
   /** Process an Attempt (Either) from an Action run.
     * @param start Start time information array from `process.hrtime`.
     */
@@ -163,7 +162,7 @@ object MainHelpers extends LazyLogger {
           case "list" => ops.list()
         }
 
-      case "asyncoperations" =>
+      case "systemjobs" =>
         val ops = new AsyncOperationsCommand(context)
         config.common.subcommand match {
           case "list"                      => ops.list()

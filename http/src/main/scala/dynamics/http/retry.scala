@@ -51,25 +51,27 @@ object RetryClient extends LazyLogger {
       policy
   }
 
-  def pause(n: Int = 5, pause: FiniteDuration = 5.seconds, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
+  def pause(n: Int = 5, pause: FiniteDuration = 5.seconds, noisy: Boolean = true)(
+      implicit e: ExecutionContext): Middleware =
     client(Pause(n, pause), noisy)
 
   def directly(n: Int = 5, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
     client(Directly(n), noisy)
 
-  protected def client(policy: retry.Policy, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware = (c: Client) => {
-    implicit val success = notBad(noisy)
-    val basePolicy = policyWithException(policy)
-    val x: Service[HttpRequest, DisposableResponse] = Kleisli { req: HttpRequest =>
-      {
-        IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeToFuture)))
-        //IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeRunAsyncFuture)))
-        // Task.fromFuture(policy[DisposableResponse]{ () =>
-        //   c.open(req).unsafeRunAsyncFuture
-        // })
+  protected def client(policy: retry.Policy, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
+    (c: Client) => {
+      implicit val success = notBad(noisy)
+      val basePolicy       = policyWithException(policy)
+      val x: Service[HttpRequest, DisposableResponse] = Kleisli { req: HttpRequest =>
+        {
+          IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeToFuture)))
+          //IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeRunAsyncFuture)))
+          // Task.fromFuture(policy[DisposableResponse]{ () =>
+          //   c.open(req).unsafeRunAsyncFuture
+          // })
+        }
       }
+      c.copy(x, c.dispose)
     }
-    c.copy(x, c.dispose)
-  }
 
 }

@@ -17,7 +17,7 @@ import fs2helpers._
 
 package object etl {
 
-  /** Common data record format for alot of ETL functions. */
+  /** Common data record format for many ETL functions. */
   type DataRecord = js.Object
 
   /** Basic transform takes one input and returns a TransformResult wrapped in an effect. */
@@ -59,7 +59,7 @@ package object etl {
     _.collect { case Right(result) => result }
   //_.evalMap(_.value).collect { case Right(result) => result }
 
-  /** Use Result output to cerate InputContext. */
+  /** Use Result output to create InputContext. */
   def ResultToInputContext[I, O]: Pipe[IO, Result[O], InputContext[O]] =
     _ flatMap { r =>
       r.output.map(InputContext[O](_, r.source))
@@ -69,8 +69,8 @@ package object etl {
   def mkPipe[I, O](t: Transform[I, O]): Pipe[IO, InputContext[I], TransformResult[I, O]] =
     _ evalMap { t(_) }
 
-  /** Transform that filters attributes on an input DataRecord.
-    * Order of changes is drops,renames then keeps.
+  /**
+    * Transform that drops, renames and filters attributes on the input record.
     */
   def FilterAttributes(drops: Seq[String] = Nil,
                        renames: Seq[(String, String)] = Nil,

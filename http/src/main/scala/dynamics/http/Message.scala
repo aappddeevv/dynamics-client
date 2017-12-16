@@ -101,7 +101,7 @@ case class HttpResponse(status: Status, headers: HttpHeaders, body: Entity) exte
   * after its has been consumed.
   */
 case class DisposableResponse(response: HttpResponse, dispose: IO[Unit]) {
-  def apply[A](f: HttpResponse => IO[A])(implicit ehandler: ApplicativeError[IO,Throwable]): IO[A] = {
+  def apply[A](f: HttpResponse => IO[A])(implicit ehandler: ApplicativeError[IO, Throwable]): IO[A] = {
     val task =
       try f(response)
       catch { case e: Throwable => ehandler.raiseError(e) }

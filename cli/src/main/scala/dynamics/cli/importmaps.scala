@@ -80,16 +80,17 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
   }
 
   def download() = Action { config =>
-      getList()
-        .map(filter(_, config.common.filter))
-        .map { _.map(imap => (imap.importmapid, imap.name)) }
-        .flatMap { ids =>
-          ids.toList.traverse {
+    getList()
+      .map(filter(_, config.common.filter))
+      .map { _.map(imap => (imap.importmapid, imap.name)) }
+      .flatMap { ids =>
+        ids.toList
+          .traverse {
             case (id, name) =>
               dynclient
                 .executeAction[js.Dynamic]("Microsoft.Dynamics.CRM.ExportMappingsImportMap",
-                  Entity.fromString("{ ExportIds: false }"),
-                  Some(("importmaps", id)))(JSONDecoder)
+                                           Entity.fromString("{ ExportIds: false }"),
+                                           Some(("importmaps", id)))(JSONDecoder)
                 .flatMap { jsdyn =>
                   val resp = jsdyn.asInstanceOf[ExportMappingsImportMapResponse]
                   val path = Utils.pathjoin(config.common.outputDir, s"${name}.xml")
@@ -102,8 +103,9 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
                         .map(_ => println(s"Wrote importmap file: $path"))
                   doit
                 }
-          }.map(_ => ()) // just to make it return the right value, Unit
-        }
+          }
+          .map(_ => ()) // just to make it return the right value, Unit
+      }
   }
 
   def list(): Action = Kleisli { config =>

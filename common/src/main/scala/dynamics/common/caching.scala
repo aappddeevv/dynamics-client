@@ -97,8 +97,8 @@ trait OfflineCache {
 }
 
 case class NeverInCache() extends OfflineCache {
-  def close(): IO[Unit]           = IO(())
-  def flush(): IO[Unit]           = IO(())
+  def close(): IO[Unit]             = IO(())
+  def flush(): IO[Unit]             = IO(())
   def write_(k: String): Unit       = {}
   def contains_(k: String): Boolean = false
   def write: Sink[IO, String] =

@@ -59,10 +59,8 @@ class ImportDataActions(val context: DynamicsContext) {
       } else throw t
   }
 
-  def waitForJobStream(jobid: String,
-                       delta: FiniteDuration = 10.seconds,
-                       handler: WaitHandler): Stream[IO, WaitTuple] =
-    fs2helpers.unfoldEvalWithDelay[IO,WaitTuple]({
+  def waitForJobStream(jobid: String, delta: FiniteDuration = 10.seconds, handler: WaitHandler): Stream[IO, WaitTuple] =
+    fs2helpers.unfoldEvalWithDelay[IO, WaitTuple]({
       dynclient.getOneWithKey[AsyncOperationOData]("asyncoperations", jobid).attempt.map { handler(_) }
     }, _ => delta)
 

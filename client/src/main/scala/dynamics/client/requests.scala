@@ -71,7 +71,7 @@ trait DynamicsClientRequests {
                          upsertPreventCreate: Boolean = false,
                          upsertPreventUpdate: Boolean = false,
                          opts: DynamicsOptions = DefaultDynamicsOptions,
-                         base: Option[String]=None)(implicit enc: EntityEncoder[A]): HttpRequest = {
+                         base: Option[String] = None)(implicit enc: EntityEncoder[A]): HttpRequest = {
     val (b, xtra) = enc.encode(body)
     val h: HttpHeaders =
       if (upsertPreventCreate) HttpHeaders("If-Match" -> "*")

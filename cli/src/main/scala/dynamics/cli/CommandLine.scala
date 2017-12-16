@@ -109,7 +109,7 @@ object CommandLine {
       .action((x, c) => c.copy(common = c.common.copy(batchSize = x)))
     opt[Unit]("batch")
       .text("If set, try to run things using batch OData.")
-      .action((x,c) => c.lens(_.common.batch).set(true))
+      .action((x, c) => c.lens(_.common.batch).set(true))
     opt[String]("outputdir")
       .text("Output directory for any content output.")
       .action((x, c) => c.copy(common = c.common.copy(outputDir = x)))
@@ -371,7 +371,12 @@ object CommandLine {
             opt[Unit]("repeat")
               .text("Repeat forever.")
               .action((x, c) => c.lens(_.export.exportRepeat).set(true)),
-            mkFilterOptBase().required().text("List of entity names to count. Use entity logical names.")
+            opt[Int]("repeat-delay")
+              .text("Delay in seconds between count cycle. The default is 60 seconds.")
+              .action((x, c) => c.lens(_.export.repeatDelay).set(x)),
+            mkFilterOptBase()
+              .required()
+              .text("List of entity names to count. Use entity logical names.")
           ),
         sub("delete-by-query")
           .text("Delete entities based on a query. This is very dangerous to use. Query must return primary key at the very least.")
@@ -381,7 +386,7 @@ object CommandLine {
               .text("Web api format query string e.g. /contacts?$select=...&$filter=...")
               .action((x, c) => c.lens(_.export.entityQuery).set(x)),
             arg[String]("entity")
-              .text("Entity to delete. We need this to identify the primary key")
+              .text("Entity to delete used in query string. We need this to identify the primary key and entity set name automatically.")
               .action((x, c) => c.lens(_.export.exportEntity).set(x))
           ),
         note("""Skip must read records then skip them.""")
@@ -510,7 +515,7 @@ object CommandLine {
       )
   }
 
- def etl(op: scopt.OptionParser[AppConfig]): Unit = {
+  def etl(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     cmd("etl")
       .text("Run a searchone etl program.")
@@ -528,16 +533,16 @@ object CommandLine {
         opt[Int]("etl-verbosity")
           .text("Verbosity for ETL logging. Default is 0 or off.")
           .action((x, c) => c.lens(_.etl.verbosity).set(x)),
-        opt[Int]("take")
+        opt[Long]("take")
           .text("Process only N records.")
           .action((x, c) => c.lens(_.etl.take).set(Some(x))),
-        opt[Int]("drop")
+        opt[Long]("drop")
           .text("Drop first N records.")
           .action((x, c) => c.lens(_.etl.drop).set(Some(x))),
         opt[Map[String, String]]("params")
           .valueName("key1=val1,key2=val2...")
           .text("Provide parameters using key-value syntax.")
-          .action((x, c) => c.lens(_.etl.cliParameters).set(x)),
+          .action((x, c) => c.lens(_.etl.cliParameters).modify(p => p ++ x)),
         opt[Int]("maxpagesize")
           .text("Set the maximum number of entities returned per 'fetch'. If node crashes when exporting large entities, set this smaller than 5000.")
           .action((x, c) => c.lens(_.etl.maxPageSize).set(Option(x))),
@@ -635,7 +640,7 @@ object CommandLine {
 
     cmd("systemjobs")
       .text("Manage system jobs.")
-      .action((x, c) => withSub(c, "asyncoperations"))
+      .action((x, c) => withCmd(c, "systemjobs"))
       .children(
         note("\n"),
         sub("list")

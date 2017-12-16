@@ -216,7 +216,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
     // create a stream of events that closes the chokidar watcher when completed
     val str2 = Stream.bracket(
       IO(chokidar.watch(config.webResource.webResourceUploadSource.toJSArray,
-                                new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
+                        new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
       cwatcher => FSWatcherOps.toStream[IO](cwatcher, Seq(add, unlink, change, error)),
       cwatcher => IO(cwatcher.close()))
 
@@ -249,7 +249,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
           case _ =>
             Seq(
               IO((NoAction(s"Event $event occurred but no action identified to take for $path."),
-                          WebResourceFile(path, path))))
+                  WebResourceFile(path, path))))
         }
     }
 
@@ -386,10 +386,10 @@ class WebResourcesCommand(val context: DynamicsContext) {
             }
             val unknownType: IO[Option[String]] =
               IO(
-                  println(
-                    format(item.fspath,
-                           s"Unknown resource type " +
-                             s"""[${item.ext.getOrElse("<no file extension>")}]""")))
+                println(
+                  format(item.fspath,
+                         s"Unknown resource type " +
+                           s"""[${item.ext.getOrElse("<no file extension>")}]""")))
                 .flatMap(_ => IO.pure(None))
 
             rtype.fold(unknownType)(createit(_))
@@ -429,8 +429,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
     }
 
     // Maybe publish all changes after processing all the file actions.
-    factions.toList.sequence
-      .attempt
+    factions.toList.sequence.attempt
       .flatMap {
         case Right(idOptList) => IO.pure(idOptList)
         case Left(t: DynamicsError) =>

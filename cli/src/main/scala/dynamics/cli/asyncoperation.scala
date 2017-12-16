@@ -114,7 +114,8 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
         Stream.emits(vec) evalMap
           (item => deleteone(item.name.orEmpty, item.asyncoperationid.get)))
 
-    nAtATime.join(5)
+    nAtATime
+      .join(5)
       .run
       .map(_ => println(s"${counter.get} records processed."))
   }

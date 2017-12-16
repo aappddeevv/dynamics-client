@@ -119,10 +119,10 @@ class PluginActions(val context: DynamicsContext) {
     import dynamics.common.FSWatcher.{add, unlink, change, error}
     val source = config.plugin.source.getOrElse("")
     // chokidar requires a .close() call
-    val str2 = Stream.bracket(
-      IO(chokidar.watch(source, new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
-      cwatcher => FSWatcherOps.toStream[IO](cwatcher, Seq(add, change, unlink)),
-      cwatcher => IO(cwatcher.close()))
+    val str2 =
+      Stream.bracket(IO(chokidar.watch(source, new ChokidarOptions(ignoreInitial = true, awaitWriteFinish = true))))(
+        cwatcher => FSWatcherOps.toStream[IO](cwatcher, Seq(add, change, unlink)),
+        cwatcher => IO(cwatcher.close()))
 
     val runme = str2
       .through(fs2helpers.log[(String, String)] { p =>

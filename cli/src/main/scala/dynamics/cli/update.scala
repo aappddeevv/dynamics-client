@@ -106,7 +106,8 @@ class UpdateActions(val context: DynamicsContext) {
         })
         .map(Stream.eval(_).map(println))
 
-    runme.join(config.common.concurrency)
+    runme
+      .join(config.common.concurrency)
       .run
       .flatMap(_ => IO(println(s"${counter.get} input records processed.")))
   }
@@ -137,8 +138,6 @@ class UpdateProcessor(val context: DynamicsContext) {
     j -= pkcol // mutating
     pk.map { (_, JSON.stringify(j.asInstanceOf[js.Object])) }
   }
-
-  import DynamicsError._
 
   /**
     * Run an update based on an input js.Object record and print a result.

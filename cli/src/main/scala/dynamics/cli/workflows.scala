@@ -70,7 +70,7 @@ class WorkflowActions(val context: DynamicsContext) {
   import context._
   import dynamics.common.implicits._
 
-  val ehandler = implicitly[ApplicativeError[IO,Throwable]]
+  val ehandler = implicitly[ApplicativeError[IO, Throwable]]
 
   implicit val dec = JsObjectDecoder[WorkflowJson]
 
@@ -232,7 +232,8 @@ class WorkflowActions(val context: DynamicsContext) {
       .through(finalStep)
       .map(Stream.eval(_).map(println))
 
-    runme.join(config.common.concurrency)
+    runme
+      .join(config.common.concurrency)
       .run
       .flatMap(_ =>
         IO {

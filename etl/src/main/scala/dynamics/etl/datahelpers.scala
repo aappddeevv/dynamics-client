@@ -18,12 +18,15 @@ import cats.implicits._
 import dynamics.common._
 import dynamics.common.implicits._
 
-/** Helpers when working with scalajs data, specifically, js.Object, js.Dynamic and
-  * js.Dictionary.
+/**
+  * Helpers when working with scalajs data, specifically, js.Object, js.Dynamic and
+  * js.Dictionary. Most of these mutate the input source so create a copy of the data
+  * prior to calling if you want.
   */
 package object jsdatahelpers {
 
-  /** Assuming a property is a string, omit the property from the object if its blank.
+  /**
+    * Assuming a property is a string, omit the property from the object if its blank.
     * This is a mutating action.
     */
   @inline
@@ -34,7 +37,7 @@ package object jsdatahelpers {
     obj
   }
 
-  /** Slow but steady deep copy. */
+  /** Slow but steady deep copy using JSON.stringify and JSON.parse. */
   @inline
   def deepCopy(obj: js.Object): js.Object = JSON.parse(JSON.stringify(obj)).asInstanceOf[js.Object]
 
@@ -129,5 +132,25 @@ package object jsdatahelpers {
       val a = dict(p).asInstanceOf[A]
       if (pf.isDefinedAt(a)) pf.apply(a)
     })
+
+  /**
+    * Given some string definitions of keep, drop and rename, create a function that
+    * that mutates a js.Object.
+    */
+  def stdConverter(keeps: Option[String], drops: Option[String], renames: Option[String]): js.Object => js.Object = {
+    val keep = keeps.map(_.split('|').map(_.trim))
+    val drop = drops.map(_.split('|').map(_.trim))
+    val rename: Option[Seq[(String, String)]] =
+      renames.map(_.split('|').map(_.split("->")).map(arr => (arr(0).trim, arr(1).trim)))
+
+    obj =>
+      {
+        val o = obj.asDict[js.Any]
+        drop.foreach(omit(o, _: _*))
+        rename.foreach(jsdatahelpers.rename(o, _: _*))
+        keep.foreach(keepOnly(o, _: _*))
+        obj
+      }
+  }
 
 }

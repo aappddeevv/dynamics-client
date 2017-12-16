@@ -65,7 +65,8 @@ private[dynamics] object ADALHelpers {
   * it is attempted to derive them from username (the demain part) and using a default authority hostname
   * `https://login.windows.net`. If acquireTokenResource is undefined, dataUrl is tried in its place.
   */
-class AuthManager(info: ConnectionInfo)(implicit ehandler: ApplicativeError[IO,Throwable], scheduler: Scheduler) extends LazyLogger {
+class AuthManager(info: ConnectionInfo)(implicit ehandler: ApplicativeError[IO, Throwable], scheduler: Scheduler)
+    extends LazyLogger {
 
   require(
     info.username.isDefined &&
@@ -136,9 +137,9 @@ object AuthManager {
     ti => { shortenDelay(delay = FiniteDuration(ti.expiresIn, TU.SECONDS)) }
 
   /** Stream of TokenInfo. Default is to renew at 95% of expiration time. */
-  def tokenStream(f: => IO[TokenInfo],
-    calc: TokenInfo => FiniteDuration = _calc)
-    (implicit F: Async[IO], sch: Scheduler, ec: ExecutionContext) =
+  def tokenStream(f: => IO[TokenInfo], calc: TokenInfo => FiniteDuration = _calc)(implicit F: Async[IO],
+                                                                                  sch: Scheduler,
+                                                                                  ec: ExecutionContext) =
     unfoldEvalWithDelay[IO, TokenInfo](F.map(F.attempt(f))(_.toOption), calc)
 
 }

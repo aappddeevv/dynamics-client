@@ -37,8 +37,8 @@ import dynamics.common._
     fields: Option[Seq[String]] = None,
     requestTimeOutInMillis: Option[Int] = None,
     concurrency: Int = 4,
-  batchSize: Int = 10,
-  batch: Boolean = false,
+    batchSize: Int = 10,
+    batch: Boolean = false,
     metadataCacheFile: Option[String] = None,
     ignoreMetadataCache: Boolean = false,
     /** NOT USED: Override to provide your own actions to be executed. */
@@ -113,7 +113,8 @@ import dynamics.common._
     exportIncludeFormattedValues: Boolean = false,
     entityQuery: String = "",
     exportWrap: Boolean = false,
-    exportRepeat: Boolean = false
+    exportRepeat: Boolean = false,
+    repeatDelay: Int = 60,
 )
 
 @Lenses case class UpdateConfig(
@@ -133,22 +134,22 @@ import dynamics.common._
 
 @Lenses case class ETLConfig(
     name: String = "", // name of etl program to run
-   paramsFile: Option[String] = None,
+    paramsFile: Option[String] = None,
     dataInputFile: String = "",
     verbosity: Int = 0,
     batchSize: Int = 10,
-    take: Option[Int] = None,
-    drop: Option[Int] = None,
+    take: Option[Long] = None,
+    drop: Option[Long] = None,
     maxPageSize: Option[Int] = None,
     cliParameters: Map[String, String] = Map(),
     batch: Boolean = false,
-  dryRun: Boolean = false,
-  /** Query to run, if relevant. */
-  query: Option[String] = None,
-  /** File that holds a query to run, if relevant. */
-  queryFile: Option[String] = None,
-  connectionUrl: Option[String] = None,
-  connectionFile: Option[String] = None,
+    dryRun: Boolean = false,
+    /** Query to run, if relevant. */
+    query: Option[String] = None,
+    /** File that holds a query to run, if relevant. */
+    queryFile: Option[String] = None,
+    connectionUrl: Option[String] = None,
+    connectionFile: Option[String] = None,
 )
 
 @Lenses case class SDKMessageConfig(

@@ -25,10 +25,10 @@ import dynamics.common._
 object DecodeResult {
   def apply[A](fa: IO[Either[DecodeFailure, A]]): DecodeResult[A] = EitherT(fa)
   def success[A](a: IO[A]): DecodeResult[A]                       = DecodeResult(a.map(Either.right(_)))
-  def success[A](a: A): DecodeResult[A]                             = success(IO.pure(a))
+  def success[A](a: A): DecodeResult[A]                           = success(IO.pure(a))
   def failure[A](e: IO[DecodeFailure]): DecodeResult[A]           = DecodeResult(e.map(Either.left(_)))
-  def failure[A](e: DecodeFailure): DecodeResult[A]                 = failure(IO.pure(e))
-  def fail[A]: DecodeResult[A]                                      = failure(IO.pure(MessageBodyFailure("Intentionally failed.")))
+  def failure[A](e: DecodeFailure): DecodeResult[A]               = failure(IO.pure(e))
+  def fail[A]: DecodeResult[A]                                    = failure(IO.pure(MessageBodyFailure("Intentionally failed.")))
 }
 
 /**

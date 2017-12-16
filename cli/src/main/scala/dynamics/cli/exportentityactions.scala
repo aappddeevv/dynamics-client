@@ -5,6 +5,7 @@
 package dynamics
 package cli
 
+import scala.concurrent.duration._
 import scala.scalajs.js
 import js._
 import js.annotation._
@@ -112,37 +113,40 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       exportAll(config, query)
   }
 
+  // TODO: Convert to batch request, this is way stupid.
   def deleteByQuery() = Action { config =>
-    val m                                 = new MetadataCache(context)
-    val counter                           = new java.util.concurrent.atomic.AtomicInteger(0)
-    def deleteOne(es: String, id: String) = dynclient.delete(es, Id(id))
+    val m       = new MetadataCache(context)
+    val counter = new java.util.concurrent.atomic.AtomicInteger(0)
 
     println(s"Deleting entities using query: ${config.export.entityQuery}")
     val edef = m.getEntityDefinition3(config.export.exportEntity)
 
-    val deletes: Stream[IO, Stream[IO, IO[(DynamicsId, Boolean)]]] =
+    val deletes =
       Stream.eval(edef).flatMap { ed =>
         dynclient
           .getListStream[js.Object](config.export.entityQuery)
           .map(jsobj => jsobj.asDict[String](ed.PrimaryId))
-          .map { a => counter.getAndIncrement(); a }
-          .map(id => deleteOne(ed.LogicalCollectionName, id))
-          .map(Stream.emit(_))
+          .map { a =>
+            counter.getAndIncrement(); a
+          }
+          .map(id => dynclient.delete(ed.LogicalCollectionName, Id(id)))
+          .map(Stream.eval(_))
       }
 
-    deletes.join(config.common.concurrency)
+    deletes
+      .join(config.common.concurrency)
       .run
       .flatMap(_ => IO { println(s"Deleted ${counter.get()} records.") })
   }
 
   def exportFromQuery() = Action { config =>
     println(s"Export entity using query: ${config.export.entityQuery}")
-    val outputpath = config.common.outputFile.getOrElse(config.export.entityQuery.hashCode() + ".json")
+    val outputpath = config.common.outputFile.getOrElse("dump_" + config.export.entityQuery.hashCode() + ".json")
     println(s"Output file: $outputpath")
 
     val opts = DynamicsOptions(
       prefers = OData.PreferOptions(maxPageSize = config.export.exportMaxPageSize,
-        includeFormattedValues = Some(config.export.exportIncludeFormattedValues)))
+                                    includeFormattedValues = Some(config.export.exportIncludeFormattedValues)))
     val values =
       dynclient
         .getListStream[js.Object](config.export.entityQuery, opts)
@@ -154,7 +158,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
           if (config.export.exportWrap) f.write("[")
           values
             .map(Utils.render(_))
-            .to(_ map { jstr => f.write(jstr + (if (config.export.exportWrap) ",\n" else "\n"))})
+            .to(_ map { jstr =>
+              f.write(jstr + (if (config.export.exportWrap) ",\n" else "\n"))
+            })
         },
         f => IO(if (config.export.exportWrap) f.write("]")).flatMap(_ => f.endFuture().toIO)
       )
@@ -273,19 +279,24 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     val entityList = Stream
       .eval(m.getEntityList())
       .flatMap(Stream.emits[EntityDescription])
-      .filter{entity => config.common.filter.contains(entity.LogicalName) }
+      .filter { entity =>
+        config.common.filter.contains(entity.LogicalName)
+      }
       .map(entity => (entity.LogicalCollectionName, entity.PrimaryId))
 
     val counters = //Stream(("contacts",  "contactid")).
       entityList.map(p => mkCountingStream(p._1, p._2))
 
-    val runCounts = counters.join(config.common.concurrency)
+    val runCounts = counters
+      .join(config.common.concurrency)
       .runLog
       .map(_.sortBy(_._1))
       .flatMap(results => IO { results.foreach(p => println(s"${p._1}, ${p._2}")) })
 
-    if (config.export.exportRepeat) Stream.eval(runCounts).repeat.run
-    else Stream.eval(runCounts).run
+    if (config.export.exportRepeat)
+      (Stream.eval(runCounts) ++ sch.sleep_[IO](config.export.repeatDelay seconds)).repeat.run
+    else
+      Stream.eval(runCounts).run
   }
 
 }

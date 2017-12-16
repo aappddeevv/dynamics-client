@@ -168,10 +168,9 @@ object NodeFetchClient extends LazyLogger {
   def newClient(info: ConnectionInfo,
                 debug: Boolean = false,
                 defaultHeaders: HttpHeaders = HttpHeaders.empty,
-    opts: NodeFetchClientOptions = DefaultNodeFetchClientOptions)
-    (implicit ec: ExecutionContext,
-      ehandler: ApplicativeError[IO, Throwable],
-      scheduler: Scheduler): Client = {
+                opts: NodeFetchClientOptions = DefaultNodeFetchClientOptions)(implicit ec: ExecutionContext,
+                                                                              ehandler: ApplicativeError[IO, Throwable],
+                                                                              scheduler: Scheduler): Client = {
 
     require(info.dataUrl.isDefined)
     val donothing = IO.pure(())

@@ -38,6 +38,7 @@ final case class JsAnyOps(a: js.Any) {
   def asDouble: Double          = a.asInstanceOf[Double]
   def asBoolean: Boolean        = a.asInstanceOf[Boolean]
   def asJsArray[A]: js.Array[A] = a.asInstanceOf[js.Array[A]]
+  def asJson: String            = js.JSON.stringify(a)
 }
 
 trait JsAnySyntax {
@@ -183,7 +184,7 @@ trait AllSyntax
     with FutureSyntax
     with IteratorSyntax
     with JsPromiseSyntax
-with StreamSyntax
+    with StreamSyntax
 
 // Add each individal syntax trait to this
 object syntax {
@@ -196,7 +197,7 @@ object syntax {
   object future        extends FutureSyntax
   object iterator      extends IteratorSyntax
   object jsPromise     extends JsPromiseSyntax
-  object stream extends StreamSyntax
+  object stream        extends StreamSyntax
 }
 
 trait AllInstances extends JsObjectInstances

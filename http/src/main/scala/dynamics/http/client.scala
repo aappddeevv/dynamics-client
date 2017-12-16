@@ -27,8 +27,8 @@ import fs2helpers._
   * a service that adds some implcit convenience for finding response
   * decoders.
   */
-final case class Client(open: Service[HttpRequest, DisposableResponse], dispose: IO[Unit])
-  (implicit ehandler: ApplicativeError[IO, Throwable]) {
+final case class Client(open: Service[HttpRequest, DisposableResponse], dispose: IO[Unit])(
+    implicit ehandler: ApplicativeError[IO, Throwable]) {
 
   /** Fetch response, process regardless of status. Very low-level. */
   def fetch[A](request: HttpRequest)(f: HttpResponse => IO[A]): IO[A] =
@@ -42,7 +42,8 @@ final case class Client(open: Service[HttpRequest, DisposableResponse], dispose:
       case Status.Successful(resp) =>
         d.decode(resp).fold(throw _, identity)
       case failedResponse =>
-        ehandler.raiseError(UnexpectedStatus(failedResponse.status, request = Option(req), response = Option(failedResponse)))
+        ehandler.raiseError(
+          UnexpectedStatus(failedResponse.status, request = Option(req), response = Option(failedResponse)))
     }
   }
 

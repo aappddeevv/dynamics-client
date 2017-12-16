@@ -14,7 +14,6 @@ import cats.data._
 import cats.effect._
 import fs2._
 import js.JSConverters._
-import cats.syntax.show._
 
 import dynamics.common._
 import fs2helpers._
@@ -23,7 +22,8 @@ import dynamics.http.instances.entityEncoder._
 import dynamics.http.instances.entityDecoder._
 
 /**
-  * See https://msdn.microsoft.com/en-us/library/mt770385.aspx
+  * See https://msdn.microsoft.com/en-us/library/mt770385.aspx,
+  *  https://msdn.microsoft.com/en-us/library/gg334391.aspx#bkmk_parseErrors
   */
 @js.native
 trait ErrorOData extends js.Object {
@@ -46,7 +46,7 @@ trait InnerErrorOData extends js.Object {
 /** Inner error returned by the dynamics server. */
 case class InnerError(etype: String, message: String, stacktrace: String)
 
-/** An error specific to Dynamics responding in the body of a message .*/
+/** An error specific to Dynamics responding in the body of a message. */
 case class DynamicsServerError(code: String, message: String, innererror: Option[InnerError] = None)
 
 object DynamicsServerError {
@@ -64,16 +64,6 @@ object DynamicsServerError {
                         err.message.getOrElse("<no message provided>"),
                         ierror)
   }
-
-  implicit val innerErrorShow: Show[InnerError] = Show { e =>
-    s"${e.message} (${e.etype})\n${e.stacktrace}"
-  }
-
-  implicit val dynamicsServerErrorShow: Show[DynamicsServerError] = Show { e =>
-    s"${e.message} (code=${e.code})\n" +
-      s"Inner Error: " + e.innererror.map(_.show).getOrElse("<not present>")
-  }
-
 }
 
 /**
@@ -117,19 +107,6 @@ object AltId {
   def apply(e: String, id: String): AltId = AltId(Seq((e, id)))
 }
 
-object DynamicsError {
-
-  import Show._
-  import DynamicsServerError._
-
-  implicit val showDynamicsError: Show[DynamicsError] = Show { e =>
-    s"Dynamics error: ${e.getMessage}\n" +
-      s"Status code: ${e.status.show}\n" +
-      s"Dynamics server error: " + e.cause.map(_.show).getOrElse("<dynamics server error not provided>") + "\n" +
-      s"Underlying error: " + e.underlying.map(_.toString).getOrElse("<underlying error not provided>") + "\n"
-  }
-}
-
 case class DynamicsOptions(
                            /** Prefer OData options. */
                            prefers: OData.PreferOptions = OData.DefaultPreferOptions,
@@ -145,12 +122,14 @@ case class DynamicsOptions(
   * All of the methods either return a Task or a Steam. The Task or Stream
   * must be run in order to execute the operation.
   */
-case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo, debug: Boolean = false)
-  (implicit ehandler: ApplicativeError[IO,Throwable], e: ExecutionContext)
+case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo, debug: Boolean = false)(
+    implicit ehandler: MonadError[IO, Throwable],
+    e: ExecutionContext)
     extends LazyLogger
     with DynamicsClientRequests {
 
-  /** Create a failed task and try to pull out a dynamics server error message from the body.
+  /**
+    * Create a failed task and try to pull out a dynamics server error message from the body.
     */
   protected def responseToFailedTask[A](resp: HttpResponse, msg: String, req: Option[HttpRequest]): IO[A] = {
     resp.body.flatMap { body =>
@@ -345,8 +324,9 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
   }
 
   /**
-    * Get a single entity using key information. The keyInfo can be a guid or alternate key criteria e.g "altkeyattribute='Larry',...".
-    * You get all the fields with this.
+    * Get a single entity using key information. The keyInfo can be a guid or
+    * alternate key criteria e.g "altkeyattribute='Larry',...".  You get all the
+    * fields with this.
     *
     * Allow you to specify a queryspec somehow as well.
     */
@@ -354,14 +334,16 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
       implicit d: EntityDecoder[A]): IO[A] =
     getOne(s"/$entitySet(${keyInfo.render()})", opts)(d)
 
-  /** Get one entity using a full query url. If you use a URL that
-    * returns a OData response with a `value` array that will be automatically
-    *  extract, you need to use a EntityDecoder that first looks for that
-    *  array then obtains your `A`. See `EntityDecoder.ValueWrapper` for an example.
-    *  You often use this function when you want to use a single entity and a 1:M
-    *  navigation property to retrieve your "list" of entities e.g. a single entity's
-    *  set of connections or some child entity. In this case, your URL will typically
-    *  have an "expand" segment.
+  /**
+    * Get one entity using a full query url.
+    *
+    * If you use a URL that returns a OData response with a `value` array that
+    * will be automatically extract, you need to use a EntityDecoder that first
+    * looks for that array then obtains your `A`. See
+    * `EntityDecoder.ValueWrapper` for an example.  You often use this pattern
+    * when employing `getOne` to obtain related records in a 1:M navigation
+    * property e.g. a single entity's set of connections or some child
+    * entity. In this case, your URL will typically have an "expand" segment.
     */
   def getOne[A](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[A]): IO[A] = {
     val request = HttpRequest(Method.GET, url, headers = toHeaders(opts))
@@ -373,16 +355,16 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
   }
 
   /**
-    * Get a list of values. Follows @data.nextLink but accumulates
-    * all the results into memory. Prefer [[getListStream]]. For now,
-    * the caller must decode external to this method.
+    * Get a list of values. Follows @data.nextLink but accumulates all the
+    * results into memory. Prefer [[getListStream]]. For now, the caller must
+    * decode external to this method. The url can be generated from QuerySpec.
     */
   def getList[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(): IO[Seq[A]] =
     getListStream[A](url).runLog
 
   /**
-    * Get a list of values as a stream. Follows @odata.nextLink. For now, the caller
-    * must decode external to this method.
+    * Get a list of values as a stream. Follows @odata.nextLink. For now, the
+    * caller must decode external to this method.
     */
   def getListStream[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions): Stream[IO, A] = {
     val str: Stream[IO, Seq[A]] = Stream.unfoldEval(Option(url)) {

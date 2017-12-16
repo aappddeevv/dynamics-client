@@ -92,7 +92,7 @@ object sources {
     val source = StreamJsonObjects.make()
     val x      = Fs.createReadStream(file)
     x.pipe(source.input)
-    Stream.fromIterator[IO,A](source.output.iterator[A])
+    Stream.fromIterator[IO, A](source.output.iterator[A])
   }
 
   val DefaultCSVParserOptions =
@@ -103,15 +103,15 @@ object sources {
     * file name and CSV options using csv-parse. Run `start` to start the OS reading.
     * The underlying CSV file is automatically opened and closed.
     */
-  def CSVFileSource(file: String, csvParserOptions: ParserOptions)(implicit ec: ExecutionContext):
-      Stream[IO, js.Object] = {
+  def CSVFileSource(file: String, csvParserOptions: ParserOptions)(
+      implicit ec: ExecutionContext): Stream[IO, js.Object] = {
     CSVFileSource_(file, csvParserOptions, readableToStream[js.Object](_: io.scalajs.nodejs.stream.Readable))
   }
 
   def CSVFileSource_(file: String,
                      csvParserOptions: ParserOptions,
                      f: io.scalajs.nodejs.stream.Readable => Stream[IO, js.Object])(
-    implicit ec: ExecutionContext): Stream[IO, js.Object] = {
+      implicit ec: ExecutionContext): Stream[IO, js.Object] = {
     val create = IO {
       val parser = CsvParse(csvParserOptions)
       val f      = Fs.createReadStream(file)
@@ -159,15 +159,14 @@ object sources {
   /**
     * Assuming the query has been set to streaming, stream the results.
     */
-  def queryToStream[A](query: Request, qsize: Int = 1000)(implicit ec: ExecutionContext): Stream[IO, A] = {
+  def queryToStream[A](query: Request, qsize: Int = 10000)(implicit ec: ExecutionContext): Stream[IO, A] = {
     val F = Async[IO]
     for {
       q <- Stream.eval(fs2.async.boundedQueue[IO, Option[Either[Throwable, A]]](qsize))
       _ <- Stream.eval(IO {
         query.on(
-          "error", (e: io.scalajs.nodejs.Error) =>
-          //q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunSync)
-          q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ()))
+          "error",
+          (e: io.scalajs.nodejs.Error) => q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ()))
         query.on("end", (_: js.Any) => q.enqueue1(None).unsafeRunAsync(_ => ()))
         query.on("row", (data: A) => q.enqueue1(Some(Right(data))).unsafeRunAsync(_ => ()))
       })
@@ -175,8 +174,8 @@ object sources {
     } yield a
   }
 
-  def MSSQLSourceRequest[A](qstr: String, config: js.Object | RawOptions | String)
-    (implicit ec: ExecutionContext): IO[common.Request] = {
+  def MSSQLSourceRequest[A](qstr: String, config: js.Object | RawOptions | String)(
+      implicit ec: ExecutionContext): IO[common.Request] = {
     def create() = MSSQL.connect(config).toIO.map { pool =>
       val request = pool.request()
       request.stream = true
@@ -191,8 +190,8 @@ object sources {
     * pool then use `queryToStream` once you create your query request.
     * @see https://www.npmjs.com/package/mssql#tedious connection string info.
     */
-  def MSSQLSource[A](qstr: String, config: js.Object | RawOptions | String, qsize: Int = 1000)
-    (implicit ec: ExecutionContext): Stream[IO, A] = {
+  def MSSQLSource[A](qstr: String, config: js.Object | RawOptions | String, qsize: Int = 10000)(
+      implicit ec: ExecutionContext): Stream[IO, A] = {
     def create() = MSSQL.connect(config).toIO.map { pool =>
       val request = pool.request()
       request.stream = true

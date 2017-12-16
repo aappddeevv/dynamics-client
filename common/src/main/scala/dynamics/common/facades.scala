@@ -596,25 +596,25 @@ class PoolOptions(
     val fifo: js.UndefOr[Boolean] = js.undefined,
     val priorityRange: js.UndefOr[Int] = js.undefined,
     val autostart: js.UndefOr[Boolean] = js.undefined
-      // ...more should go here...
+    // ...more should go here...
 ) extends js.Object
 
 @js.native
 @JSImport("mssql", JSImport.Namespace)
 object MSSQL extends js.Object with IEventEmitter {
-  def connect(config: RawOptions | String): js.Promise[ConnectionPool] = js.native
-  def Request(): Request = js.native
-  def ConnectionPool(options: js.UndefOr[PoolOptions|RawOptions]): ConnectionPool = js.native
+  def connect(config: RawOptions | String): js.Promise[ConnectionPool]              = js.native
+  def Request(): Request                                                            = js.native
+  def ConnectionPool(options: js.UndefOr[PoolOptions | RawOptions]): ConnectionPool = js.native
 }
 
 @js.native
 trait ConnectionPool extends js.Object with IEventEmitter {
-  def request(): Request = js.native
-  def close(): js.Promise[Unit] = js.native
+  def request(): Request                    = js.native
+  def close(): js.Promise[Unit]             = js.native
   def connect(): js.Promise[ConnectionPool] = js.native
-  val connected: Boolean = js.native
-  val connecting: Boolean = js.native
-  val driver: String = js.native
+  val connected: Boolean                    = js.native
+  val connecting: Boolean                   = js.native
+  val driver: String                        = js.native
 }
 
 @js.native
@@ -628,11 +628,11 @@ trait Result[A] extends js.Object {
 @js.native
 trait Request extends js.Object with IEventEmitter {
   def input(p: String, t: Int, value: js.Any): Result[js.Any] = js.native
-  var stream: js.UndefOr[Boolean]                    = js.native
-  var cancelled: js.UndefOr[Boolean]                    = js.native
-  var verbose: js.UndefOr[Boolean]                    = js.native
-  def query[A](q: String): js.Promise[Result[A]]                    = js.native
-  def cancel(): Unit = js.native
+  var stream: js.UndefOr[Boolean]                             = js.native
+  var cancelled: js.UndefOr[Boolean]                          = js.native
+  var verbose: js.UndefOr[Boolean]                            = js.native
+  def query[A](q: String): js.Promise[Result[A]]              = js.native
+  def cancel(): Unit                                          = js.native
 }
 
 /**

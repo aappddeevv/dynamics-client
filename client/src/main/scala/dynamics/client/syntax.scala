@@ -5,7 +5,13 @@
 package dynamics
 package client
 
-final case class DynamicsIdOps(val i: DynamicsId) extends AnyVal {}
+import cats._
+import cats.data._
+import cats.syntax.show._
+
+final case class DynamicsIdOps(val id: DynamicsId) extends AnyVal {
+  def idToString: String = id.render()
+}
 
 final case class DynamicsIdStringOps(val s: String) extends AnyVal {
   def id: DynamicsId = Id(s)
@@ -14,23 +20,42 @@ final case class DynamicsIdStringOps(val s: String) extends AnyVal {
 trait DynamicsIdSyntax {
   implicit def dynamicsSyntaxDynamicsId(id: DynamicsId) = new DynamicsIdOps(id)
   implicit def dynamicsIdStringOps(s: String)           = new DynamicsIdStringOps(s)
+
+  // alright, this is evil, but convenient...
+  implicit def stringToId(v: String): DynamicsId = v.id
 }
 
-trait DynamicsIdImplicits {
-  implicit def idToString(id: DynamicsId): String = id.render()
-  implicit def stringToId(s: String): DynamicsId  = Id(s)
+trait ClientShows {
+  implicit val innerErrorShow: Show[InnerError] = Show { e =>
+    s"${e.message} (${e.etype})\n${e.stacktrace}"
+  }
+
+  implicit val dynamicsServerErrorShow: Show[DynamicsServerError] = Show { e =>
+    s"${e.message} (code=${e.code})\n" +
+      s"Inner Error: " + e.innererror.map(_.show).getOrElse("<not present>")
+  }
+
+  implicit val showDynamicsError: Show[DynamicsError] = Show { e =>
+    s"Dynamics error: ${e.getMessage}\n" +
+      s"Status code: ${e.status.show}\n" +
+      s"Dynamics server error: " + e.cause.map(_.show).getOrElse("<dynamics server error not provided>") + "\n" +
+      s"Underlying error: " + e.underlying.map(_.toString).getOrElse("<underlying error not provided>") + "\n"
+  }
 }
 
-// Add each individual syntax trait to this
 trait AllSyntax extends QuerySpecSyntax with DynamicsIdSyntax
 
-// Add each individal syntax trait to this
 object syntax {
   object all        extends AllSyntax
   object queryspec  extends QuerySpecSyntax
   object dynamicsid extends DynamicsIdSyntax
 }
 
-//trait AllImplicits extends DynamicsIdImplicits with MiscImplicits
-trait AllImplicits extends DynamicsIdImplicits
-object implicits   extends AllImplicits with AllSyntax
+trait AllInstances extends ClientShows
+
+object instances {
+  object all    extends AllInstances
+  object client extends ClientShows
+}
+
+object implicits extends AllSyntax with AllInstances

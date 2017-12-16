@@ -35,13 +35,13 @@ object ADAL extends LazyLogger {
 
   import java.util.concurrent.{TimeUnit => TU}
 
-  def apply(info: ConnectionInfo, retryPolicy: Policy = Pause(3, 2.seconds))
-    (implicit sch: Scheduler, e: ExecutionContext): Middleware =
+  def apply(info: ConnectionInfo, retryPolicy: Policy = Pause(3, 2.seconds))(implicit sch: Scheduler,
+                                                                             e: ExecutionContext): Middleware =
     (c: Client) => {
-      val auth                   = new AuthManager(info)
-      val ctx                    = auth.getAuthContext()
+      val auth                 = new AuthManager(info)
+      val ctx                  = auth.getAuthContext()
       var token: IO[TokenInfo] = auth.getToken(ctx) // get initial...
-      var terminate              = new java.util.concurrent.atomic.AtomicBoolean(false)
+      var terminate            = new java.util.concurrent.atomic.AtomicBoolean(false)
 
       val tokenSetter: Sink[IO, TokenInfo] = _ map { ti =>
         logger.info(s"Setting new token.")

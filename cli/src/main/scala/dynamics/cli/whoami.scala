@@ -29,17 +29,17 @@ class WhoAmIActions(context: DynamicsContext) {
   import context._
   implicit val WhoAmIDecoder = JsObjectDecoder[WhoAmI]
 
-  def whoami() = Action  { config =>
-        dynclient
-          .executeFunction[WhoAmI]("WhoAmI")
-          .map { who =>
-            println("WhoAmI Results:")
-            println(s"""Business Unit Id: ${who.BusinessUnitId}
+  def whoami() = Action { config =>
+    dynclient
+      .executeFunction[WhoAmI]("WhoAmI")
+      .map { who =>
+        println("WhoAmI Results:")
+        println(s"""Business Unit Id: ${who.BusinessUnitId}
 Organization Unit Id: ${who.OrganizationId}
 UserId: ${who.UserId}""")
-          }
-          .flatMap { _ =>
-            IO.pure(())
-          }
       }
+      .flatMap { _ =>
+        IO.pure(())
+      }
+  }
 }

@@ -18,10 +18,13 @@ import dynamics.common._
   * TODO: Make extensible.
   */
 case class InputContext[A](
-    /** Transform input. Treat as mutable. */
+    /** Transform input. */
     input: A,
-    /** User oriented source marker for processing reporting.
-      * Should be short. May be printed multiple times.
+    /**
+      * User oriented source marker for processing reporting.
+      * Should be short. May be printed multiple times. Often
+      * a primary or natural key from `input` but could also
+      * be a simple record number.
       */
     source: String
 )
