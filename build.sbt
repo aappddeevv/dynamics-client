@@ -12,7 +12,6 @@ scalaJSLinkerConfig ~= {
 }
 
 autoCompilerPlugins := true
-//addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full)
 
 //scalafmtVersion in ThisBuild := "1.3.0" // all projects
 

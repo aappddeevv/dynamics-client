@@ -21,6 +21,7 @@ import scala.scalajs.runtime.wrapJavaScriptException
 import io.scalajs.RawOptions
 import io.scalajs.nodejs.Error
 import io.scalajs.nodejs
+import io.scalajs.nodejs.readline._
 import io.scalajs.nodejs.buffer.Buffer
 import io.scalajs.nodejs.stream.{Readable, Writable}
 import io.scalajs.nodejs.events.IEventEmitter
@@ -34,55 +35,76 @@ import dynamics.common.implicits._
 
 object sources {
 
+  type EventRegistration[F[_], A] = QueueForStream[F, A] => js.UndefOr[A] => Unit
+
   /**
-    * Turn a Readable parser into a Stream of js.Object using
-    * the callback `onData`. While `A` could be a Buffer or String,
-    * it could also be a js.Object. `A` must reflect the callers
-    * understanding of what objects the Readable will produce. You could use
-    * this over readable.iterator => fs2.Stream when you want to bubble
-    * up errors explicitly through the fs2 layer.
+    * Convert a readable to a fs2 Stream given a specific set of events and
+    * their handlers. Each handler can signal the end of the stream by
+    * enqueuing None or an error by returning a Left. Handler return results via
+    * `qparam.enqueue1(Some(Right(data))).unsafeRunAsync(_ => ())` or something
+    * similar. If your callbacks all have different types, you may have
+    * to type out your own conversion or cast.
     */
-  def readableToStream[A](readable: io.scalajs.nodejs.stream.Readable, qsize: Int = 1000)(
-      implicit ec: ExecutionContext): Stream[IO, A] = {
-    val counter = new java.util.concurrent.atomic.AtomicInteger(-1)
-    //val F = Task.asyncInstance(Strategy.sequential) // mpilquist suggested sync enqueue1
+  def jsToFs2Stream[F[_], A](events: Seq[(String, EventRegistration[F, A])],
+                             source: io.scalajs.nodejs.events.IEventEmitter,
+                             qsize: Int = 1000)(implicit ec: ExecutionContext, F: Effect[F]): Stream[F, A] = {
     for {
-      q <- Stream.eval(fs2.async.boundedQueue[IO, Option[Either[Throwable, A]]](qsize))
-      _ <- Stream.eval(IO {
-        readable.onError { (e: io.scalajs.nodejs.Error) =>
-          q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ())
-        }
-        readable.onEnd { () =>
-          q.enqueue1(None).unsafeRunAsync(_ => ())
-        }
-        readable.onClose { () =>
-          q.enqueue1(None).unsafeRunAsync(_ => ())
-        }
-        readable.onData { (data: A) =>
-          val x = counter.getAndIncrement()
-          q.enqueue1(Some(Right(data))).unsafeRunAsync {
-            _ match {
-              case Right(v) => () //println(s"Readable: $x: $data added to queue.")
-              case Left(t)  => println(s"Error adding to queue, index ($x): $t")
-            }
-          }
-        }
-      }) // could use .attempt here but need to wrap js exception inside :-(
+      q      <- Stream.eval(fs2.async.boundedQueue[F, Option[Either[Throwable, A]]](qsize))
+      _      <- Stream.eval(F.delay { events.foreach(p => source.on(p._1, p._2(q))) })
       record <- q.dequeue.unNoneTerminate.rethrow
     } yield record
   }
 
   /**
-    * Stream a file containing JSON objects separated by newlines. Newlines should be
-    * escaped inside JSON values. isArray = true implies that json objects inside
-    * are wrapped in an array and hence have commas separating the objects.
+    * Turn a Readable parser into a Stream of js.Object using the callback
+    * `onData`. While `A` could be a Buffer or String, it could also be a
+    * js.Object. `A` must reflect the callers understanding of what objects the
+    * Readable will produce. You could use this over readable.iterator =>
+    * fs2.Stream when you want to bubble up errors explicitly through the fs2
+    * layer. If you have other event names that are used for the callbacks, use
+    * `readableToStreamWithEvents`.
+    */
+  def readableToStream[F[_], A](readable: io.scalajs.nodejs.stream.Readable,
+                                qsize: Int = 1000)(implicit ec: ExecutionContext, F: Effect[F]): Stream[F, A] = {
+    val counter = new java.util.concurrent.atomic.AtomicInteger(-1)
+    for {
+      q <- Stream.eval(fs2.async.boundedQueue[F, Option[Either[Throwable, A]]](qsize))
+      _ <- Stream.eval(F.delay {
+        readable.onError { (e: io.scalajs.nodejs.Error) =>
+          async.unsafeRunAsync(q.enqueue1(Some(Left(wrapJavaScriptException(e)))))(_ => IO.unit)
+        }
+        readable.onEnd { () =>
+          async.unsafeRunAsync(q.enqueue1(None))(_ => IO.unit)
+        }
+        readable.onClose { () =>
+          async.unsafeRunAsync(q.enqueue1(None))(_ => IO.unit)
+        }
+        readable.onData { (data: A) =>
+          val x = counter.getAndIncrement()
+          async.unsafeRunAsync(q.enqueue1(Some(Right(data)))) {
+            _ match {
+              case Right(v) => IO.unit //println(s"Readable: $x: $data added to queue.")
+              case Left(t)  => IO(println(s"Error adding to queue, index ($x): $t"))
+            }
+          }
+        }
+      })
+      record <- q.dequeue.unNoneTerminate.rethrow
+    } yield record
+  }
+
+  /**
+    * Stream a file containing JSON objects separated by newlines. Newlines
+    * should be escaped inside JSON values. isArray = true implies that json
+    * objects inside are wrapped in an array and hence have commas separating
+    * the objects.
     */
   def JSONFileSource[A](file: String, isArray: Boolean = false)(implicit ec: ExecutionContext): Stream[IO, A] = {
     Stream.bracket(IO {
       val source = if (!isArray) StreamJsonObjects.make() else StreamArray.make()
       (source, Fs.createReadStream(file))
     })(
-      p => { p._2.pipe(p._1.input); readableToStream[A](p._1.output) },
+      p => { p._2.pipe(p._1.input); readableToStream[IO, A](p._1.output) },
       p => IO(()) // rely on autoclose behavior
     )
   }
@@ -99,13 +121,13 @@ object sources {
     new ParserOptions(columns = true, skip_empty_lines = true, trim = true, auto_parse = false)
 
   /**
-    * Create a Stream[IO, js.Object] from a
-    * file name and CSV options using csv-parse. Run `start` to start the OS reading.
-    * The underlying CSV file is automatically opened and closed.
+    * Create a Stream[IO, js.Object] from a file name and CSV options using
+    * csv-parse. Run `start` to start the OS reading.  The underlying CSV file
+    * is automatically opened and closed.
     */
-  def CSVFileSource(file: String, csvParserOptions: ParserOptions)(
+  def CSVFileSource(file: String, csvParserOptions: ParserOptions = DefaultCSVParserOptions)(
       implicit ec: ExecutionContext): Stream[IO, js.Object] = {
-    CSVFileSource_(file, csvParserOptions, readableToStream[js.Object](_: io.scalajs.nodejs.stream.Readable))
+    CSVFileSource_(file, csvParserOptions, readableToStream[IO, js.Object](_: io.scalajs.nodejs.stream.Readable))
   }
 
   def CSVFileSource_(file: String,
@@ -204,7 +226,28 @@ object sources {
     )
   }
 
-  /** Add a source string based on the record index position.
+  private[dynamics] type QueueForStream[F[_], A] = fs2.async.mutable.Queue[F, Option[Either[Throwable, A]]]
+
+  /** Read a file (utf8) line by line. */
+  def FileLines(file: String)(implicit ec: ExecutionContext): Stream[IO, String] = {
+    Stream.bracket(IO {
+      val instream  = Fs.createReadStream(file)
+      val outstream = io.scalajs.nodejs.process.stdout
+      Readline.createInterface(new ReadlineOptions(input = instream, output = outstream, terminal = false))
+    })(
+      interface => {
+        val events: Seq[(String, EventRegistration[IO, String])] = Seq(
+          ("line", q => data => data.foreach(d => q.enqueue1(Some(Right(d))).unsafeRunAsync(_ => ()))),
+          ("close", q => data => q.enqueue1(None).unsafeRunAsync(_ => ())),
+        )
+        jsToFs2Stream[IO, String](events, interface)
+      },
+      i => IO(i.close())
+    )
+  }
+
+  /**
+    * Add a source string based on the record index position.
     */
   def toInput[A](startIndex: Int = 1): Pipe[IO, A, InputContext[A]] =
     _.zipWithIndex.map {

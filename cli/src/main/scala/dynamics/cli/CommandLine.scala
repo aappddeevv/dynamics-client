@@ -304,20 +304,20 @@ object CommandLine {
 
     val formattedValues = opt[Unit]("include-formatted-values")
       .text("Include formmated values in the output. This increases the size significantly.")
-      .action((x, c) => c.lens(_.export.exportIncludeFormattedValues).set(true))
+      .action((x, c) => c.lens(_.export.includeFormattedValues).set(true))
 
     val top = opt[Int]("top")
       .text("Top N records.")
-      .action((x, c) => c.lens(_.export.exportTop).set(Option(x)))
+      .action((x, c) => c.lens(_.export.top).set(Option(x)))
 
     val skip = opt[Int]("skip")
       .text("Skip N records.")
-      .action((x, c) => c.lens(_.export.exportSkip).set(Option(x)))
+      .action((x, c) => c.lens(_.export.skip).set(Option(x)))
 
     val maxPageSize = opt[Int]("maxpagesize")
       .text(
         "Set the maximum number of entities returned per 'fetch'. If node crashes when exporting large entities, set this smaller than 5000.")
-      .action((x, c) => c.lens(_.export.exportMaxPageSize).set(Option(x)))
+      .action((x, c) => c.lens(_.export.maxPageSize).set(Option(x)))
 
     cmd("entity")
       .text("Query/delete entity data from CRM using parts of a query that is assembled into a web api query.")
@@ -329,24 +329,24 @@ object CommandLine {
           .children(
             arg[String]("entity")
               .text("Entity to export. Use the entity set collection logical name (the plural name) which is usually all lowercase and pluralized (s or es appended).")
-              .action((x, c) => c.lens(_.export.exportEntity).set(x)),
+              .action((x, c) => c.lens(_.export.entity).set(x)),
             opt[String]("fetchxml")
               .text("Fetch XML for query focused on entity.")
-              .action((x, c) => c.lens(_.export.exportFetchXml).set(Option(x))),
+              .action((x, c) => c.lens(_.export.fetchXml).set(Option(x))),
             top,
             skip,
             opt[String]("filter")
               .text("Filter criteria using web api format. Do not include $filter.")
-              .action((x, c) => c.lens(_.export.exportFilter).set(Option(x))),
+              .action((x, c) => c.lens(_.export.filter).set(Option(x))),
             opt[Seq[String]]("orderby")
               .text("Order by criteria e.g. createdon desc. Attribute must be included for download if you are using select. Multiple order bys can be specified in same option, separate by commas.")
-              .action((x, c) => c.lens(_.export.exportOrderBy).set(x)),
+              .action((x, c) => c.lens(_.export.orderBy).set(x)),
             opt[Unit]("raw")
               .text("Instead of dumping a CSV file, dump one raw json record so you can see what attributes are available. Add a dummy select field to satisfy CLI args.")
-              .action((x, c) => c.lens(_.export.exportRaw).set(true)),
+              .action((x, c) => c.lens(_.export.raw).set(true)),
             opt[Seq[String]]("select")
               .text("Select criteria using web api format. Do not include $select.")
-              .action((x, c) => c.lens(_.export.exportSelect).set(x)),
+              .action((x, c) => c.lens(_.export.select).set(x)),
             maxPageSize,
             formattedValues
           ),
@@ -356,10 +356,10 @@ object CommandLine {
           .children(
             arg[String]("query")
               .text("Web api format query string e.g. /contacts?$filter=...")
-              .action((x, c) => c.lens(_.export.entityQuery).set(x)),
+              .action((x, c) => c.lens(_.export.query).set(x)),
             opt[Unit]("wrap")
               .text("Wrap the entire output in an array.")
-              .action((x, c) => c.lens(_.export.exportWrap).set(true)),
+              .action((x, c) => c.lens(_.export.wrap).set(true)),
             formattedValues,
             maxPageSize,
             skip
@@ -370,26 +370,38 @@ object CommandLine {
           .children(
             opt[Unit]("repeat")
               .text("Repeat forever.")
-              .action((x, c) => c.lens(_.export.exportRepeat).set(true)),
+              .action((x, c) => c.lens(_.export.repeat).set(true)),
             opt[Int]("repeat-delay")
               .text("Delay in seconds between count cycle. The default is 60 seconds.")
               .action((x, c) => c.lens(_.export.repeatDelay).set(x)),
+            opt[Map[String, String]]("query")
+              .text(
+                "Query to run whose results will be counted. --query name=querystring[,name=querystring]. Can repeated.")
+              .unbounded()
+              .action((x, c) => c.lens(_.export.queries).modify(qs => qs ++ x)),
+            opt[String]("query-file")
+              .text("Obtain queries from key-value pairs from the json file.")
+              .action((x, c) => c.lens(_.export.queryFile).set(Some(x))),
             mkFilterOptBase()
-              .required()
               .text("List of entity names to count. Use entity logical names.")
           ),
-        sub("delete-by-query")
-          .text("Delete entities based on a query. This is very dangerous to use. Query must return primary key at the very least.")
+        sub("delete")
+          .text("DANGER! Delete entities based on a query. Query must return primary key at the very least.")
           .action((x, c) => withSub(c, "deleteByQuery"))
           .children(
-            arg[String]("query")
-              .text("Web api format query string e.g. /contacts?$select=...&$filter=...")
-              .action((x, c) => c.lens(_.export.entityQuery).set(x)),
             arg[String]("entity")
-              .text("Entity to delete used in query string. We need this to identify the primary key and entity set name automatically.")
-              .action((x, c) => c.lens(_.export.exportEntity).set(x))
+              .text("Entity name to delete. This is used to obtain the primary key and entity set name.")
+              .action((x, c) => c.lens(_.export.entity).set(x)),
+            opt[String]("query")
+              .text("Web api format query string e.g. /contacts?$select=...&$filter=...")
+              .action((x, c) => c.lens(_.export.query).set(x)),
+            opt[String]("query-file")
+              .text("Obtain queries from each line in a file. Deletions occur in order.")
+              .action((x, c) => c.lens(_.export.queryFile).set(Some(x))),
           ),
-        note("""Skip must read records then skip them.""")
+        note("""Skip must read records then skip them."""),
+        note("count does not handle navigation properties or path properties."),
+        note("For delete, you must specify a --query or --query-file, otherwise nothing will be deleted.")
       )
 
   }

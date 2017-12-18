@@ -100,90 +100,106 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   def export() = Action { config =>
     val query = QuerySpec(
-      select = config.export.exportSelect,
-      filter = config.export.exportFilter,
-      top = config.export.exportTop,
-      orderBy = config.export.exportOrderBy,
-      includeCount = config.export.exportIncludeCount
+      select = config.export.select,
+      filter = config.export.filter,
+      top = config.export.top,
+      orderBy = config.export.orderBy,
+      includeCount = config.export.includeCount
     )
 
-    if (config.export.exportRaw)
+    if (config.export.raw)
       exportOne(config, query)
     else
       exportAll(config, query)
   }
 
+  /** Return a query that deletes and returns 1 for each delete. */
+  def deleteFromQuery(query: String, primaryId: String, esname: String, concurrency: Int) = {
+    dynclient
+      .getListStream[js.Object](query)
+      .map(jsobj => jsobj.asDict[String](primaryId))
+      .map(id => dynclient.delete(esname, Id(id)))
+      .map(Stream.eval(_))
+      .join(concurrency)
+      .as(1L)
+      .fold(0L)(_ + _)
+      .map(count => (query, count))
+  }
+
   // TODO: Convert to batch request, this is way stupid.
   def deleteByQuery() = Action { config =>
-    val m       = new MetadataCache(context)
-    val counter = new java.util.concurrent.atomic.AtomicInteger(0)
+    val m           = new MetadataCache(context)
+    val concurrency = config.common.concurrency
 
-    println(s"Deleting entities using query: ${config.export.entityQuery}")
-    val edef = m.getEntityDefinition3(config.export.exportEntity)
+    val deleteFromCLI: Stream[IO, (String, Long)] =
+      if (config.export.query.size > 0)
+        Stream
+          .eval(m.getEntityDefinition3(config.export.entity))
+          .flatMap(ed => deleteFromQuery(config.export.query, ed.PrimaryId, ed.EntitySetName, concurrency))
+      else
+        Stream.empty
 
-    val deletes =
-      Stream.eval(edef).flatMap { ed =>
-        dynclient
-          .getListStream[js.Object](config.export.entityQuery)
-          .map(jsobj => jsobj.asDict[String](ed.PrimaryId))
-          .map { a =>
-            counter.getAndIncrement(); a
-          }
-          .map(id => dynclient.delete(ed.LogicalCollectionName, Id(id)))
-          .map(Stream.eval(_))
-      }
+    val deleteFromCSVFile: Stream[IO, (String, Long)] =
+      config.export.queryFile
+        .map(
+          f =>
+            etl.sources
+              .CSVFileSource(f)
+              .map(obj => { val dict = obj.asDict[String]; (dict("entity"), dict("query")) })
+              .evalMap(p => m.getEntityDefinition3(p._1).map(ed => (p._1, p._2, ed)))
+              .flatMap(t => deleteFromQuery(t._2, t._3.PrimaryId, t._3.EntitySetName, concurrency)))
+        .getOrElse(Stream.empty)
 
-    deletes
-      .join(config.common.concurrency)
+    (deleteFromCLI ++ deleteFromCSVFile)
+      .map(p => println(s"${p._2} deletes: ${p._1}"))
       .run
-      .flatMap(_ => IO { println(s"Deleted ${counter.get()} records.") })
   }
 
   def exportFromQuery() = Action { config =>
-    println(s"Export entity using query: ${config.export.entityQuery}")
-    val outputpath = config.common.outputFile.getOrElse("dump_" + config.export.entityQuery.hashCode() + ".json")
+    println(s"Export entity using query: ${config.export.query}")
+    val outputpath = config.common.outputFile.getOrElse("dump_" + config.export.query.hashCode() + ".json")
     println(s"Output file: $outputpath")
 
     val opts = DynamicsOptions(
-      prefers = OData.PreferOptions(maxPageSize = config.export.exportMaxPageSize,
-                                    includeFormattedValues = Some(config.export.exportIncludeFormattedValues)))
+      prefers = OData.PreferOptions(maxPageSize = config.export.maxPageSize,
+                                    includeFormattedValues = Some(config.export.includeFormattedValues)))
     val values =
       dynclient
-        .getListStream[js.Object](config.export.entityQuery, opts)
-        .drop(config.export.exportSkip.map(_.toLong).getOrElse(0))
+        .getListStream[js.Object](config.export.query, opts)
+        .drop(config.export.skip.map(_.toLong).getOrElse(0))
 
     Stream
       .bracket(IO(Fs.createWriteStream(outputpath, null)))(
         f => {
-          if (config.export.exportWrap) f.write("[")
+          if (config.export.wrap) f.write("[")
           values
             .map(Utils.render(_))
             .to(_ map { jstr =>
-              f.write(jstr + (if (config.export.exportWrap) ",\n" else "\n"))
+              f.write(jstr + (if (config.export.wrap) ",\n" else "\n"))
             })
         },
-        f => IO(if (config.export.exportWrap) f.write("]")).flatMap(_ => f.endFuture().toIO)
+        f => IO(if (config.export.wrap) f.write("]")).flatMap(_ => f.endFuture().toIO)
       )
       .run
   }
 
   def exportAll(config: AppConfig, q: QuerySpec): IO[Unit] = {
-    println(s"Export entity: ${config.export.exportEntity}")
-    val url = q.url(config.export.exportEntity)
+    println(s"Export entity: ${config.export.entity}")
+    val url = q.url(config.export.entity)
     val opts = DynamicsOptions(
-      prefers = OData.PreferOptions(maxPageSize = config.export.exportMaxPageSize,
-                                    includeFormattedValues = Some(config.export.exportIncludeFormattedValues)))
+      prefers = OData.PreferOptions(maxPageSize = config.export.maxPageSize,
+                                    includeFormattedValues = Some(config.export.includeFormattedValues)))
 
-    val values = dynclient.getListStream[js.Object](url, opts).drop(config.export.exportSkip.map(_.toLong).getOrElse(0))
+    val values = dynclient.getListStream[js.Object](url, opts).drop(config.export.skip.map(_.toLong).getOrElse(0))
 
     // either explicit from CLI or retrieve all of them by getting one record
     val columns =
       (
-        if (config.export.exportSelect.size > 0) IO.pure(config.export.exportSelect)
+        if (config.export.select.size > 0) IO.pure(config.export.select)
         else getAllColumnNames(config, q)
       ).map(allcols => allcols.map(n => (n, n)))
 
-    val outputpath = config.common.outputFile.getOrElse(s"${config.export.exportEntity}.csv")
+    val outputpath = config.common.outputFile.getOrElse(s"${config.export.entity}.csv")
 
     println(s"Output path: $outputpath")
     // TODO, resource control the file descriptor
@@ -222,7 +238,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
   /** Get column names by retrieving a single record. */
   def getAllColumnNames(config: AppConfig, q: QuerySpec): IO[Seq[String]] = {
     val query = q.copy(top = Option(1), select = Nil)
-    val url   = query.url(config.export.exportEntity)
+    val url   = query.url(config.export.entity)
     dynclient.getList[js.Object](url).map { records =>
       if (records.size == 0) Nil
       else js.Object.keys(records(0)).toSeq
@@ -231,8 +247,8 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   def exportOne(config: AppConfig, q: QuerySpec): IO[Unit] = {
     val query = q.copy(top = Option(1), select = Nil)
-    val url   = query.url(config.export.exportEntity)
-    IO(println(s"Dump one record in simple key-value format: ${config.export.exportEntity}")).flatMap { _ =>
+    val url   = query.url(config.export.entity)
+    IO(println(s"Dump one record in simple key-value format: ${config.export.entity}")).flatMap { _ =>
       dynclient.getList[js.Object](url).map { records =>
         records.foreach(r => println(s"${PrettyJson.render(r)}"))
         ()
@@ -240,6 +256,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     }
   }
 
+  /*
   private def testit() = {
     println("TEST START")
     val str = CSVStringify(Array(Array("1", "2", "3"), Array("4", "5", "6")), (err, result) => {
@@ -263,37 +280,53 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     streamer.end()
     println("TEST END")
   }
+   */
 
-  /** Count entities. TODO: Use batch mode. */
-  def count(): Action = Kleisli { config =>
+  def mkCountingStreamForEntity(e: String, pk: String) =
+    dynclient
+      .getListStream[js.Object](s"/${e}?$$select=${pk}")
+      .as(1L)
+      .fold(0L)(_ + _)
+      .map(count => (e, count))
+
+  def fromEntityNames(entityNames: Seq[String]) = {
     import metadata._
     val m = new MetadataCache(context)
-    def mkCountingStream(e: String, pk: String) =
-      dynclient
-        .getListStream[js.Object](s"/${e}?$$select=${pk}")
-        .as(1)
-        //.sum
-        .fold(0)(_ + _)
-        .map(count => (e, count))
-
     val entityList = Stream
       .eval(m.getEntityList())
       .flatMap(Stream.emits[EntityDescription])
-      .filter { entity =>
-        config.common.filter.contains(entity.LogicalName)
-      }
+      .filter(entity => entityNames.contains(entity.LogicalName))
       .map(entity => (entity.LogicalCollectionName, entity.PrimaryId))
 
-    val counters = //Stream(("contacts",  "contactid")).
-      entityList.map(p => mkCountingStream(p._1, p._2))
+    entityList.map(p => mkCountingStreamForEntity(p._1, p._2))
+  }
 
-    val runCounts = counters
+  def fromMap(queries: Map[String, String]) = {
+    Stream
+      .emits(queries.toSeq)
+      .map(
+        p =>
+          dynclient
+            .getListStream[js.Object](p._2)
+            .as(1L)
+            .fold(0L)(_ + _)
+            .flatMap(count => Stream.emit((p._1, count)).covary[IO]))
+  }
+
+  def fromJsonFile(file: String) =
+    fromMap(Utils.slurpAsJson[js.Object](file).asDict[String].toMap)
+
+  def count() = Action { config =>
+    val countersQueries  = fromMap(config.export.queries)
+    val countersEntity   = fromEntityNames(config.common.filter)
+    val countersFromJson = config.export.queryFile.map(fromJsonFile(_)).getOrElse(Stream.empty)
+    val all              = countersQueries ++ countersEntity ++ countersFromJson
+    val runCounts = all
       .join(config.common.concurrency)
       .runLog
       .map(_.sortBy(_._1))
       .flatMap(results => IO { results.foreach(p => println(s"${p._1}, ${p._2}")) })
-
-    if (config.export.exportRepeat)
+    if (config.export.repeat)
       (Stream.eval(runCounts) ++ sch.sleep_[IO](config.export.repeatDelay seconds)).repeat.run
     else
       Stream.eval(runCounts).run
