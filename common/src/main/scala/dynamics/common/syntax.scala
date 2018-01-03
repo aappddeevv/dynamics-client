@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -47,6 +47,7 @@ trait JsAnySyntax {
 
 final case class JsObjectOps(o: js.Object) {
   def asDict[A] = o.asInstanceOf[js.Dictionary[A]]
+  def asAnyDict = o.asInstanceOf[js.Dictionary[js.Any]]
   def asDyn     = o.asInstanceOf[js.Dynamic]
 }
 
@@ -158,7 +159,7 @@ trait JsPromiseSyntax {
 }
 
 case class FutureOps[A](val f: Future[A])(implicit ec: ExecutionContext) {
-  def toIO: IO[A] = IO.fromFuture(Eval.always(f))
+  def toIO: IO[A] = IO.fromFuture(IO(f))
 }
 
 trait FutureSyntax {

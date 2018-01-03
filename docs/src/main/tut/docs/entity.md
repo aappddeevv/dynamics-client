@@ -11,7 +11,7 @@ The `entity` command allows you to export data from a CRM server at fairly high 
 * count: Count the number of entities. If you provide the --repeat option, it will continuously count entities, which can be resource intensive so use --repeat wisely. You can provide a list of entities to count. Count requests are run in parallel.
 * delete: Delete data by providing a query. If you created a load id for your data loads or use the builtin load id, you can delete a slice of the data based on the id. Otherwise, the query must return the primary key which will be used to issue the delete commands. It is suggested that you first run count or export the entities you want to delete to ensure your delete query will select the correct records.
 
-## count
+### count
 You can specify any/all `--query`, `--query-file` or ``--filter` to select the entities to count.
 
 * `--query`: key=value pairs. The key will be used to sort the count results.
@@ -36,24 +36,24 @@ accountAddressGt2, 100
 
 You cannot use navigation properties to in the queries to count child entities. Reverse the query and run the count on the child record.
 
-## export, export-from-query
+### export, export-from-query
 Exporting data comes in two flavors. Exporting using a query created from parts on the command line and using a fully formed query. You can export data into a CSV or JSON streaming file.
 
 Both of these options take:
 * include-formatted-values: Include formatted values in the output.
 * max-page-size: The pagesize to use when retrieving data. You should use the default unless you see stack or heap errors. Either increase the head/stack or decrease max-page-size to fix.
 
-### export
+#### export
 You can dump a single json object using `--raw` in order to see some example output. Then use the rest of the parameters to compose a web api query to select data to be exported.
 
-### export-from-query
+#### export-from-query
 * query: Specify the query here. Watch out for shell escapes if you use single quotes on linux. You can limit results using $top.
 * wrap: Wrap the output in json array brackets and separate records with a comma. 
 * skip: While highly inefficient, this will skip the first N records. There's no clever way to jump to a results page efficiently.
 
 The default is to output JSON strings separated by newlines.
 
-## delete
+### delete
 By providing a web api, you can delete those records selected. Each query must return the primary key in the query and you must specify which entity you are deleting so that the metadata for the entity can be looked up and the primary key identified correctly.
 
 * `--query` and `--entity`: Specify these to delete records based on a query and the entity specified.
@@ -70,3 +70,8 @@ contact,/contacts?$select=contactid&$filter=age gt 25
 account,/accounts?$select=accountid&$filter=importsequencenumber eq 20
 ```
 Note that you can run a bulk delete job directly on CRM and use a sophisticated FetchXml query. This delete functionality is designed to handle simple delete scenarios that you often run into after a bad data load in a script.
+
+## Examples
+
+
+## Future

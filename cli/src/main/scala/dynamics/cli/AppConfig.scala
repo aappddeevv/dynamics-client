@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -41,7 +41,6 @@ import dynamics.common._
     batch: Boolean = false,
     metadataCacheFile: Option[String] = None,
     ignoreMetadataCache: Boolean = false,
-    /** NOT USED: Override to provide your own actions to be executed. */
     actionSelector: Option[ActionSelector] = Some(MainHelpers.defaultActionSelector)
 )
 
@@ -75,6 +74,12 @@ import dynamics.common._
     solutionExportManaged: Boolean = false,
     solutionJsonConfigFile: Option[String] = None,
     solutionPublishWorkflows: Boolean = true
+)
+
+@Lenses case class ActionConfig(
+  action: String = "",
+  payloadFile: Option[String] = None,
+  pprint: Boolean = false,
 )
 
 @Lenses case class ImportConfig(
@@ -191,7 +196,8 @@ import dynamics.common._
     metadata: MetadataConfig = MetadataConfig(),
     sdkMessage: SDKMessageConfig = SDKMessageConfig(),
     test: TestConfig = TestConfig(),
-    systemjob: SystemJobConfig = SystemJobConfig()
+  systemjob: SystemJobConfig = SystemJobConfig(),
+    action: ActionConfig = ActionConfig(),
 ) {
   def debug       = common.debug
   def noisy       = !common.quiet

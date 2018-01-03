@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -45,8 +45,8 @@ object CommandLine {
     }
   }
 
-  def withCmd(ac: AppConfig, command: String)    = ac.copy(common = ac.common.copy(command = command))
-  def withSub(ac: AppConfig, subcommand: String) = ac.copy(common = ac.common.copy(subcommand = subcommand))
+  def withCmd(ac: AppConfig, command: String)    = ac.lens(_.common.command).set(command)
+  def withSub(ac: AppConfig, subcommand: String) = ac.lens(_.common.subcommand).set(subcommand)
 
   def general(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
@@ -55,67 +55,67 @@ object CommandLine {
     opt[Unit]("debug")
       .text("Debug level logging")
       .hidden()
-      .action((x, c) => c.copy(common = c.common.copy(debug = true)))
+      .action((x, c) => c.lens(_.common.debug).set(true))
     opt[Int]("concurrency")
       .text("General concurrency metric. Default is 4.")
-      .action((x, c) => c.copy(common = c.common.copy(concurrency = x)))
+      .action((x, c) => c.lens(_.common.concurrency).set(x))
     opt[String]("logger-level")
       .hidden()
       .text("Logger level: trace, debug, info, warn or error. Overrides debug option.")
       .action { (x, c) =>
-        val newC = c.copy(common = c.common.copy(loggerLevel = Some(x)))
+        val newC = c.lens(_.common.loggerLevel).set(Some(x))
         if (x.toUpperCase == "DEBUG") newC.copy(common = newC.common.copy(debug = true))
         else newC
       }
     opt[Int]("lcid")
       .text("Whenever language choices need to be made, use this LCID.")
-      .action((x, c) => c.copy(common = c.common.copy(lcid = x)))
+      .action((x, c) => c.lens(_.common.lcid).set(x))
     opt[String]("logfile")
       .text("Logger file.")
-      .action((x, c) => c.copy(common = c.common.copy(logFile = x)))
+      .action((x, c) => c.lens(_.common.logFile).set(x))
     opt[Unit]('v', "verbose")
       .text("Be verbose.")
-      .action((x, c) => c.copy(common = c.common.copy(verbose = true)))
+      .action((x, c) => c.lens(_.common.verbose).set(true))
     opt[Unit]('q', "quiet")
       .text("No extra output, just the results of the command.")
-      .action((x, c) => c.copy(common = c.common.copy(quiet = true)))
+      .action((x, c) => c.lens(_.common.quiet).set(true))
     opt[String]('c', "crm-config")
       .valueName("<file>")
       .text("CRM connection configuration file")
-      .action((x, c) => c.copy(common = c.common.copy(crmConfigFile = x)))
+      .action((x, c) => c.lens(_.common.crmConfigFile).set(x))
     opt[String]("table-format")
       .valueName("honeywell|norc|ramac|void")
       .text("Change the table output format. void = no table adornments.")
-      .action((x, c) => c.copy(common = c.common.copy(tableFormat = x)))
+      .action((x, c) => c.lens(_.common.tableFormat).set(x))
     opt[Int]("num-retries")
       .text("Number of retries if a request fails. Default is 5.")
-      .action((x, c) => c.copy(common = c.common.copy(numRetries = x)))
+      .action((x, c) => c.lens(_.common.numRetries).set(x))
     opt[Int]("pause-between")
       .text("Pause between retries in seconds. Default is 10.")
-      .action((x, c) => c.copy(common = c.common.copy(pauseBetween = x.seconds)))
+      .action((x, c) => c.lens(_.common.pauseBetween).set(x.seconds))
       .validate(pause =>
         if (pause < 0 || pause > 60 * 5) failure("Pause must be between 0 and 300 seconds.") else success)
     opt[Int]("request-timeout")
       .text("Request timeout in millis. 1000millis = 1s")
-      .action((x, c) => c.copy(common = c.common.copy(requestTimeOutInMillis = Some(x))))
+      .action((x, c) => c.lens(_.common.requestTimeOutInMillis).set(Some(x)))
     opt[String]("metadata-cache-file")
       .text("Metadata cache file to use explicitly. Otherwise it is automatically located.")
-      .action((x, c) => c.copy(common = c.common.copy(metadataCacheFile = Some(x))))
+      .action((x, c) => c.lens(_.common.metadataCacheFile).set(Some(x)))
     opt[Unit]("ignore-metadata-cache")
       .text("Ignore any existing metadata cache. This will cause a new metadata download.")
-      .action((x, c) => c.copy(common = c.common.copy(ignoreMetadataCache = true)))
+      .action((x, c) => c.lens(_.common.ignoreMetadataCache).set(true))
     opt[Int]("batchsize")
       .text("If batching is used, this is the batch size.")
-      .action((x, c) => c.copy(common = c.common.copy(batchSize = x)))
+      .action((x, c) => c.lens(_.common.batchSize).set(x))
     opt[Unit]("batch")
       .text("If set, try to run things using batch OData.")
       .action((x, c) => c.lens(_.common.batch).set(true))
     opt[String]("outputdir")
       .text("Output directory for any content output.")
-      .action((x, c) => c.copy(common = c.common.copy(outputDir = x)))
+      .action((x, c) => c.lens(_.common.outputDir).set(x))
     opt[String]("outputfile")
       .text("Output file.")
-      .action((x, c) => c.copy(common = c.common.copy(outputFile = Some(x))))
+      .action((x, c) => c.lens(_.common.outputFile).set(Some(x)))
   }
 
   /**
@@ -579,6 +579,31 @@ object CommandLine {
       )
   }
 
+  def actions(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    val h = CliHelpers(op)
+    import h.sub
+    cmd("actions")
+      .text("Perform actions using the actions API")
+      .action((x,c) => withCmd(c, "actions"))
+      .children(
+        sub("execute")
+          .text("Execute action. The JSON response payload is output to stdout.")
+          .action((x,c) => withSub(c, "execute"))
+          .children(
+            arg[String]("action")
+              .text("Action to execute. Can be bound or unbound syntax.")
+              .action((x,c) => c.lens(_.action.action).set(x)),
+            opt[String]("payload-file")
+              .text("Payload file if needed for data. It is read as a pure string without parsing.")
+              .action((x,c) => c.lens(_.action.payloadFile).set(Some(x))),
+            opt[Unit]("pprint")
+              .text("Pretty print the JSON response.")
+              .action((x,c) => c.lens(_.action.pprint).set(true)),
+          )
+      )
+  }
+
   def solutions(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     val h = CliHelpers(op)
@@ -833,7 +858,6 @@ object CommandLine {
       .text("Manage Web Resources.")
       .action((x, c) => withCmd(c, "webresources"))
       .children(
-        note("\n"),
         sub("list")
           .text("List web resources")
           .action((x, c) => withSub(c, "list"))
@@ -872,7 +896,7 @@ object CommandLine {
           ),
         sub("upload")
           .text("Upload web resources and optionally publish.")
-          .action((x, c) => withCmd(c, "upload"))
+          .action((x, c) => withSub(c, "upload"))
           .children(
             arg[String]("source")
               .unbounded()

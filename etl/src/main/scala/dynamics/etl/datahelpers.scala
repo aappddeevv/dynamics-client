@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -30,7 +30,7 @@ package object jsdatahelpers {
     * This is a mutating action.
     */
   @inline
-  def pruneIfBlank(obj: js.Dictionary[js.Any], p: String*): obj.type = {
+  def pruneIfBlank(obj: JsAnyDict, p: String*): obj.type = {
     p.foreach { k =>
       if (isBlank(obj, k)) omit(obj, k)
     }
@@ -41,36 +41,34 @@ package object jsdatahelpers {
   @inline
   def deepCopy(obj: js.Object): js.Object = JSON.parse(JSON.stringify(obj)).asInstanceOf[js.Object]
 
+  /**
+    * If the property is present and is not blank, apply f to it.
+    */
   @inline
-  def replaceIfBlank(obj: js.Dictionary[js.Any], p: String, f: String => js.Any): obj.type =
-    xfObj[String](obj, p, {
-      case a if (a.size == 0) => obj += (p -> f(a))
+  def replaceIfBlank(obj: JsAnyDict, p: String, f: js.Any => js.Any): obj.type =
+    xfObj[js.Any](obj, p, {
+      case a if (isBlank(obj, p)) => obj += (p -> f(a))
     })
 
-  /** True if property is present on the object. */
+  /** True if property is defined on the object. Shouldn't we use hasOwnProperty? */
   @inline
   def isDefined(obj: js.Dictionary[_], p: String) = if (obj.contains(p)) true else false
 
-  /** If property is defined, do something to object, otherwise return original object. */
-  def doIfDefined(obj: js.Dictionary[js.Any], p: String, f: js.Dictionary[js.Any] => Unit): obj.type = {
+  /** If property is defined, do something to object, otherwise return original object. Mutating! */
+  @inline
+  def doIfDefined(obj: JsAnyDict, p: String, f: js.Dictionary[js.Any] => Unit): obj.type = {
     if (isDefined(obj, p)) f(obj)
     obj
   }
 
-  /** If property is present, return true if its value is string blank or null, otherwise, return false. */
+  /** If property is present, return true if its value is string 0|blank|null|undefined. Otherwise, return false. */
   @inline
-  def isBlank(obj: js.Dictionary[js.Any], p: String): Boolean =
-    obj
-      .get(p)
-      .map(v => if (v == null) "" else v)
-      .map(_.asInstanceOf[String])
-      .filterNot(_.isEmpty)
-      .map(_ => true)
-      .getOrElse(false)
+  def isBlank(obj: JsAnyDict, p: String): Boolean =
+    obj.contains(p) && !DynamicImplicits.truthValue(obj(p).asDyn)
 
   /** If property is present, replace with value regardless of the current value. */
   @inline
-  def setTo(obj: js.Dictionary[js.Any], p: String, value: js.Any): obj.type =
+  def setTo(obj: JsAnyDict, p: String, value: js.Any): obj.type =
     doIfDefined(obj, p, { dict =>
       dict += (p -> value)
     })
@@ -78,11 +76,12 @@ package object jsdatahelpers {
   @inline
   def roundAt(p: Int)(n: Double): Double = { val s = math pow (10, p); (math round n * s) / s }
 
-  /** Get a value in the js object and return it wrapped in `Option`. If found,
+  /** 
+    * Get a value in the js object and return it wrapped in `Option`. If found,
     * it is removed from the object, a mutating operation.
     */
   @inline
-  def getAndZap[A](j: js.Dictionary[js.Any], p: String): Option[A] = {
+  def getAndZap[A](j: JsAnyDict, p: String): Option[A] = {
     val r = j.get(p).asInstanceOf[Option[A]]
     r.foreach(_ => j -= p)
     r
@@ -96,16 +95,16 @@ package object jsdatahelpers {
   }
 
   @inline
-  def keepOnly(obj: js.Dictionary[js.Any], names: String*): js.Object = {
-    val keys = js.Object.properties(obj)
-    updateObject(keys -- names, Nil, obj.asInstanceOf[js.Object])
+  def keepOnly(obj: JsAnyDict, names: String*): obj.type = {
+    updateObject((obj.keySet -- names).toSeq, Nil, obj)
+    obj
   }
 
   /** Rename keys. Mutates input object. Old keys are removed as they
     * are moved. If a key is not found, that property is not renamed.
     */
   @inline
-  def rename(j: js.Dictionary[js.Any], renames: (String, String)*): j.type = {
+  def rename(j: JsAnyDict, renames: (String, String)*): j.type = {
     renames.foreach {
       case (o, n) =>
         j.get(o) match {
@@ -119,7 +118,8 @@ package object jsdatahelpers {
   }
 
   /** Update an object. Mutates in place! Processng order is drops then renames. */
-  def updateObject[A](drops: Seq[String], renames: Seq[(String, String)], obj: js.Object): js.Object = {
+  @inline
+  def updateObject[A](drops: Seq[String], renames: Seq[(String, String)], obj: JsAnyDict): js.Dictionary[js.Any] = {
     val d = obj.asInstanceOf[js.Dictionary[js.Any]]
     omit(d, drops: _*)
     rename(d, renames: _*)
@@ -127,10 +127,13 @@ package object jsdatahelpers {
   }
 
   /** If property is present, apply partial function. */
-  def xfObj[A](obj: js.Dictionary[js.Any], p: String, pf: PartialFunction[A, Unit]): obj.type =
+  @inline
+  def xfObj[A](obj: JsAnyDict, p: String, pf: PartialFunction[A, Unit]): obj.type =
     doIfDefined(obj, p, dict => {
-      val a = dict(p).asInstanceOf[A]
-      if (pf.isDefinedAt(a)) pf.apply(a)
+      if(dict.contains(p)) {
+        val a = dict(p).asInstanceOf[A]
+        if (pf.isDefinedAt(a)) pf.apply(a)
+      }
     })
 
   /**
@@ -145,7 +148,7 @@ package object jsdatahelpers {
 
     obj =>
       {
-        val o = obj.asDict[js.Any]
+        val o = obj.asAnyDict
         drop.foreach(omit(o, _: _*))
         rename.foreach(jsdatahelpers.rename(o, _: _*))
         keep.foreach(keepOnly(o, _: _*))

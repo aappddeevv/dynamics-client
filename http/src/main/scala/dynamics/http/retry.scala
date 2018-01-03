@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -64,7 +64,7 @@ object RetryClient extends LazyLogger {
       val basePolicy       = policyWithException(policy)
       val x: Service[HttpRequest, DisposableResponse] = Kleisli { req: HttpRequest =>
         {
-          IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeToFuture)))
+          IO.fromFuture(IO(basePolicy(c.open(req).unsafeToFuture)))
           //IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeRunAsyncFuture)))
           // Task.fromFuture(policy[DisposableResponse]{ () =>
           //   c.open(req).unsafeRunAsyncFuture

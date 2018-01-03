@@ -10,14 +10,9 @@ object Dependencies {
   val commonDependencies = Def.setting(Seq(
     "com.github.scopt"       %%% "scopt"       % "latest.version",
     "org.scalatest"          %%% "scalatest"    % "latest.release" % "test",
-    "co.fs2" %%% "fs2-core" % "0.10.0-M9",
-    //"org.typelevel" %%% "cats" % "0.9.0",
-    "org.typelevel" %%% "cats-core" % "1.0.0-MF",
-    //"co.fs2" %%% "fs2-cats" % "0.3.0",
-    //"co.fs2" %%% "fs2-cats" % "0.5.0",
-    //"co.fs2" %%% "fs2-cats" % "latest.version",
-    // 0.5 is dependent on cats 1.0.0-RC, which may break fs2
-    "org.typelevel" %%% "cats-effect" % "0.5",
+    "co.fs2" %%% "fs2-core" % "0.10.0-M10",
+    "org.typelevel" %%% "cats-core" % "1.0.0-RC2",
+    "org.typelevel" %%% "cats-effect" % "0.6",
     //"com.github.mpilquist" %%% "simulacrum" % "0.10.0",
     "io.monadless" %%% "monadless-core" % "latest.version",
     "io.monadless" %%% "monadless-stdlib" % "latest.version",

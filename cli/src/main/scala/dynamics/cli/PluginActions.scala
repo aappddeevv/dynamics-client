@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -104,7 +104,7 @@ class PluginActions(val context: DynamicsContext) {
         case Right(assembly) =>
           val dll = unlift(base64FromFile(source))
           if (assembly.content.map(_ == dll).getOrElse(false))
-            println("Content is the same. No updated performed.")
+            println("Content is the same. No update performed.")
           else {
             val r = update(assembly.pluginassemblyid.getOrElse(""), assembly.name.getOrElse(""), dll)
               .map(_ => println("Update completed successfully."))

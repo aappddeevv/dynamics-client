@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -23,6 +23,7 @@ import io.scalajs.npm.winston._
 import io.scalajs.npm.winston.transports._
 import cats.implicits._
 import cats.effect._
+import monocle.macros.syntax.lens._
 
 import dynamics.common._
 import dynamics.client._
@@ -53,7 +54,7 @@ object MainHelpers extends LazyLogger {
         process.exit(1)
         zero
       } { c =>
-        c.copy(common = c.common.copy(connectInfo = readConnectionInfoOrExit(c.common.crmConfigFile)))
+        c.lens(_.common.connectInfo).set(readConnectionInfoOrExit(c.common.crmConfigFile))
       }
 
     val start = process.hrtime()
@@ -98,7 +99,8 @@ object MainHelpers extends LazyLogger {
     }
   }
 
-  /** Process an Attempt (Either) from an Action run.
+  /** 
+    * Process an Attempt (Either) from an Action run.
     * @param start Start time information array from `process.hrtime`.
     */
   def actionPostProcessor[A](noisy: Boolean, start: Array[Int]): Either[Throwable, A] => Unit =
@@ -142,7 +144,8 @@ object MainHelpers extends LazyLogger {
         }
     }
 
-  /** Provide a default set of actions. If no commands are recognized
+  /** 
+    * Provide a default set of actions. If no commands are recognized
     * this runs an action to inform the user to use --help. It always
     * returns a Some.
     */

@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -125,7 +125,7 @@ object Utils {
     * @return Unit if file written, otherwise a failed IO.
     */
   def writeToFile(path: String, content: String | Buffer)(implicit ec: ExecutionContext): IO[Unit] = {
-    IO.fromFuture(Eval.always(Fse.outputFile(path, content)))
+    IO.fromFuture(IO(Fse.outputFile(path, content)))
   }
 
   /** Write to file synchronously. */
@@ -168,5 +168,8 @@ object Utils {
 
   /** Generate a new CRM GUID. */
   def CRMGUID(): String = java.util.UUID.randomUUID.toString
+
+  /** Parse some json. */
+  def jsonParse(content: String): js.Dynamic = js.JSON.parse(content)
 
 }

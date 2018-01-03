@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -132,7 +132,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
     }
   }
 
-  def export(): Action = Kleisli { config =>
+  def export() = Action { config =>
     val jsonconfig = config.solution.solutionJsonConfigFile
       .map(Utils.slurp(_))
       .map(JSON.parse(_))
@@ -183,7 +183,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
       case "upload" => upload()
       case _ =>
         Action { _ =>
-          IO(println(s"solutions command '${command}' not recognized"))
+          IO(println(s"solutions command '${command}' not recognized."))
         }
     }
 }

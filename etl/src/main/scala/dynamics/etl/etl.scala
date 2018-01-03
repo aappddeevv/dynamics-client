@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -14,6 +14,7 @@ import cats.effect._
 
 import dynamics.common._
 import fs2helpers._
+import common.syntax.jsobject._
 
 package object etl {
 
@@ -78,9 +79,9 @@ package object etl {
     Transform.instance { input: InputContext[DataRecord] =>
       import dynamics.common.syntax.jsobject._
       IO {
-        val j0 = jsdatahelpers.updateObject(drops, renames, input.input)
-        val j1 = jsdatahelpers.keepOnly(j0.asDict[js.Any], keeps: _*)
-        TransformResult.success(Result(input.source, Stream.emit(j1)))
+        val j0 = jsdatahelpers.updateObject(drops, renames, input.input.asDict[js.Any])
+        val j1 = jsdatahelpers.keepOnly(j0, keeps: _*)
+        TransformResult.success(Result(input.source, Stream.emit(j1.asInstanceOf[js.Object])))
       }
     }
 
@@ -89,7 +90,7 @@ package object etl {
     */
   def UpdateObject[A](drops: Seq[String], renames: Seq[(String, String)], f: A => DataRecord): Pipe[IO, A, A] =
     _ map { a =>
-      jsdatahelpers.updateObject[A](drops, renames, f(a))
+      jsdatahelpers.updateObject[A](drops, renames, f(a).asAnyDict)
       a
     }
 

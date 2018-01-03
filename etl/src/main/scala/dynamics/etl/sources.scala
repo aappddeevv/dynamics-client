@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -181,30 +181,29 @@ object sources {
   /**
     * Assuming the query has been set to streaming, stream the results.
     */
-  def queryToStream[A](query: Request, qsize: Int = 10000)(implicit ec: ExecutionContext): Stream[IO, A] = {
-    val F = Async[IO]
+  def queryToStream[F[_], A](query: Request, qsize: Int = 10000)
+    (implicit ec: ExecutionContext, F: Effect[F]): Stream[F, A] = {
     for {
-      q <- Stream.eval(fs2.async.boundedQueue[IO, Option[Either[Throwable, A]]](qsize))
-      _ <- Stream.eval(IO {
-        query.on(
-          "error",
-          (e: io.scalajs.nodejs.Error) => q.enqueue1(Some(Left(wrapJavaScriptException(e)))).unsafeRunAsync(_ => ()))
-        query.on("end", (_: js.Any) => q.enqueue1(None).unsafeRunAsync(_ => ()))
-        query.on("row", (data: A) => q.enqueue1(Some(Right(data))).unsafeRunAsync(_ => ()))
+      q <- Stream.eval(async.boundedQueue[F, Option[Either[Throwable, A]]](qsize))
+      _ <- Stream.eval(F.delay {
+        query.on("error",
+          (e: io.scalajs.nodejs.Error) =>
+          async.unsafeRunAsync(q.enqueue1(Some(Left(wrapJavaScriptException(e)))))(_ => IO.unit))
+        query.on("done", (_: js.Any) => async.unsafeRunAsync(q.enqueue1(None))(_ => IO.unit))
+        query.on("row", (data: A) => async.unsafeRunAsync(q.enqueue1(Some(Right(data))))(_ => IO.unit))
       })
       a <- q.dequeue.unNoneTerminate.rethrow
     } yield a
   }
 
   def MSSQLSourceRequest[A](qstr: String, config: js.Object | RawOptions | String)(
-      implicit ec: ExecutionContext): IO[common.Request] = {
-    def create() = MSSQL.connect(config).toIO.map { pool =>
+    implicit ec: ExecutionContext): IO[common.Request] = {
+    MSSQL.connect(config).toIO.map { pool =>
       val request = pool.request()
       request.stream = true
       request.query(qstr)
       request
     }
-    create()
   }
 
   /**
@@ -221,7 +220,7 @@ object sources {
       request
     }
     Stream.bracket(create())(
-      (q: common.Request) => queryToStream[A](q, qsize),
+      (q: common.Request) => queryToStream[IO, A](q, qsize),
       (q: common.Request) => IO.pure(()) // close something?
     )
   }

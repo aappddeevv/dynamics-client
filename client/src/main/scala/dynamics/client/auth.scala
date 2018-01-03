@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -116,7 +116,7 @@ class AuthManager(info: ConnectionInfo)(implicit ehandler: ApplicativeError[IO, 
 
   /** Get a token but use the specified retry policy. */
   def getTokenWithRetry(ctx: AuthenticationContext, policy: Policy)(implicit e: ExecutionContext): IO[TokenInfo] = {
-    IO.fromFuture(Eval.always(policyWithException(policy)(getToken(ctx).attempt.unsafeToFuture()))).flatMap { e =>
+    IO.fromFuture(IO(policyWithException(policy)(getToken(ctx).attempt.unsafeToFuture()))).flatMap { e =>
       e match {
         case Right(ti) => IO.pure(ti)
         case Left(t)   => ehandler.raiseError(t)

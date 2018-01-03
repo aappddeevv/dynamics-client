@@ -20,15 +20,19 @@ npm i -g dynamics-client
 ## Running
 The script can be run, assuming it is on the path:
 ```sh
-dynamicscli ...
+dynamicscli --help
 ```
 If you need to run directly with node,
 ```sh
 node dynamicscli <args for dynamicscli>
 ```
-If you are on a recent node release, you may also want to use NODE_OPTS to set a large stack size if you are using a high level of concurrency:
+If you are on a recent node release, you may also want to use NODE_OPTS or node options to set a large stack size if you are pushing alot of data:
 ```sh
 export NODE_OPTIONS="--max_old_space_size=6000"
+```
+or 
+```sh
+node [node opts e.g. --stack-size 3000] dynamicscli [dynamicscli opts]
 ```
 
 ## CRM Connection Parameters
@@ -44,7 +48,7 @@ Dynamics connection parameters should be placed in a json file. The default is c
     "acquireTokenResource": "https://<yourorg>.crm.dynamics.com"
 }
 ```
-Your password can also be in the environment variable `DYNAMICS_PASSWORD`.
+Your password can also be in the environment variable `DYNAMICS_PASSWORD` as you should avoid passwords in config files that may get checked into version control.
 
 The above shows the domain name to be `<yourorg>.onmicrosoft.com` but the domain varies, It could be `mycompany.com`. The `dataUrl` can be obtained from Developers page in the CRM application's Settings area. `applicationId` can only be obtained from our Azure Active Directory application's registration page. Sometimes, applicationId is called clientId. `authorityHostUrl` should only be changed if you know that you should change it, otherwise, leave it the same as the value above.
 
@@ -62,7 +66,8 @@ Use `dynamics --help` to print out help and see the commands.
    * Solutions
    * System jobs
    * Import maps
-   * plugins (one-time/continuously) an update .dll plugin file that is already registered.
+   * Execute actions (bound and unbound)
+   * plugins (one-time or watch) update an assembly (.dll) that is already registered.
    * Option sets
    * Processes - Workflows
       * List/activate/deactivate/run (against a query)
@@ -86,4 +91,6 @@ Use `dynamics --help` to print out help and see the commands.
 
 All the ingredients for packaging solution deployment are here so you can create your own scripted solution deployer by just creating a directory and a script.
 
+All work sponsored by The Trapelo Group.
 
+Copyrght 2017 The Trapelo Group

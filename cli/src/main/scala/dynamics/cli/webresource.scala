@@ -1,4 +1,4 @@
-// Copyright (c) 2017 aappddeevv@gmail.com
+// Copyright (c) 2017 The Trapelo Group LLC
 // This software is licensed under the MIT License (MIT).
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
@@ -184,7 +184,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
     */
   def writeToFile(path: String, base64Content: String): IO[Unit] = {
     val binary = Buffer.from(base64Content, "base64")
-    IO.fromFuture(Eval.always(Fse.outputFile(path, binary)))
+    IO.fromFuture(IO(Fse.outputFile(path, binary)))
   }
 
   /** Read file, convert to baes64. */
@@ -483,6 +483,10 @@ class WebResourcesCommand(val context: DynamicsContext) {
       case "download" => download()
       case "upload"   => selectUpload
       case "delete"   => delete()
+      case _ =>
+        Action { _ =>
+          IO(println(s"webresource command '${command}' not recognized."))
+        }
     }
   }
 

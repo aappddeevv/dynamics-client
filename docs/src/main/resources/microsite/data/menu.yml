@@ -1,7 +1,10 @@
 options:
   - title: Getting Started
     url: docs/index.html
-    
+
+  - title: actions
+    url: docs/actions.html
+
   - title: entity
     url: docs/entity.html
 
@@ -28,3 +31,6 @@ options:
 
   - title: ETL
     url: docs/etl.html
+
+  - title: Create Your Own Solution Deployer Script
+    url: docs/solutiondeployment.html
