@@ -208,6 +208,19 @@ object AsyncOperation {
     Map(0 -> "Submitted", 1 -> "Parsing", 2 -> "Transforming", 3 -> "Importing", 4 -> "Completed", 5 -> "Failed")
 }
 
+/** Attaches to a solution. */
+@js.native
+trait SolutionComponentOData extends js.Object {
+
+  /** 61=webresource */
+  var solutioncomponentid: String    = js.native
+  var rootsolutioncomonentid: String = js.native
+  var objectid: String               = js.native
+  var ismetadata: Boolean            = js.native
+  var comonenttype: Int              = js.native
+  var _solutionid_value: String      = js.native
+}
+
 /** WebResource as provided in odata response.
   */
 @js.native
@@ -224,6 +237,8 @@ trait WebResourceOData extends js.Object {
   val webresourcetype: Int   = js.native
   @JSName("webresourcetype@OData.Community.Display.V1.FormattedValue")
   val webresourcetypeF: String = js.native
+  // 0 published, 1 unpublished, 2 deleted, 3 deleted unpublished
+  val componentstate: Int = js.native
 }
 
 object WebResource {

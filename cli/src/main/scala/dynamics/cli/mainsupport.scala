@@ -99,7 +99,7 @@ object MainHelpers extends LazyLogger {
     }
   }
 
-  /** 
+  /**
     * Process an Attempt (Either) from an Action run.
     * @param start Start time information array from `process.hrtime`.
     */
@@ -144,7 +144,7 @@ object MainHelpers extends LazyLogger {
         }
     }
 
-  /** 
+  /**
     * Provide a default set of actions. If no commands are recognized
     * this runs an action to inform the user to use --help. It always
     * returns a Some.

@@ -76,7 +76,7 @@ package object jsdatahelpers {
   @inline
   def roundAt(p: Int)(n: Double): Double = { val s = math pow (10, p); (math round n * s) / s }
 
-  /** 
+  /**
     * Get a value in the js object and return it wrapped in `Option`. If found,
     * it is removed from the object, a mutating operation.
     */
@@ -130,7 +130,7 @@ package object jsdatahelpers {
   @inline
   def xfObj[A](obj: JsAnyDict, p: String, pf: PartialFunction[A, Unit]): obj.type =
     doIfDefined(obj, p, dict => {
-      if(dict.contains(p)) {
+      if (dict.contains(p)) {
         val a = dict(p).asInstanceOf[A]
         if (pf.isDefinedAt(a)) pf.apply(a)
       }

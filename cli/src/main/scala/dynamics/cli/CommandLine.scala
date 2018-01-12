@@ -585,21 +585,21 @@ object CommandLine {
     import h.sub
     cmd("actions")
       .text("Perform actions using the actions API")
-      .action((x,c) => withCmd(c, "actions"))
+      .action((x, c) => withCmd(c, "actions"))
       .children(
         sub("execute")
           .text("Execute action. The JSON response payload is output to stdout.")
-          .action((x,c) => withSub(c, "execute"))
+          .action((x, c) => withSub(c, "execute"))
           .children(
             arg[String]("action")
               .text("Action to execute. Can be bound or unbound syntax.")
-              .action((x,c) => c.lens(_.action.action).set(x)),
+              .action((x, c) => c.lens(_.action.action).set(x)),
             opt[String]("payload-file")
               .text("Payload file if needed for data. It is read as a pure string without parsing.")
-              .action((x,c) => c.lens(_.action.payloadFile).set(Some(x))),
+              .action((x, c) => c.lens(_.action.payloadFile).set(Some(x))),
             opt[Unit]("pprint")
               .text("Pretty print the JSON response.")
-              .action((x,c) => c.lens(_.action.pprint).set(true)),
+              .action((x, c) => c.lens(_.action.pprint).set(true)),
           )
       )
   }
@@ -863,6 +863,14 @@ object CommandLine {
           .action((x, c) => withSub(c, "list"))
           .children(
             mkFilterOpt()
+          ),
+        sub("delete-source-maps")
+          .text("Delete sources maps found in a given solution. Web resources must end in .js.map to be selected.")
+          .action((x, c) => withSub(c, "deleteSourceMaps"))
+          .children(
+            arg[String]("unique-solution-name")
+              .text("Solution name")
+              .action((x, c) => c.lens(_.webResource.webResourceUploadSolution).set(x))
           ),
         sub("delete")
           .text("Delete a webresource by its unique name.")

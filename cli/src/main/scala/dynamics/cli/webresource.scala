@@ -464,9 +464,12 @@ class WebResourcesCommand(val context: DynamicsContext) {
     dynclient.executeAction("PublishXml", Entity.fromString(body), None)(void)
   }
 
+  /** Not sure there is a way to unpublish a resource via API. */
+  def unpublish(id: String) = IO.unit
+
   /** Add a WR to a Solution. */
-  def addToSolution(id: String, soln: String) = {
-    val args = new AddSolutionComponentArgs(ComponentId = id, ComponentType = 61, SolutionUniqueName = soln)
+  def addToSolution(id: String, soln: String, componentType: Int = 61) = {
+    val args = new AddSolutionComponentArgs(ComponentId = id, ComponentType = componentType, SolutionUniqueName = soln)
     dynclient.executeAction[AddSolutionComponentResponse]("AddSolutionComponent", args.toEntity._1)
   }
 
@@ -476,13 +479,55 @@ class WebResourcesCommand(val context: DynamicsContext) {
     } else upload()(config)
   }
 
+  /**
+    * Delete all source maps (.js.map) web resources given a solution unique name.
+    * Only this extension is allowed in order to avoid accidental deletes.
+    */
+  val deleteSourceMaps = Action { config =>
+    // get solution id from name
+    // get all web resources in the solution via the solution components
+    // note its possible during dev that webresource.solutionid is *not* set correctly
+    // delete those that match the name
+
+    val sname = config.webResource.webResourceUploadSolution
+    val qsoln = QuerySpec(filter = Some(s"uniquename eq '$sname'"))
+    dynclient
+      .getList[SolutionOData](qsoln.url("solutions"))
+      .flatMap { solns =>
+        if (solns.length != 1) IO(println(s"Unique solution name $sname was not found."))
+        else {
+          val q = QuerySpec(filter = Some(s"componenttype eq 61 and _solutionid_value eq ${solns(0).solutionid}"))
+          dynclient
+            .getListStream[SolutionComponentOData](q.url("solutioncomponents"))
+            .map { sc =>
+              Stream.eval(dynclient.getOneWithKey[WebResourceOData]("webresourceset", sc.objectid))
+            }
+            .join(config.common.concurrency)
+            .filter(wr => wr.name.endsWith(".js.map"))
+            .evalMap { wr =>
+              val deleteit = dynclient.delete("webresourceset", wr.webresourceid).map(_ => s"Deleted ${wr.name}.")
+              wr.componentstate match {
+                case 0     => unpublish(wr.webresourceid).flatMap(_ => deleteit)
+                case 1     => deleteit
+                case 2 | 3 => IO(s"Web resource ${wr.name} is already in a deleted state. No action taken.")
+                case _     => IO(s"Web resource ${wr.name}. Unknown component state ${wr.componentstate}")
+              }
+            }
+            .to(Sink.lines(System.out))
+            .run
+        }
+      }
+      .flatMap(_ => IO.unit)
+  }
+
   def get(command: String): Action = {
     command match {
-      case "list"     => list()
-      case "dumpraw"  => dumpRaw()
-      case "download" => download()
-      case "upload"   => selectUpload
-      case "delete"   => delete()
+      case "list"             => list()
+      case "dumpraw"          => dumpRaw()
+      case "download"         => download()
+      case "upload"           => selectUpload
+      case "delete"           => delete()
+      case "deleteSourceMaps" => deleteSourceMaps
       case _ =>
         Action { _ =>
           IO(println(s"webresource command '${command}' not recognized."))
@@ -490,4 +535,10 @@ class WebResourcesCommand(val context: DynamicsContext) {
     }
   }
 
+}
+
+object WebResource {
+
+  /** web resource component type. should get from metadata, not hardcode */
+  val WebResourceComponentType = IO(61)
 }

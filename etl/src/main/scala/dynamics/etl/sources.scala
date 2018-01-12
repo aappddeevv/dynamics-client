@@ -181,14 +181,14 @@ object sources {
   /**
     * Assuming the query has been set to streaming, stream the results.
     */
-  def queryToStream[F[_], A](query: Request, qsize: Int = 10000)
-    (implicit ec: ExecutionContext, F: Effect[F]): Stream[F, A] = {
+  def queryToStream[F[_], A](query: Request, qsize: Int = 10000)(implicit ec: ExecutionContext,
+                                                                 F: Effect[F]): Stream[F, A] = {
     for {
       q <- Stream.eval(async.boundedQueue[F, Option[Either[Throwable, A]]](qsize))
       _ <- Stream.eval(F.delay {
         query.on("error",
-          (e: io.scalajs.nodejs.Error) =>
-          async.unsafeRunAsync(q.enqueue1(Some(Left(wrapJavaScriptException(e)))))(_ => IO.unit))
+                 (e: io.scalajs.nodejs.Error) =>
+                   async.unsafeRunAsync(q.enqueue1(Some(Left(wrapJavaScriptException(e)))))(_ => IO.unit))
         query.on("done", (_: js.Any) => async.unsafeRunAsync(q.enqueue1(None))(_ => IO.unit))
         query.on("row", (data: A) => async.unsafeRunAsync(q.enqueue1(Some(Right(data))))(_ => IO.unit))
       })
@@ -197,7 +197,7 @@ object sources {
   }
 
   def MSSQLSourceRequest[A](qstr: String, config: js.Object | RawOptions | String)(
-    implicit ec: ExecutionContext): IO[common.Request] = {
+      implicit ec: ExecutionContext): IO[common.Request] = {
     MSSQL.connect(config).toIO.map { pool =>
       val request = pool.request()
       request.stream = true

@@ -81,15 +81,15 @@ object FSWatcherOps {
 
   /** Return chokidar watcher and stream of events. (event, path) */
   def toStream[F[_]](watcher: io.scalajs.nodejs.fs.FSWatcher, enames: Traversable[String] = Nil)(
-      implicit F: Effect[F], ec: ExecutionContext): Stream[F, (String, String)] =
+      implicit F: Effect[F],
+      ec: ExecutionContext): Stream[F, (String, String)] =
     for {
       q <- Stream.eval(fs2.async.unboundedQueue[F, (String, String)])
       // Stream that only exists for setting up the never ending flow...
       _ <- Stream.suspend {
         // setup the callback and queueing
         enames foreach { e =>
-          watcher.on(e,
-            (arg: String) => async.unsafeRunAsync(q.enqueue1((e, arg)))(_ => IO.unit))
+          watcher.on(e, (arg: String) => async.unsafeRunAsync(q.enqueue1((e, arg)))(_ => IO.unit))
         }
         Stream.emit(())
       }

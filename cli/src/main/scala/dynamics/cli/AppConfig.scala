@@ -77,9 +77,9 @@ import dynamics.common._
 )
 
 @Lenses case class ActionConfig(
-  action: String = "",
-  payloadFile: Option[String] = None,
-  pprint: Boolean = false,
+    action: String = "",
+    payloadFile: Option[String] = None,
+    pprint: Boolean = false,
 )
 
 @Lenses case class ImportConfig(
@@ -196,7 +196,7 @@ import dynamics.common._
     metadata: MetadataConfig = MetadataConfig(),
     sdkMessage: SDKMessageConfig = SDKMessageConfig(),
     test: TestConfig = TestConfig(),
-  systemjob: SystemJobConfig = SystemJobConfig(),
+    systemjob: SystemJobConfig = SystemJobConfig(),
     action: ActionConfig = ActionConfig(),
 ) {
   def debug       = common.debug

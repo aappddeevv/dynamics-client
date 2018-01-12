@@ -23,20 +23,21 @@ class ActionActions(ctx: DynamicsContext) extends LazyLogger {
   val execute = Action { config =>
     val body = config.action.payloadFile.fold("")(f => Utils.slurp(f))
     executeAction[String](config.action.action, body.toEntity._1)
-      .map{r =>
-        if(config.action.pprint) PrettyJson.render(Utils.jsonParse(r).asJsObj)
+      .map { r =>
+        if (config.action.pprint) PrettyJson.render(Utils.jsonParse(r).asJsObj)
         else r
-      }.flatMap{result =>
+      }
+      .flatMap { result =>
         IO(println(s"Payload response:\n$result"))
       }
   }
-
 
   def get(command: String): Action =
     command match {
       case "execute" => execute
       case _ =>
-        Action{ _ => IO(println(s"action command '${command}' not recognized."))
+        Action { _ =>
+          IO(println(s"action command '${command}' not recognized."))
         }
     }
 }

@@ -1,6 +1,6 @@
 dynamicscli - a nodejs CLI application and client framework for working with online Microsoft Dynamics applications. The application will not currently authenticate with on-premise systems.
 
-dynamicscli uses the new ODatav4 REST data api which means that you must register the application with Azure Active Directory. It's easy to do, but you need Admin access to create the registration. You can use any application registration that allows your userid access to the data and has an application id.
+dynamicscli uses the ODatav4 REST data api which means that you must register the application with Azure Active Directory to allow the CLI to connect to the server. Registering is easy to do, but you need Admin access to create the registration. You can use any application registration that allows your userid access to the data and has an application id.
 
 dynamics-client two personalities:
 * A CLI that can be used from any OS. While one could use PowerShell for everything, its much easier to add commands or make commands robust using an application directly.
