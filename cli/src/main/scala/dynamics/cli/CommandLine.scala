@@ -530,7 +530,7 @@ object CommandLine {
   def etl(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     cmd("etl")
-      .text("Run a searchone etl program.")
+      .text("Run an etl program.")
       .action((x, c) => withCmd(c, "etl"))
       .children(
         arg[String]("etlid")
@@ -960,24 +960,20 @@ object CommandLine {
     webresources,
     whoami,
     workflows,
-    etl,
   )
 
-  /** Add head and help to a list of options, which by default is all base commands. */
+  /** Add scopt head, help and a list of options, which by default is all base commands. */
   def addAllOptions(op: scopt.OptionParser[AppConfig],
                     addme: Seq[scopt.OptionParser[AppConfig] => Unit] = stdOps): Unit = {
     import op._
-
-    head("dynamics", "0.1.0")
-    addme.foreach { o =>
-      o(op)
-    }
+    head("dynamics", BuildInfo.version)
     version("version")
       .abbr("v")
       .text("Print version")
     help("help")
       .abbr("h")
       .text("dynamics command line tool")
+    addme.foreach { o => o(op) }
   }
 
   /**

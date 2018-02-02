@@ -23,11 +23,18 @@ trait DynamicsClientRequests {
     HttpRequest(Method.POST, s"/$entitySet", body = Entity.fromString(body), headers = toHeaders(opts))
 
   /** Make a pure delete request. */
-  def mkDeleteRequest(entitySet: String, keyInfo: DynamicsId, opts: DynamicsOptions = DefaultDynamicsOptions) =
+  def mkDeleteRequest(entitySet: String, keyInfo: DynamicsId, opts: DynamicsOptions = DefaultDynamicsOptions) = {
+    val etag =
+      if(opts.applyOptimisticConcurrency.getOrElse(false) && opts.version.isDefined)
+        HttpHeaders("If-Match" -> opts.version.get)
+      else HttpHeaders.empty
     HttpRequest(Method.DELETE, s"/$entitySet(${keyInfo.render()})", headers = toHeaders(opts))
+  }
 
-  def mkGetOneRequest(url: String, opts: DynamicsOptions) =
-    HttpRequest(Method.GET, url, headers = toHeaders(opts))
+  def mkGetOneRequest(url: String, opts: DynamicsOptions) = {
+    val etag = opts.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
+    HttpRequest(Method.GET, url, headers = toHeaders(opts) ++ etag)
+  }
 
   def mkExecuteActionRequest(action: String,
                              body: Entity,
@@ -37,10 +44,12 @@ trait DynamicsClientRequests {
     HttpRequest(Method.POST, url, body = body, headers = toHeaders(opts))
   }
 
+  /** This does not handle the version tag yet. */
   def toHeaders(o: DynamicsOptions): HttpHeaders = {
     val prefer = OData.render(o.prefers)
     prefer.map(str => HttpHeaders("Prefer"        -> str)).getOrElse(HttpHeaders.empty) ++
-      o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty)
+    o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty)
+    //++ o.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
   }
 
   /** Not sure adding $base to the @odata.id is correct. */
@@ -65,6 +74,9 @@ trait DynamicsClientRequests {
     HttpRequest(Method.DELETE, url, body = Entity.empty)
   }
 
+  /**
+   * The upsert flags use an id as the "tag" instead of an etag.
+   */
   def mkUpdateRequest[A](entitySet: String,
                          id: String,
                          body: A,
@@ -73,12 +85,15 @@ trait DynamicsClientRequests {
                          opts: DynamicsOptions = DefaultDynamicsOptions,
                          base: Option[String] = None)(implicit enc: EntityEncoder[A]): HttpRequest = {
     val (b, xtra) = enc.encode(body)
-    val h: HttpHeaders =
-      if (upsertPreventCreate) HttpHeaders("If-Match" -> "*")
-      else if (upsertPreventUpdate) HttpHeaders("If-None-Match" -> "*")
+    val h1 =
+      if (upsertPreventCreate || opts.applyOptimisticConcurrency.getOrElse(false)) HttpHeaders("If-Match" -> "*")
+      else HttpHeaders.empty
+    val h2 =
+      if (upsertPreventUpdate) HttpHeaders("If-None-Match" -> "*")
       else HttpHeaders.empty
     val mustHave = HttpHeaders.empty ++ Map("Content-Type" -> Seq("application/json", "type=entry"))
-    HttpRequest(Method.PATCH, s"${base.getOrElse("")}/$entitySet($id)", toHeaders(opts) ++ h ++ xtra ++ mustHave, b)
+    HttpRequest(Method.PATCH, s"${base.getOrElse("")}/$entitySet($id)",
+      toHeaders(opts) ++ h1 ++ h2 ++ xtra ++ mustHave, b)
   }
 
   def mkExecuteFunctionRequest(function: String,

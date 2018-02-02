@@ -24,15 +24,7 @@ dynamicscli --help
 ```
 If you need to run directly with node,
 ```sh
-node dynamicscli <args for dynamicscli>
-```
-If you are on a recent node release, you may also want to use NODE_OPTS or node options to set a large stack size if you are pushing alot of data:
-```sh
-export NODE_OPTIONS="--max_old_space_size=6000"
-```
-or 
-```sh
-node [node opts e.g. --stack-size 3000] dynamicscli [dynamicscli opts]
+node /path/to/dynamicscli <args for dynamicscli>
 ```
 
 ## CRM Connection Parameters
@@ -54,12 +46,15 @@ The above shows the domain name to be `<yourorg>.onmicrosoft.com` but the domain
 
 Some information can be inferred if left out. For example, the tenant can be inferred from username and the dataUrl can be inferred from acquireTokenResource but its best to specify them directly.
 
+Once you have created your connection file, use it with the `-c <connectionfile>` option. If you connect to several organizations just name the connection file after the organization e.g. myorg1.json or myorg2.json then use it `-c myorg1.json`.
+
 ## Commands
 The general CLI usage is `dynamics command [subcommand] [opts]`.
 
 Use `dynamics --help` to print out help and see the commands.
 
 ## What can you do?
+Some of the things you can do with the CLI include:
 
 * List and manage:
    * Publishers
@@ -89,8 +84,14 @@ Use `dynamics --help` to print out help and see the commands.
    * Export a single, new auth token.
    * Continuously export a valid, refreshed token to a specific file.
 
-All the ingredients for packaging solution deployment are here so you can create your own scripted solution deployer by just creating a directory and a script.
+See [dynamics-client](https://aappddeevv.github.io/dynamics-client) for details.
+
+Ingredients for packaging up parts of a solution deployment are here so you can create your own scripted solution deployer by just creating a directory and a standard script.
 
 All work sponsored by The Trapelo Group.
 
-Copyrght 2017 The Trapelo Group
+## License
+
+MIT license. See the LICENSE file.
+
+Copyright 2017 The Trapelo Group.

@@ -81,7 +81,9 @@ final case class JsDynamicOps(val jsdyn: js.Dynamic) {
   def asInt: Int                  = jsdyn.asInstanceOf[Int]
   def asArray[A]: js.Array[A]     = jsdyn.asInstanceOf[js.Array[A]]
   def asBoolean: Boolean          = jsdyn.asInstanceOf[Boolean]
+  /** @deprecated use asJsObj */
   def asJSObj: js.Object          = jsdyn.asInstanceOf[js.Object]
+  def asJsObj: js.Object          = jsdyn.asInstanceOf[js.Object]
   def asDict[A]: js.Dictionary[A] = jsdyn.asInstanceOf[js.Dictionary[A]]
   def asUndefOr[A]: js.UndefOr[A] = jsdyn.asInstanceOf[js.UndefOr[A]]
   def asJsObjSub[A <: js.Object]  = jsdyn.asInstanceOf[A] // assumes its there!

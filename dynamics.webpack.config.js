@@ -2,7 +2,7 @@ let webpack = require('webpack'),
     merge = require('webpack-merge'),
     nodeExternals = require('webpack-node-externals'),
     UglifyJsPlugin = require("uglifyjs-webpack-plugin"),
-    fs = require("fs"),
+    fs = require("fs-extra"),
     path = require("path"),
     util = require("util"),
     common, config
@@ -23,9 +23,8 @@ common = {
     },
     target: "node",
     devtool: "source-map",
-    externals: [nodeExternals({
-        whitelist: ['winston']
-    })],
+    // do not bundle any node_modules, no monolithic output
+    externals: [nodeExternals()],
     resolve: {
         alias: {
             Provided: path.resolve(__dirname, "./cli/src/main/resources"),

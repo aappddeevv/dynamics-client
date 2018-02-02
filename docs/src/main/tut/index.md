@@ -32,4 +32,4 @@ While the tool has been used in multiple projects, it is still needs improvement
 # Copyright and License
 All code is available to you under the MIT license.
 
-Copyright aappddeevv@gmail.com, 2017.
+Copyright 2017 The Trapelo Group

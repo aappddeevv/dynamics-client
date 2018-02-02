@@ -85,9 +85,10 @@ mainClass in Compile := Some("dynamics.cli.Main")
 lazy val cli = project
   .settings(dynamicsSettings)
   .dependsOn(client, common, etl)
-  .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
+  .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin, BuildInfoPlugin)
   .settings(
-    unmanagedResourceDirectories in Compile += baseDirectory.value / "cli/src/main/js"
+    unmanagedResourceDirectories in Compile += baseDirectory.value / "cli/src/main/js",
+    buildInfoPackage := "dynamics.cli"
   )
 
 lazy val `cli-main` = project
@@ -97,7 +98,7 @@ lazy val `cli-main` = project
     mainClass in Compile := Some("dynamics.cli.Main"),
     scalaJSModuleKind := ModuleKind.CommonJSModule
   )
-  .dependsOn(client, common, etl, cli) //,searchone
+  .dependsOn(client, common, etl, cli) 
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val docs = project
@@ -113,7 +114,7 @@ lazy val docs = project
     micrositeDocumentationUrl := "/dynamics-client/docs",
     micrositeAuthor := "aappddeevv",
     micrositeGithubRepo := "dynamics-client",
-    micrositeGithubOwner :="aappddeevv",
+    micrositeGithubOwner := sys.env.get("GITHUB_USER").getOrElse("unknown"),
     micrositeGithubToken := sys.env.get("GITHUB_TOKEN"),
     micrositePushSiteWith := GitHub4s
   )
