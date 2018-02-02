@@ -5,11 +5,10 @@ resolvers += Resolver.bintrayRepo("softprops", "maven") // for retry
 resolvers += Resolver.bintrayRepo("scalameta", "maven") // for latset scalafmt
 resolvers += Resolver.jcenterRepo
 
-
-// placeholder for scala-js 1.x
-scalaJSLinkerConfig ~= {
-  _.withModuleKind(ModuleKind.CommonJSModule)
-}
+// placeholder for scala-js 1.x, must be placed in settings
+//scalaJSLinkerConfig ~= {
+//  _.withModuleKind(ModuleKind.CommonJSModule)
+//}
 
 autoCompilerPlugins := true
 
@@ -105,6 +104,7 @@ lazy val docs = project
   .settings(buildSettings)
   .settings(noPublishSettings)
   .enablePlugins(MicrositesPlugin)
+  .enablePlugins(ScalaUnidocPlugin)
   .dependsOn(client, http, cli, `cli-main`, etl, common).
   settings(
     micrositeName := "dynamics-client",
@@ -118,21 +118,24 @@ lazy val docs = project
     micrositeGithubToken := sys.env.get("GITHUB_TOKEN"),
     micrositePushSiteWith := GitHub4s
   )
+  .settings(
+    siteSubdirName in ScalaUnidoc := "api",
+    addMappingsToSiteDir(mappings in (ScalaUnidoc, packageDoc), siteSubdirName in ScalaUnidoc)
+  )
 
 val npmBuild = taskKey[Unit]("fullOptJS then webpack")
 npmBuild := {
-  val x = (fullOptJS in Compile).value
+  (fullOptJS in Compile).value
   "npm run afterScalaJSFull" !
 }
 
 val npmBuildFast = taskKey[Unit]("fastOptJS then webpack")
 npmBuildFast := {
-  //val x = (fastOptJS in Compile).value
   (fastOptJS in Compile).value
   "npm run afterScalaJSFast" !
 }
 
-//addCommandAlias("watchit", "~ ;fastOptJS; postScalaJS")
+addCommandAlias("watchit", "~ ;fastOptJS; npmBuildFast")
 
  buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
 // buildInfoPackage := "dynamics-client"

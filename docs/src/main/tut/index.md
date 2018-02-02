@@ -21,6 +21,11 @@ node --stack-size 3000 dynamicscli --help
 ```
 The CLI uses the newer Dynamics Web API which requires dynamicscli to have an application id. The application id can be created using the process described at [MSDN](https://msdn.microsoft.com/en-us/library/mt622431.aspx). The latest Web API uses OAuth 2.0. You will need administrator access to generate the application id. The id only needs to be generated once. If another Web API client has already been registered similarly, you can probably use that id for dynamicscli.
 
+# Documentation
+CLI documentation can be found [here](docs/index.html).
+
+Integrated API documentation from each module can be found at [here](api/index.html).
+
 # Motivation
 Microsoft Dynamics has many entry points including a REST interface based on the OData standard. During the course of a Dynamics implementation, you typically have need to perform many different types of operations from downloading data, uploading data or managing workflows and solutions. You can use powershell for some of these operations. Other tools are also available such as the Plugin Registration Tool, which while fairly useful interactively, is not helpful for batch/automated execution. Solution Packager is another helpful tool that is open source and uses Dyanmics' APIs.
 
