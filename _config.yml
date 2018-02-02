@@ -6,6 +6,6 @@ docs: true
 collections:
   tut:
     output: true
-version: 0.1.0
+version: 0.1.1-M1
 org: com.github.aappddeevv.dynamics
 markdown: kramdown
