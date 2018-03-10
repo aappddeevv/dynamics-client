@@ -1,0 +1,157 @@
+<html><head><title>dynamics-client</title><meta charset="utf-8" /><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="aappddeevv" /><meta name="description" content="A Microsoft Dynamics CLI swiss-army knife and browser/server library." /><meta name="og:image" content="/dynamics-client/img/poster.png" /><meta name="og:title" content="dynamics-client" /><meta name="og:site_name" content="dynamics-client" /><meta name="og:url" content="" /><meta name="og:type" content="website" /><meta name="og:description" content="A Microsoft Dynamics CLI swiss-army knife and browser/server library." /><link rel="icon" type="image/png" href="/dynamics-client/img/favicon.png" /><meta name="twitter:title" content="dynamics-client" /><meta name="twitter:image" content="img/poster.png" /><meta name="twitter:description" content="A Microsoft Dynamics CLI swiss-army knife and browser/server library." /><meta name="twitter:card" content="summary_large_image" /><link rel="icon" type="image/png" sizes="16x16" href="/dynamics-client/img/favicon16x16.png" /><link rel="icon" type="image/png" sizes="24x24" href="/dynamics-client/img/favicon24x24.png" /><link rel="icon" type="image/png" sizes="32x32" href="/dynamics-client/img/favicon32x32.png" /><link rel="icon" type="image/png" sizes="48x48" href="/dynamics-client/img/favicon48x48.png" /><link rel="icon" type="image/png" sizes="57x57" href="/dynamics-client/img/favicon57x57.png" /><link rel="icon" type="image/png" sizes="60x60" href="/dynamics-client/img/favicon60x60.png" /><link rel="icon" type="image/png" sizes="64x64" href="/dynamics-client/img/favicon64x64.png" /><link rel="icon" type="image/png" sizes="70x70" href="/dynamics-client/img/favicon70x70.png" /><link rel="icon" type="image/png" sizes="72x72" href="/dynamics-client/img/favicon72x72.png" /><link rel="icon" type="image/png" sizes="76x76" href="/dynamics-client/img/favicon76x76.png" /><link rel="icon" type="image/png" sizes="96x96" href="/dynamics-client/img/favicon96x96.png" /><link rel="icon" type="image/png" sizes="114x114" href="/dynamics-client/img/favicon114x114.png" /><link rel="icon" type="image/png" sizes="120x120" href="/dynamics-client/img/favicon120x120.png" /><link rel="icon" type="image/png" sizes="128x128" href="/dynamics-client/img/favicon128x128.png" /><link rel="icon" type="image/png" sizes="144x144" href="/dynamics-client/img/favicon144x144.png" /><link rel="icon" type="image/png" sizes="150x150" href="/dynamics-client/img/favicon150x150.png" /><link rel="icon" type="image/png" sizes="152x152" href="/dynamics-client/img/favicon152x152.png" /><link rel="icon" type="image/png" sizes="196x196" href="/dynamics-client/img/favicon196x196.png" /><link rel="icon" type="image/png" sizes="310x310" href="/dynamics-client/img/favicon310x310.png" /><link rel="icon" type="image/png" sizes="310x150" href="/dynamics-client/img/favicon310x150.png" /><link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" /><link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" /><link rel="stylesheet" href="/dynamics-client/highlight/styles/default.css" /><link rel="stylesheet" href="/dynamics-client/css/style.css" /><link rel="stylesheet" href="/dynamics-client/css/palette.css" /><link rel="stylesheet" href="/dynamics-client/css/codemirror.css" /></head><body class="docs"><div id="wrapper"><div id="sidebar-wrapper"><ul id="sidebar" class="sidebar-nav"><li class="sidebar-brand"><a href="/dynamics-client/" class="brand"><div class="brand-wrapper"><span>dynamics-client</span></div></a></li> <li><a href="/dynamics-client/docs/index.html" class="">Getting Started</a></li> <li><a href="/dynamics-client/docs/actions.html" class="">actions</a></li> <li><a href="/dynamics-client/docs/entity.html" class="">entity</a></li> <li><a href="/dynamics-client/docs/importdata.html" class="">importdata</a></li> <li><a href="/dynamics-client/docs/importmaps.html" class="">importmaps</a></li> <li><a href="/dynamics-client/docs/plugins.html" class="">plugins</a></li> <li><a href="/dynamics-client/docs/settings.html" class=" active ">settings</a></li> <li><a href="/dynamics-client/docs/solutions.html" class="">solutions</a></li> <li><a href="/dynamics-client/docs/systemjobs.html" class="">systemjobs</a></li> <li><a href="/dynamics-client/docs/webresources.html" class="">webresources</a></li> <li><a href="/dynamics-client/docs/creatingacustomcli.html" class="">Create your own CLI</a></li> <li><a href="/dynamics-client/docs/etl.html" class="">ETL</a></li> <li><a href="/dynamics-client/docs/solutiondeployment.html" class="">Create Your Own Solution Deployer Script</a></li></ul></div><div id="page-content-wrapper"><div class="nav"><div class="container-fluid"><div class="row"><div class="col-lg-12"><div class="action-menu pull-left clearfix"><a href="#menu-toggle" id="menu-toggle"><i class="fa fa-bars" aria-hidden="true"></i></a></div><ul class="pull-right"><li id="gh-eyes-item" class="hidden-xs"><a href="https://github.com/aappddeevv/dynamics-client"><i class="fa fa-eye"></i><span>WATCH<span id="eyes" class="label label-default">--</span></span></a></li><li id="gh-stars-item" class="hidden-xs"><a href="https://github.com/aappddeevv/dynamics-client"><i class="fa fa-star-o"></i><span>STARS<span id="stars" class="label label-default">--</span></span></a></li><li><a href="#" onclick="shareSiteTwitter('dynamics-client A Microsoft Dynamics CLI swiss-army knife and browser/server library.');"><i class="fa fa-twitter"></i></a></li><li><a href="#" onclick="shareSiteFacebook('dynamics-client A Microsoft Dynamics CLI swiss-army knife and browser/server library.');"><i class="fa fa-facebook"></i></a></li><li><a href="#" onclick="shareSiteGoogle();"><i class="fa fa-google-plus"></i></a></li></ul></div></div></div></div><div id="content" data-github-owner="aappddeevv" data-github-repo="dynamics-client"><div class="content-wrapper"><section><p>The <code class="highlighter-rouge">settings</code> command sets traditionally unsettable org settings using undocumented API. It is equivalent to Settings&gt;Administration&gt;System Settings.</p>
+
+<p>This command does not support the “previews” settings, which can more rapidly change over time.</p>
+
+<h2 id="subcommands">Subcommands</h2>
+<ul>
+  <li>post: Post a settings file to the org.</li>
+</ul>
+
+<h3 id="post">post</h3>
+<p>The undocumented API is not associated with the web api and hence, the <code class="highlighter-rouge">acquireTokenResource</code> setting in the connection info file must be set as it represent the “org” that you are obtaining authorization to access.</p>
+
+<p>The command is:</p>
+
+<div class="language-sh highlighter-rouge"><pre class="highlight"><code>dynamicscli post <span class="o">[</span>--setting-file file] -c <span class="nv">$CRMCON</span>
+</code></pre>
+</div>
+<p>The default settings file name is <code class="highlighter-rouge">org-settings.xml</code>.</p>
+
+<p>The settings files is an undocumented XML file looking like:</p>
+
+<div class="language-xml highlighter-rouge"><pre class="highlight"><code><span class="nt">&lt;organization</span>
+  <span class="err">...xml</span> <span class="err">fragments</span> <span class="err">representing</span> <span class="err">settings...</span>
+<span class="err">&lt;/organization</span><span class="nt">&gt;</span>
+</code></pre>
+</div>
+
+<p>No validation or processing of the settings file is performed so it must be perfect. The best way to understanding what settings are available and the format of the content is to look below or, given that the documentation below is incomplete, look at the “POST” from the settings dialag window and copy the content to a settings XML file.</p>
+
+<h4 id="allowable-xml-fragments">allowable xml fragments</h4>
+<p>This is an incomplete of settings and their XML format. Since the settings file is XML, XML value settings, or reaally any value with potentially XML conflicting characters, must be url-encoded before inserting into their respective settings tag.</p>
+
+<h5 id="enablemicrosoftflowintegration">enablemicrosoftflowintegration</h5>
+
+<p>Examples:</p>
+<ul>
+  <li>
+    <enablemicrosoftflowintegration>true</enablemicrosoftflowintegration>
+    <p>: Enable MS flow integration.</p>
+  </li>
+</ul>
+
+<h5 id="features">features</h5>
+
+<p>features requires an embedded XML structure.</p>
+
+<more info="" needed="" here="">
+
+##### generatealertsfor*
+
+This is a set of flags with a value of 0 or 1.
+
+The list includes:
+* generatealertsforerrors
+* generatealertsforerrors
+* generatealertsforwarnings
+* generatealertsforinformation
+
+Examples:
+* <generatealertsforerrors>0</generatealertsforerrors>
+
+##### hashfilterkeywords
+
+regex is something like `^[\s]*([\w]+\s?:[\s]*)+`
+
+Examples:
+* <hashfilterkeywords>^[\s]*([\w]+\s?:[\s]*)+</hashfilterkeywords>
+
+##### ignoreinternalemail
+
+This is the `Track emails sent between Dynamics 365 users as two activities` option.
+
+Examples:
+* <ignoreinternalemail>true</ignoreinternalemail>: This checks the box that is, uses two activities for an email, in and out.
+
+##### isexternalsearchindexenabled
+
+Enable relevance searching.
+
+Examples:
+* <isexternalsearchindexenabled>true</isexternalsearchindexenabled>: Enable it.
+
+##### isautosaveenabled
+
+Turn on form auto-save.
+
+Examples:
+* <isautosaveenabled>true</isautosaveenabled>: Turn on autosave.
+
+##### ispresenceenabled
+
+Turn on skype presence
+
+Examples:
+* <ispresenceenabled>true</ispresenceenabled>: Turn on skype.
+
+##### istextwrapenabled
+
+true or false to wrap text. You should really usually have this set to true.
+
+Examples:
+* <istextwrapenabled>true</istextwrapenabled>: Enable text wrapping.
+
+##### maxappointmentdurationdays
+
+The maximum calendar appointment duration days. This mostly helps you avoid really bad data entry for calendar appointment durations.
+
+Examples:
+* <maxappointmentdurationdays>15</maxappointmentdurationdays>: Maximum calendar duration is 15 days.
+
+##### maxuploadfilesize
+
+`size` in bytes for the max upload file size associated with emails attachments and webresources.
+
+Examples:
+* <maxuploadfilesize>15362049</maxuploadfilesize>: 15MB file size limit
+
+##### plugintracelogsetting
+
+Enable/disable trace log settings.
+
+The values are:
+* 0: Off
+* 1: Exception
+* 2: All
+
+Examples:
+* <plugintracelogsetting>1</plugintracelogsetting>: Enable it.
+
+##### sessiontimeout*
+
+Max duration is 1,440 minutes.
+
+Examples:
+* <sessiontimeoutenabled>true</sessiontimeoutenabled>: Enabled custom timeout.
+* <sessiontimeoutinmins>1440</sessiontimeoutinmins>: Set session time-out to 1440 minutes.
+* <sessiontimeoutreminderinmins>20</sessiontimeoutreminderinmins>: Set reminder before expire.
+
+##### servestaticresourcesfromazurecdn
+
+Serve content from azure CDN. You should mostly set this to true.
+
+Examples:
+* <servestaticresourcesfromazurecdn>true</servestaticresourcesfromazurecdn>: Use azure CDN.
+
+##### trackingprefix
+
+Email tracking prefix. Semi-colon separated list. Usually the token has a colon.
+
+Examples:
+* <trackingprefix>MyOrg:</trackingprefix>: Use MyOrg: as the prefix for the tracking token.
+</more>
+</section></div></div></div></div><script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script><script src="/dynamics-client/highlight/highlight.pack.js"></script><script>hljs.configure({
+languages:['scala','java','bash']
+});
+hljs.initHighlighting();
+             </script><script src="/dynamics-client/js/main.js"></script></body></html>
