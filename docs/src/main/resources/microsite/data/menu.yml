@@ -17,6 +17,9 @@ options:
   - title: plugins
     url: docs/plugins.html
 
+  - title: settings
+    url: docs/settings.html
+
   - title: solutions
     url: docs/solutions.html
 

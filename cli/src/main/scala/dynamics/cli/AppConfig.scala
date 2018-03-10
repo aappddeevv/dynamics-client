@@ -19,8 +19,8 @@ import dynamics.common._
     debug: Boolean = false,
     loggerLevel: Option[String] = Some("error"),
     quiet: Boolean = false,
-  verbose: Boolean = false,
-  verbosity: Int = 0,
+    verbose: Boolean = false,
+    verbosity: Int = 0,
     crmConfigFile: String = "dynamics.json",
     outputDir: String = "./",
     outputFile: Option[String] = None,
@@ -184,6 +184,10 @@ import dynamics.common._
     tokenOutputFile: String = "crm-token.json"
 )
 
+@Lenses case class SettingsConfig(
+    settingsFile: Option[String] = None
+)
+
 @Lenses case class AppConfig(
     common: CommonConfig = CommonConfig(),
     solution: SolutionConfig = SolutionConfig(),
@@ -199,6 +203,7 @@ import dynamics.common._
     test: TestConfig = TestConfig(),
     systemjob: SystemJobConfig = SystemJobConfig(),
     action: ActionConfig = ActionConfig(),
+    settings: SettingsConfig = SettingsConfig(),
 ) {
   def debug       = common.debug
   def noisy       = !common.quiet

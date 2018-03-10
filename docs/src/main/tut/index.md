@@ -24,7 +24,7 @@ The CLI uses the newer Dynamics Web API which requires dynamicscli to have an ap
 # Documentation
 CLI documentation can be found [here](docs/index.html).
 
-Integrated API documentation from each module can be found at [here](api/index.html).
+Integrated API documentation from each module can be found at [here](api/dynamics/index.html).
 
 # Motivation
 Microsoft Dynamics has many entry points including a REST interface based on the OData standard. During the course of a Dynamics implementation, you typically have need to perform many different types of operations from downloading data, uploading data or managing workflows and solutions. You can use powershell for some of these operations. Other tools are also available such as the Plugin Registration Tool, which while fairly useful interactively, is not helpful for batch/automated execution. Solution Packager is another helpful tool that is open source and uses Dyanmics' APIs.

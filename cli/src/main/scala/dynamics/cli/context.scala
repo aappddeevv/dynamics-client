@@ -24,6 +24,9 @@ trait DynamicsContext extends Context {
 
   /** Execute to close. */
   def close(): IO[Unit]
+
+  /** The overall configuration for all plugins/modules. */
+  def appConfig: AppConfig
 }
 
 object DynamicsContext {
@@ -51,5 +54,7 @@ object DynamicsContext {
         DynamicsClient(httpclient, config.common.connectInfo, config.common.debug)
 
       def close() = httpclient.dispose
+
+      val appConfig = config
     }
 }

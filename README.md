@@ -1,4 +1,4 @@
-dynamicscli - a nodejs CLI application and client framework for working with online Microsoft Dynamics applications. The application will not currently authenticate with on-premise systems.
+dynamicscli - a nodejs CLI application and client framework for working with online Microsoft Dynamics applications. The application will not currently authenticate with on-premise systems (or at least I do not think so).
 
 dynamicscli uses the ODatav4 REST data api which means that you must register the application with Azure Active Directory to allow the CLI to connect to the server. Registering is easy to do, but you need Admin access to create the registration. You can use any application registration that allows your userid access to the data and has an application id.
 
@@ -6,7 +6,7 @@ dynamics-client two personalities:
 * A CLI that can be used from any OS. While one could use PowerShell for everything, its much easier to add commands or make commands robust using an application directly.
 * An extensive client library that is performant on the nodejs platform. You can use this as a framework for developing small Dynamics applications like ETL or platform management. For example, I added a command to help manage the dynamics platform in around 30 minutes and it worked the first time.
 
-dynamicscli is written in scalajs which is much like typescript but with extensive type-safety.
+dynamicscli is written in scala.js which is a small language with more extensive type-safety, immutability and greater consistency. It is a great language for writing logic heavy code.
 
 Why nodejs? nodejs has an extensive array of web oriented resources and is lightweight on memory while still being fast enough. You could also use the client framework for CRM web applications directly. You can also use it for hot-reload, local development that seamlessly integrates with CRM so you get easy development of new CRM UI extensions. Running a nodejs instance on azure also means that you can deploy dynamicscli to azure and have a continuously running Dynamics platform processing platform ready to go.
 
@@ -70,6 +70,7 @@ Some of the things you can do with the CLI include:
       * List/activate/deactivate
 * Webresources
    * List and manage
+   * Set unsettable settings
    * Upload / update / download
    * Watch a local filesystem and create/update/delete on the remote server
 * Update records generically
@@ -94,4 +95,4 @@ All work sponsored by The Trapelo Group.
 
 MIT license. See the LICENSE file.
 
-Copyright 2017 The Trapelo Group.
+Copyright 2017 The Trapelo Group LLC.

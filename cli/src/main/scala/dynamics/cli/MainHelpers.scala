@@ -155,6 +155,10 @@ object MainHelpers extends LazyLogger {
         val ops = new WebResourcesCommand(context)
         ops.get(config.common.subcommand)
 
+      case "settings" =>
+        val ops = new SettingsActions(context)
+        ops.get(config.common.subcommand)
+
       case "solutions" =>
         val ops = new SolutionActions(context)
         ops.get(config.common.subcommand)

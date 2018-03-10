@@ -6,9 +6,7 @@ resolvers += Resolver.bintrayRepo("scalameta", "maven") // for latset scalafmt
 resolvers += Resolver.jcenterRepo
 
 // placeholder for scala-js 1.x, must be placed in settings
-//scalaJSLinkerConfig ~= {
-//  _.withModuleKind(ModuleKind.CommonJSModule)
-//}
+//scalaJSLinkerConfig ~= {_.withModuleKind(ModuleKind.CommonJSModule) }
 
 autoCompilerPlugins := true
 
@@ -31,7 +29,10 @@ lazy val buildSettings = Seq(
 ) ++ licenseSettings
 
 lazy val noPublishSettings = Seq(
-  skip in publish := true
+  skip in publish := true,
+  publish := {},
+  publishLocal := {},
+  publishArtifact := false
 )
 
 lazy val publishSettings = Seq(
@@ -57,33 +58,51 @@ lazy val root = project.in(file("."))
   .settings(dynamicsSettings)
   .settings(noPublishSettings)
   .settings(name := "dynamics-client")
-  .aggregate(http, client, common, etl, cli, `cli-main`, docs)
+  .aggregate(http, client, common, etl, cli, `cli-main`, docs, adal)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val common = project
   .settings(dynamicsSettings)
+  .settings(description := "Common components")
+  .settings(libraryDependencies ++= Dependencies.monadlessDependencies.value)
+  .settings(name := "dynamics-client-common")
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val etl = project
   .settings(dynamicsSettings)
+  .settings(name := "dynamics-client-etl")
+  .settings(description := "ETL support")
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
   .dependsOn(common, client, http)
 
 lazy val http = project
   .settings(dynamicsSettings)
+  .settings(name := "dynamics-client-http")
+  .settings(description := "http client ")
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
   .dependsOn(common)
 
+lazy val adal = project
+  .settings(dynamicsSettings)
+  .settings(name := "dynamics-client-adal")
+  .settings(description := "dynamics active directory authentication")
+  .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
+  .dependsOn(client, common)
+
 lazy val client = project
   .settings(dynamicsSettings)
+  .settings(name := "dynamics-client-dynamicsclient")
+  .settings(description := "dynamics client")
   .dependsOn(http, common)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
-mainClass in Compile := Some("dynamics.cli.Main")
-
 lazy val cli = project
   .settings(dynamicsSettings)
-  .dependsOn(client, common, etl)
+  .settings(name := "dynamics-client-cli")
+  .settings(description := "common CLI client infrastructure")
+  .settings(libraryDependencies ++=
+    Dependencies.cliDependencies.value ++ Dependencies.monadlessDependencies.value)
+  .dependsOn(client, common, etl, adal)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin, BuildInfoPlugin)
   .settings(
     unmanagedResourceDirectories in Compile += baseDirectory.value / "cli/src/main/js",
@@ -92,10 +111,14 @@ lazy val cli = project
 
 lazy val `cli-main` = project
   .settings(dynamicsSettings)
+  .settings(name := "dynamics-client-cli-main")
+  .settings(description := "CLI main")
+  .settings(libraryDependencies ++=
+    Dependencies.cliDependencies.value ++ Dependencies.monadlessDependencies.value)
   .settings(
+    scalaJSLinkerConfig ~= {_.withModuleKind(ModuleKind.CommonJSModule) },
     scalaJSUseMainModuleInitializer := true,
     mainClass in Compile := Some("dynamics.cli.Main"),
-    scalaJSModuleKind := ModuleKind.CommonJSModule
   )
   .dependsOn(client, common, etl, cli) 
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
@@ -125,23 +148,23 @@ lazy val docs = project
 
 val npmBuild = taskKey[Unit]("fullOptJS then webpack")
 npmBuild := {
-  (fullOptJS in Compile).value
+  (fullOptJS in (`cli-main`, Compile)).value
   "npm run afterScalaJSFull" !
 }
 
 val npmBuildFast = taskKey[Unit]("fastOptJS then webpack")
 npmBuildFast := {
-  (fastOptJS in Compile).value
+  (fastOptJS in (`cli-main`, Compile)).value
   "npm run afterScalaJSFast" !
 }
 
 addCommandAlias("watchit", "~ ;fastOptJS; npmBuildFast")
 
- buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
+buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
 // buildInfoPackage := "dynamics-client"
 
-// bintrayPackageLabels := Seq("scalajs", "dynamics", "dynamics 365", "crm", "microsoft")
-// bintrayVcsUrl := Some("git:git@github.com:aappddeevv/dynamics")
-// bintrayRepository := "maven"
-// bintrayPackage := "dynamics"
+bintrayReleaseOnPublish in ThisBuild := false
+bintrayPackageLabels := Seq("scalajs", "dynamics", "dynamics 365", "crm", "microsoft")
+bintrayVcsUrl := Some("git:git@github.com:aappddeevv/dynamics")
+bintrayRepository := "maven"
 

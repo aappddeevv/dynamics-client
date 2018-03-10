@@ -77,10 +77,11 @@ trait JsUndefOrSyntax {
 }
 
 final case class JsDynamicOps(val jsdyn: js.Dynamic) {
-  def asString: String            = jsdyn.asInstanceOf[String]
-  def asInt: Int                  = jsdyn.asInstanceOf[Int]
-  def asArray[A]: js.Array[A]     = jsdyn.asInstanceOf[js.Array[A]]
-  def asBoolean: Boolean          = jsdyn.asInstanceOf[Boolean]
+  def asString: String        = jsdyn.asInstanceOf[String]
+  def asInt: Int              = jsdyn.asInstanceOf[Int]
+  def asArray[A]: js.Array[A] = jsdyn.asInstanceOf[js.Array[A]]
+  def asBoolean: Boolean      = jsdyn.asInstanceOf[Boolean]
+
   /** @deprecated use asJsObj */
   def asJSObj: js.Object          = jsdyn.asInstanceOf[js.Object]
   def asJsObj: js.Object          = jsdyn.asInstanceOf[js.Object]

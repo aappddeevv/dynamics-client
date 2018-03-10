@@ -527,6 +527,27 @@ object CommandLine {
       )
   }
 
+  def settings(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    val helpers = CliHelpers(op)
+    import helpers._
+
+    cmd("settings")
+      .text("Manage settings using undocumented API.")
+      .action((x, c) => withCmd(c, "settings"))
+      .children(
+        note("\n"),
+        sub("post")
+          .text("Post a settings config object (XML) specified from a file.")
+          .action((x, c) => withSub(c, "post"))
+          .children(
+            opt[String]("settings-file")
+              .text("Config file with XML settings. Default is org-settings.xml")
+              .action((x, c) => c.lens(_.settings.settingsFile).set(Option(x)))
+          )
+      )
+  }
+
   def etl(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     cmd("etl")
@@ -960,6 +981,7 @@ object CommandLine {
     webresources,
     whoami,
     workflows,
+    settings,
   )
 
   /** Add scopt head, help and a list of options, which by default is all base commands. */
@@ -973,7 +995,9 @@ object CommandLine {
     help("help")
       .abbr("h")
       .text("dynamics command line tool")
-    addme.foreach { o => o(op) }
+    addme.foreach { o =>
+      o(op)
+    }
   }
 
   /**

@@ -25,7 +25,7 @@ trait DynamicsClientRequests {
   /** Make a pure delete request. */
   def mkDeleteRequest(entitySet: String, keyInfo: DynamicsId, opts: DynamicsOptions = DefaultDynamicsOptions) = {
     val etag =
-      if(opts.applyOptimisticConcurrency.getOrElse(false) && opts.version.isDefined)
+      if (opts.applyOptimisticConcurrency.getOrElse(false) && opts.version.isDefined)
         HttpHeaders("If-Match" -> opts.version.get)
       else HttpHeaders.empty
     HttpRequest(Method.DELETE, s"/$entitySet(${keyInfo.render()})", headers = toHeaders(opts))
@@ -48,7 +48,7 @@ trait DynamicsClientRequests {
   def toHeaders(o: DynamicsOptions): HttpHeaders = {
     val prefer = OData.render(o.prefers)
     prefer.map(str => HttpHeaders("Prefer"        -> str)).getOrElse(HttpHeaders.empty) ++
-    o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty)
+      o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty)
     //++ o.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
   }
 
@@ -75,8 +75,8 @@ trait DynamicsClientRequests {
   }
 
   /**
-   * The upsert flags use an id as the "tag" instead of an etag.
-   */
+    * The upsert flags use an id as the "tag" instead of an etag.
+    */
   def mkUpdateRequest[A](entitySet: String,
                          id: String,
                          body: A,
@@ -92,8 +92,10 @@ trait DynamicsClientRequests {
       if (upsertPreventUpdate) HttpHeaders("If-None-Match" -> "*")
       else HttpHeaders.empty
     val mustHave = HttpHeaders.empty ++ Map("Content-Type" -> Seq("application/json", "type=entry"))
-    HttpRequest(Method.PATCH, s"${base.getOrElse("")}/$entitySet($id)",
-      toHeaders(opts) ++ h1 ++ h2 ++ xtra ++ mustHave, b)
+    HttpRequest(Method.PATCH,
+                s"${base.getOrElse("")}/$entitySet($id)",
+                toHeaders(opts) ++ h1 ++ h2 ++ xtra ++ mustHave,
+                b)
   }
 
   def mkExecuteFunctionRequest(function: String,

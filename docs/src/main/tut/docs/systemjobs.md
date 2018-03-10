@@ -8,3 +8,12 @@ title: systemjobs
 ```sh
 dynamicscli systemjobs delete-completed -c dynamicsorg.json
 ```
+
+You can delete different statuses using:
+* delete-completed
+* delete-canceled
+* delete-failed
+* delete-waiting
+* delete-waiting-for-resources
+* delete-inprogress
+

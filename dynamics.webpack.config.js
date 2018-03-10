@@ -63,7 +63,7 @@ common = {
 }
 
 const prod = {
-    entry: path.resolve(__dirname, "cli-main/target/scala-2.12/cli-main-opt.js"),
+    entry: path.resolve(__dirname, "cli-main/target/scala-2.12/dynamics-client-cli-main-opt.js"),
     plugins: [
         new webpack.DefinePlugin({
             "proces.env": {
@@ -79,7 +79,7 @@ const prod = {
 }
 
 const dev = {
-    entry: path.resolve(__dirname, "cli-main/target/scala-2.12/cli-main-fastopt.js")
+    entry: path.resolve(__dirname, "cli-main/target/scala-2.12/dynamics-client-cli-main-fastopt.js")
 }
 
 switch (process.env.npm_lifecycle_event) {

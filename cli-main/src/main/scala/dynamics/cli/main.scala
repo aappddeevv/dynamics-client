@@ -8,7 +8,7 @@ package cli
 import scala.scalajs.js
 import annotation._
 
-object Main extends js.JSApp {
+object Main {
 
   def main(): Unit = {
     MainHelpers.run(AppConfig())
