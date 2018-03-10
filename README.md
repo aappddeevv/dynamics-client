@@ -70,9 +70,10 @@ Some of the things you can do with the CLI include:
       * List/activate/deactivate
 * Webresources
    * List and manage
-   * Set unsettable settings
    * Upload / update / download
    * Watch a local filesystem and create/update/delete on the remote server
+* Settings
+   * Set unsettable settings
 * Update records generically
    * By exporting the data using this CLI, you can move configuration or entity data to a new organization.
 * Run data imports using standard Dynamics data import capabilities.
