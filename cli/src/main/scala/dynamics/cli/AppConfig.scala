@@ -185,7 +185,9 @@ import dynamics.common._
 )
 
 @Lenses case class SettingsConfig(
-    settingsFile: Option[String] = None
+  settingsFile: Option[String] = None,
+  entityList: Seq[String] = Nil,
+  name: Option[String] = None,
 )
 
 @Lenses case class AppConfig(

@@ -7,143 +7,51 @@ The `settings` command sets traditionally unsettable org settings using undocume
 
 This command does not support the "previews" settings, which can more rapidly change over time.
 
+Some more settings changers:
+* A CLI MS provided tool, [OrgDbOrgSettings](https://support.microsoft.com/en-us/help/2691237/orgdborgsettings-tool-for-microsoft-dynamics-crm) that changes some "registry" type settings.
+* Graphical UI settings changer: https://github.com/seanmcne/OrgDbOrgSettings
+* Powershell: https://github.com/seanmcne/Microsoft.Xrm.Data.PowerShell
+
+Generally, you should use the above tools first before this one. Use the powershell one first it is supported by some microsoft employees for over two years now.
+
+This tool allows you to set them via static json formatted text file so once you have it setup, you are all set.
+
+The settings allowed in the json file are documented here:
+* https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/organization?view=dynamics-ce-odata-9
+
+However, its easier to just run the `list` command, find your org, then see what the settings names and values are.
+
 ## Subcommands
 * post: Post a settings file to the org.
+* list: Dump out an unformatted json record of the settings. Use this to see the current settings. This dumps all settings for all orgs with json "formatted values" so the output is quite voluminous.
+* categorizedsearch: Set the entity list for categorized list. NOT WORKNG YET!
 
-### post
-The undocumented API is not associated with the web api and hence, the `acquireTokenResource` setting in the connection info file must be set as it represent the "org" that you are obtaining authorization to access.
+## post
 
-The command is:
+Assuming org-settings.json contains a 10MB upload limit:
 
 ```sh
-dynamicscli post [--settings-file file] -c $CRMCON
-```
-The default settings file name is `org-settings.xml`.
-
-The settings files is an undocumented XML file looking like:
-
-```xml
-<organization
-  ...xml fragments representing settings...
-</organization>
+{ "maxfilesize": 10000000 }
 ```
 
-No validation or processing of the settings file is performed so it must be perfect. The best way to understanding what settings are available and the format of the content is to look below or, given that the documentation below is incomplete, look at the "POST" from the settings dialag window and copy the content to a settings XML file.
+Example:
 
-## XML Fragments
-This is an incomplete of settings and their XML format. Since the settings file is XML, XML value settings, or reaally any value with potentially XML conflicting characters, must be url-encoded before inserting into their respective settings tag.
+```sh
+dynamicscli settings post -c $CRMCON
+```
 
-### enablemicrosoftflowintegration
+## list
+List all settings for all orgs:
 
-Examples:
-* `<enablemicrosoftflowintegration>true</enablemicrosoftflowintegration>`: Enable MS flow integration.
+Example:
 
-### features
+```sh
+dynamicscli settings list -c $CRMCON
+```
 
-features requires an embedded XML structure.
+## categorizedsearch
 
-...more info needed here...
-
-### generatealertsfor*
-
-This is a set of flags with a value of 0 or 1.
-
-The list includes:
-* generatealertsforerrors
-* generatealertsforerrors
-* generatealertsforwarnings
-* generatealertsforinformation
+Set the categorized search entity list. You must provide the entire list. A good default list is: account,contact,systemuser,activitypointer,lead,incident,opportunity,competitor,appointment.
 
 Examples:
-* `<generatealertsforerrors>0</generatealertsforerrors>`
-
-### hashfilterkeywords
-
-regex is something like `^[\s]*([\w]+\s?:[\s]*)+`
-
-Examples:
-* `<hashfilterkeywords>^[\s]*([\w]+\s?:[\s]*)+</hashfilterkeywords>`
-
-### ignoreinternalemail
-
-This is the `Track emails sent between Dynamics 365 users as two activities` option.
-
-Examples:
-* `<ignoreinternalemail>true</ignoreinternalemail>`: This checks the box that is, uses two activities for an email, in and out.
-
-### isexternalsearchindexenabled
-
-Enable relevance searching.
-
-Examples:
-* `<isexternalsearchindexenabled>true</isexternalsearchindexenabled>`: Enable it.
-
-### isautosaveenabled
-
-Turn on form auto-save.
-
-Examples:
-* `<isautosaveenabled>true</isautosaveenabled>`: Turn on autosave.
-
-### ispresenceenabled
-
-Turn on skype presence
-
-Examples:
-* `<ispresenceenabled>true</ispresenceenabled>`: Turn on skype.
-
-### istextwrapenabled
-
-true or false to wrap text. You should really usually have this set to true.
-
-Examples:
-* `<istextwrapenabled>true</istextwrapenabled>`: Enable text wrapping.
-
-### maxappointmentdurationdays
-
-The maximum calendar appointment duration days. This mostly helps you avoid really bad data entry for calendar appointment durations.
-
-Examples:
-* `<maxappointmentdurationdays>15</maxappointmentdurationdays>`: Maximum calendar duration is 15 days.
-
-### maxuploadfilesize
-
-`size` in bytes for the max upload file size associated with emails attachments and webresources.
-
-Examples:
-* `<maxuploadfilesize>15362049</maxuploadfilesize>`: 15MB file size limit
-
-### plugintracelogsetting
-
-Enable/disable trace log settings.
-
-The values are:
-* 0: Off
-* 1: Exception
-* 2: All
-
-Examples:
-* `<plugintracelogsetting>1</plugintracelogsetting>`: Enable it.
-
-### sessiontimeout*
-
-Max duration is 1,440 minutes.
-
-Examples:
-* `<sessiontimeoutenabled>true</sessiontimeoutenabled>`: Enabled custom timeout.
-* `<sessiontimeoutinmins>1440</sessiontimeoutinmins>`: Set session time-out to 1440 minutes.
-* `<sessiontimeoutreminderinmins>20</sessiontimeoutreminderinmins>`: Set reminder before expire.
-
-### servestaticresourcesfromazurecdn
-
-Serve content from azure CDN. You should mostly set this to true.
-
-Examples:
-* `<servestaticresourcesfromazurecdn>true</servestaticresourcesfromazurecdn>`: Use azure CDN.
-
-### trackingprefix
-
-Email tracking prefix. Semi-colon separated list. Usually the token has a colon.
-
-Examples:
-* `<trackingprefix>MyOrg:</trackingprefix>`: Use MyOrg: as the prefix for the tracking token.
+* dynamicscli categorizedsearch account,contact,systemuser,activitypointer,lead,incident,opportunity,competitor,appointment  -c $CRMCON

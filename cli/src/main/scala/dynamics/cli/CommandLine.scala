@@ -538,12 +538,34 @@ object CommandLine {
       .children(
         note("\n"),
         sub("post")
-          .text("Post a settings config object (XML) specified from a file.")
+          .text("Post a settings config object (json) specified from a file.")
           .action((x, c) => withSub(c, "post"))
           .children(
+            opt[String]("org-name")
+              .text("Organization name. Secify this or it must be in the json file.")
+              .action((x,c) => c.lens(_.settings.name).set(Option(x))),
             opt[String]("settings-file")
               .text("Config file with XML settings. Default is org-settings.xml")
               .action((x, c) => c.lens(_.settings.settingsFile).set(Option(x)))
+          ),
+        sub("categorizedsearch")
+          .text("Set the categorized search entity list.")
+          .action((x, c) => withSub(c, "categorizedsearch"))
+          .children(
+            opt[String]("org-name")
+              .text("Organization name")
+              .action((x,c) => c.lens(_.settings.name).set(Option(x))),
+            arg[Seq[String]]("entity-list")
+              .text("Comma separated list of logical entity names to allow categorized search.")
+              .action((x, c) => c.lens(_.settings.entityList).modify(cur => cur ++ x))
+          ),
+        sub("list")
+          .text("List org db settings.")
+          .action((x, c) => withSub(c, "list"))
+          .children(
+            opt[String]("org-name")
+              .text("Organization name")
+              .action((x,c) => c.lens(_.settings.name).set(Option(x)))
           )
       )
   }

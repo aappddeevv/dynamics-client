@@ -166,5 +166,4 @@ trait EntityDecoderInstances {
         else DecodeResult.failure(OnlyOneExpected(s"found ${arr.size}"))
       })
     }
-
 }

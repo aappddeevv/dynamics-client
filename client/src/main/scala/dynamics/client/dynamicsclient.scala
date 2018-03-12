@@ -369,7 +369,8 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
   /**
     * Get a list of values. Follows @data.nextLink but accumulates all the
     * results into memory. Prefer [[getListStream]]. For now, the caller must
-    * decode external to this method. The url can be generated from QuerySpec.
+    * decode external to this method. The url is usually generated from a
+    * QuerySpec.
     */
   def getList[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(): IO[Seq[A]] =
     getListStream[A](url).runLog

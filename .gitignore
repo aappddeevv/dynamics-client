@@ -12,6 +12,7 @@ src_managed/
 project/boot/
 project/plugins/project/
 node_modules/*
+bin/dynamicscli
 
 .ensime*
 .classpath
