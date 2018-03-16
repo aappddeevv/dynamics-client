@@ -152,7 +152,8 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
     (deleteFromCLI ++ deleteFromCSVFile)
       .map(p => println(s"${p._2} deletes: ${p._1}"))
-      .run
+      .compile
+      .drain
   }
 
   def exportFromQuery() = Action { config =>
@@ -180,7 +181,8 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
         },
         f => IO(if (config.export.wrap) f.write("]")).flatMap(_ => f.endFuture().toIO)
       )
-      .run
+      .compile
+      .drain
   }
 
   def exportAll(config: AppConfig, q: QuerySpec): IO[Unit] = {
@@ -232,7 +234,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       streamer => IO(streamer.end())
     )
 
-    withSink.map(_ => () /*Fs.closeSync(f)*/ ).run // build Stream into a Task
+    withSink.map(_ => () /*Fs.closeSync(f)*/ ).compile.drain // build Stream into a Task
   }
 
   /** Get column names by retrieving a single record. */
@@ -316,6 +318,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
   def fromJsonFile(file: String) =
     fromMap(Utils.slurpAsJson[js.Object](file).asDict[String].toMap)
 
+  /** Convert to function: RetrieveTotalRecordCount if possible. */
   def count() = Action { config =>
     val countersQueries  = fromMap(config.export.queries)
     val countersEntity   = fromEntityNames(config.common.filter)
@@ -323,13 +326,14 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     val all              = countersQueries ++ countersEntity ++ countersFromJson
     val runCounts = all
       .join(config.common.concurrency)
-      .runLog
+      .compile
+      .toVector
       .map(_.sortBy(_._1))
       .flatMap(results => IO { results.foreach(p => println(s"${p._1}, ${p._2}")) })
     if (config.export.repeat)
-      (Stream.eval(runCounts) ++ sch.sleep_[IO](config.export.repeatDelay seconds)).repeat.run
+      (Stream.eval(runCounts) ++ sch.sleep_[IO](config.export.repeatDelay seconds)).repeat.compile.drain
     else
-      Stream.eval(runCounts).run
+      Stream.eval(runCounts).compile.drain
   }
 
 }

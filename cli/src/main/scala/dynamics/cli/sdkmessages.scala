@@ -79,11 +79,14 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
       dynclient.getOneWithKey[SDKMessageProcessingStep](ENTITYSET, id).map { step =>
         println(s"$msg SDK message [${step.name}] with id ${id}")
       }
-  }
+    }
 
-  def activate(): Action = Kleisli { config =>
-    val body = """{"statecode": 0, "statuscode": 1 }"""
+  def mkBody(activate: Boolean) = 
+    if(activate)"""{"statecode": 0, "statuscode": 1 }"""
+    else """{"statecode": 1, "statuscode": 2 }"""
 
+  def changeActivation(activate: Boolean, message: String) = Action { config =>
+    val body = mkBody(activate)
     val doit = lift {
       val ids =
         if (config.common.filter.size > 0) {
@@ -92,29 +95,14 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
           filtered.map(_.sdkmessageprocessingstepid.orEmpty).filterNot(_.isEmpty)
         } else
           Seq(config.sdkMessage.id)
-      //unlift(IO.traverse(ids.toSeq.map(id => doOne(id, body, "Activated")))(identity))
-      unlift(ids.toList.map(id => doOne(id, body, "Activated")).sequence)
+      unlift(ids.toList.map(id => doOne(id, body, message)).sequence)
     }
     doit.map(_ => ())
   }
 
-  def deactivate(): Action = Kleisli { config =>
-    val body = """{"statecode": 1, "statuscode": 2 }"""
+  def activate() =  changeActivation(true, "Activated")
 
-    val doit = lift {
-      val ids =
-        if (config.common.filter.size > 0) {
-          val list     = unlift(getList())
-          val filtered = filter(list, config.common.filter)
-          filtered.map(_.sdkmessageprocessingstepid.orEmpty).filterNot(_.isEmpty)
-        } else
-          Seq(config.sdkMessage.id)
-      unlift(ids.toList.map(id => doOne(id, body, "Deactivated")).sequence)
-    }
-    doit.map(_ => ())
-
-  }
-
+  def deactivate() = changeActivation(false, "Deactivated")
 }
 
 object SDKMessageProcessingStepsActions {

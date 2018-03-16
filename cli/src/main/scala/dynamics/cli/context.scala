@@ -36,7 +36,10 @@ object DynamicsContext {
   import dynamics.http._
   import dynamics.client._
 
-  /** Create a default DynamicsContext. */
+  /**
+    * Create a default DynamicsContext. Middleware for request retry and ADAL are
+    * automatically addded.
+    */
   def default(config: AppConfig)(implicit e: ExecutionContext): DynamicsContext =
     new DynamicsContext {
       import dynamics.client._
@@ -45,10 +48,15 @@ object DynamicsContext {
 
       val fetchOpts = NodeFetchClientOptions(timeoutInMillis = config.common.requestTimeOutInMillis.getOrElse(0))
 
+      val retryPolicyMiddleware = config.common.retryPolicy match {
+        case "backoff" => RetryClient.backoff(config.common.numRetries, config.common.pauseBetween/*, config.common.debug*/)
+        case _ => RetryClient.pause(config.common.numRetries, config.common.pauseBetween/*, config.common.debug*/)
+      }
+      val middleware =
+        retryPolicyMiddleware andThen ADAL(config.common.connectInfo)
+
       val httpclient: Client =
-        (RetryClient.pause(config.common.numRetries, config.common.pauseBetween) andThen
-          ADAL(config.common.connectInfo))(
-          NodeFetchClient.newClient(config.common.connectInfo, config.common.debug, opts = fetchOpts))
+        middleware(NodeFetchClient.newClient(config.common.connectInfo, config.common.debug, opts = fetchOpts))
 
       implicit val dynclient: DynamicsClient =
         DynamicsClient(httpclient, config.common.connectInfo, config.common.debug)

@@ -29,7 +29,7 @@ import client.implicits._
 @js.native
 trait OrganizationJS extends js.Object {
   var organizationid: String = js.native
-  var name: String = js.native
+  var name: String           = js.native
 }
 
 /**
@@ -51,37 +51,37 @@ class SettingsActions(context: DynamicsContext) extends LazyLogger {
       case Some(settingsFile) if (Utils.fexists(settingsFile)) =>
         val body = JSON.parse(Utils.slurp(settingsFile))
         val nameOpt =
-          if(js.DynamicImplicits.truthValue(body.name)) {
+          if (js.DynamicImplicits.truthValue(body.name)) {
             // remove it from the json
             js.special.delete(body, "name")
             Option(body.name.asString)
-          }
-          else if(config.settings.name.isDefined) config.settings.name
+          } else if (config.settings.name.isDefined) config.settings.name
           else None
-        nameOpt.fold(IO(println("No name found from command line or settings file.")))(
-          name => {
-            val qopts = QuerySpec(select=Seq("name", "organizationid"))
-            dynclient.getList[OrganizationJS](qopts.url(SettingsActions.entitySet))
-              .flatMap(_.headOption match {
-                case Some(org) =>
-                  dynclient.update(SettingsActions.entitySet, org.organizationid, JSON.stringify(body), true)
-                    .map(_ => println("Settings updated."))
-                case _ =>
-                  IO(println(s"Organization name ${name} not found."))
-              })
-          })
+        nameOpt.fold(IO(println("No name found from command line or settings file.")))(name => {
+          val qopts = QuerySpec(select = Seq("name", "organizationid"))
+          dynclient
+            .getList[OrganizationJS](qopts.url(SettingsActions.entitySet))
+            .flatMap(_.headOption match {
+              case Some(org) =>
+                dynclient
+                  .update(SettingsActions.entitySet, org.organizationid, JSON.stringify(body), true)
+                  .map(_ => println("Settings updated."))
+              case _ =>
+                IO(println(s"Organization name ${name} not found."))
+            })
+        })
       case _ => IO(println("No settings file specified and the default ${defaultSettingsFile} does not exist."))
     }
   }
- 
-  /** 
-   * Modify entities for categorized search. There is a form endpoint for this
-   * but then you need a crmwrpctoken which we cannot get externally. Publish to
-   * the old org web services endpoint.
-   * 
-   * @see https://bettercrm.blog/2017/08/02/list-of-undocumented-sdk-messages.
-   * @see https://stackoverflow.com/questions/11655943/bad-request-415
-   */
+
+  /**
+    * Modify entities for categorized search. There is a form endpoint for this
+    * but then you need a crmwrpctoken which we cannot get externally. Publish to
+    * the old org web services endpoint.
+    *
+    * @see https://bettercrm.blog/2017/08/02/list-of-undocumented-sdk-messages.
+    * @see https://stackoverflow.com/questions/11655943/bad-request-415
+    */
   def search() = Action { config =>
     // (context.appConfig.common.connectInfo.acquireTokenResource.toOption,
     //   config.settings.entityList) match {
@@ -112,17 +112,18 @@ class SettingsActions(context: DynamicsContext) extends LazyLogger {
 
   def list() = Action { config =>
     val qopts = QuerySpec()
-    dynclient.getList[OrganizationJS](qopts.url("organizations"))
-      .map{ list =>
+    dynclient
+      .getList[OrganizationJS](qopts.url("organizations"))
+      .map { list =>
         list.foreach(org => println(Utils.render(org)))
       }
   }
 
   def get(command: String): Action = {
     command match {
-      case "post" => post()
+      case "post"              => post()
       case "categorizedsearch" => search()
-      case "list" => list()
+      case "list"              => list()
       case _ =>
         Action { _ =>
           IO(println(s"settings command '${command}' not recognized."))

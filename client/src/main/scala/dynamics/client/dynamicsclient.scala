@@ -21,75 +21,6 @@ import dynamics.http._
 import dynamics.http.instances.entityEncoder._
 import dynamics.http.instances.entityDecoder._
 
-/**
-  * See https://msdn.microsoft.com/en-us/library/mt770385.aspx,
-  *  https://msdn.microsoft.com/en-us/library/gg334391.aspx#bkmk_parseErrors
-  */
-@js.native
-trait ErrorOData extends js.Object {
-  val code: js.UndefOr[String]                = js.undefined
-  val message: js.UndefOr[String]             = js.undefined
-  val innererror: js.UndefOr[InnerErrorOData] = js.undefined
-}
-
-/**
-  * See https://msdn.microsoft.com/en-us/library/mt770385.aspx
-  */
-@js.native
-trait InnerErrorOData extends js.Object {
-  @JSName("type")
-  val etype: js.UndefOr[String]      = js.undefined
-  val message: js.UndefOr[String]    = js.undefined
-  val stacktrace: js.UndefOr[String] = js.undefined
-}
-
-/** Inner error returned by the dynamics server. */
-case class InnerError(etype: String, message: String, stacktrace: String)
-
-/** An error specific to Dynamics responding in the body of a message. */
-case class DynamicsServerError(code: String, message: String, innererror: Option[InnerError] = None)
-
-object DynamicsServerError {
-
-  def apply(err: ErrorOData): DynamicsServerError = {
-    val ierror = err.innererror.map { i =>
-      InnerError(
-        i.etype.getOrElse("<no error type provided>"),
-        i.message.getOrElse("<no message provided>"),
-        i.stacktrace.map(_.replaceAll("\\r\\n", "\n")).getOrElse("<no stacktrace provided>")
-      )
-    }.toOption
-
-    DynamicsServerError(err.code.filterNot(_.isEmpty).getOrElse("<no code provided>"),
-                        err.message.getOrElse("<no message provided>"),
-                        ierror)
-  }
-}
-
-/**
-  * Combines a message, an optional DynamicsServerError, an optional underlying
-  * error and the Status of the http call.
-  */
-sealed abstract class DynamicsError extends RuntimeException {
-  def message: String
-  final override def getMessage: String = message
-  def cause: Option[DynamicsServerError]
-  def underlying: Option[Throwable]
-  def status: Status
-
-  /** True if there was a server error. */
-  def hasServerError = cause.isDefined
-}
-
-final case class DynamicsClientError(details: String,
-                                     val cause: Option[DynamicsServerError] = None,
-                                     underlying: Option[Throwable] = None,
-                                     val status: Status)
-    extends DynamicsError {
-  //cause.foreach(initCause) // which one to use as underlying?
-  def message = s"Dynamics client request encountered an error: $details"
-}
-
 sealed trait DynamicsId {
   def render(): String
 }
@@ -143,7 +74,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
   /**
     * Create a failed task and try to pull out a dynamics server error message from the body.
     */
-  protected def responseToFailedTask[A](resp: HttpResponse, msg: String, req: Option[HttpRequest]): IO[A] = {
+  def responseToFailedTask[A](resp: HttpResponse, msg: String, req: Option[HttpRequest]): IO[A] = {
     resp.body.flatMap { body =>
       logger.debug(s"ERROR: ${resp.status}: RESPONSE BODY: $body")
       val statuserror                       = Option(UnexpectedStatus(resp.status, request = req, response = Option(resp)))
@@ -157,6 +88,10 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     }
   }
 
+  /** 
+   * Not sure when this might apply. Do we get errors where the error property
+   * is embedded on a Message (capital?) field?
+   */
   protected def findSimpleMessage(body: js.Dynamic): Option[String] = {
     val error: js.UndefOr[js.Dynamic] = body.Message
     error.map(_.asInstanceOf[String]).toOption
@@ -164,8 +99,11 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
 
   /** Find an optional dynamics error message in the body. */
   protected def findDynamicsError(body: js.Dynamic): Option[ErrorOData] = {
-    val error: js.UndefOr[js.Dynamic] = body.error
-    error.map(_.asInstanceOf[ErrorOData]).toOption
+    if(js.DynamicImplicits.truthValue(body.error)) {
+      val error: js.UndefOr[js.Dynamic] = body.error
+      error.map(_.asInstanceOf[ErrorOData]).toOption
+    }
+    else None
   }
 
   /** Exposed so you can formulate batch request from standard HttpRequest objects which must have
@@ -175,7 +113,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     if (connectInfo.dataUrl.get.endsWith("/")) connectInfo.dataUrl.get.dropRight(1)
     else connectInfo.dataUrl.get
 
-//private val reg = """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""".r
+  //private val reg = """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""".r
 
   /** Update a single property, return the id updated. */
   def updateOneProperty(entitySet: String,
@@ -203,8 +141,6 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
           case Status.Successful(resp) => resp.as[A]
           case failedResponse =>
             responseToFailedTask(failedResponse, s"Batch", Option(therequest))
-          case _ => // never reaches here??!?!
-            ehandler.raiseError(new IllegalArgumentException("Batch request requires a Multipart body."))
         }
     }
   }
@@ -373,7 +309,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     * QuerySpec.
     */
   def getList[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(): IO[Seq[A]] =
-    getListStream[A](url).runLog
+    getListStream[A](url).compile.toVector
 
   /**
     * Get a list of values as a stream. Follows @odata.nextLink. For now, the

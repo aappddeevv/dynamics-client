@@ -26,8 +26,9 @@ import dynamics.common._
     outputFile: Option[String] = None,
     logFile: String = "dynamicscli.log",
     noclobber: Boolean = false,
-    numRetries: Int = 5,
-    pauseBetween: FiniteDuration = 10.seconds,
+  numRetries: Int = 5,
+  retryPolicy: String = "pause", // pause, backoff
+    pauseBetween: FiniteDuration = 10.seconds, // or initial value if backoff
     command: String = "", // should rename to "command"
     subcommand: String = "",
     filter: Seq[String] = Nil,
@@ -42,7 +43,7 @@ import dynamics.common._
     batch: Boolean = false,
     metadataCacheFile: Option[String] = None,
     ignoreMetadataCache: Boolean = false,
-    actionSelector: Option[ActionSelector] = Some(MainHelpers.defaultActionSelector)
+  actionSelector: Option[ActionSelector] = Some(MainHelpers.defaultActionSelector),
 )
 
 @Lenses case class PluginConfig(
@@ -126,7 +127,7 @@ import dynamics.common._
 )
 
 @Lenses case class UpdateConfig(
-    updateDataInputCSVFile: String = "",
+    inputFile: String = "",
     updateUpsert: Boolean = false,
     updateEntity: String = "",
     updatePKColumnName: String = "id",
@@ -185,9 +186,9 @@ import dynamics.common._
 )
 
 @Lenses case class SettingsConfig(
-  settingsFile: Option[String] = None,
-  entityList: Seq[String] = Nil,
-  name: Option[String] = None,
+    settingsFile: Option[String] = None,
+    entityList: Seq[String] = Nil,
+    name: Option[String] = None,
 )
 
 @Lenses case class AppConfig(

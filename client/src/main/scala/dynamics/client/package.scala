@@ -6,4 +6,11 @@ package dynamics
 
 package object client {
   val DefaultDynamicsOptions = DynamicsOptions()
+
+  /** Boolean header value to suppress duplicate detection. */
+  val SuppressDuplicateDetection = "MSCRM.SuppressDuplicateDetection"
+
+  /** Header for impersonating. Value sould be the systemuserid. */
+  val Impersonate = "MSCRMCallerID"
+
 }

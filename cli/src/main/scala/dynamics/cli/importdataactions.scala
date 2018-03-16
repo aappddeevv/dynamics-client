@@ -72,7 +72,7 @@ class ImportDataActions(val context: DynamicsContext) {
         case _                                          => ()
       }
     }
-  }.run
+  }.compile.drain
 
   def reportImportStatus(importid: String): IO[Unit] =
     dynclient.getOneWithKey[ImportJson]("imports", importid).map { i =>
@@ -312,7 +312,8 @@ class ImportDataActions(val context: DynamicsContext) {
       .map { imp =>
         counter.getAndIncrement(); imp
       }
-      .run
+      .compile
+      .drain
       .map(_ => println(s"${counter.get} imports delete."))
   }
 

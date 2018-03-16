@@ -159,6 +159,7 @@ npmBuildFast := {
 }
 
 addCommandAlias("watchit", "~ ;fastOptJS; npmBuildFast")
+addCommandAlias("fmt", ";scalafmt")
 
 buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion)
 // buildInfoPackage := "dynamics-client"

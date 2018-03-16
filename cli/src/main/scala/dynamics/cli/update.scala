@@ -43,10 +43,10 @@ import dynamics.client.implicits._
 import dynamics.http.implicits._
 
 /**
-  * Can run a generic update operation but requires data in a specific format. The format
-  * is a sequence of json objects that are parse and load ready for an update process.
-  * The payload should contain the id to be updated or not contain it, in which case
-  * the payload can be upserted if specified.
+  * Can run a generic upsert operation but requires data in a specific
+  * format. The format is a sequence of json objects that are ready for an
+  * update post. The payload should contain the id to be updated. If it's
+  * present but not yet an id, it will be used for an upsert operation.
   */
 class UpdateActions(val context: DynamicsContext) {
 
@@ -63,31 +63,26 @@ class UpdateActions(val context: DynamicsContext) {
 
     IO(println("json streaming test"))
       .flatMap { _ =>
-        process.run
+        process.compile.drain
       }
   }
 
   val update = Action { config =>
-    println("Update records from a set of JSON objects")
+    println("Update records from a set of JSON objects.")
     val uc    = config.update
     val pkcol = uc.updatePKColumnName
-    val updateone =
-      dynclient.update(uc.updateEntity, _: String, _: String, uc.upsertPreventCreate, uc.upsertPreventUpdate)
-    /*
-    val parserOpts = new ParserOptions(
-        columns = true,
-        skip_empty_lines = true,
-        trim = true
-      )
-     */
-    //val records = CSVFileSource(config.updateDataInputCSVFile, parserOpts)
-    //val records = CSVFileSource(config.etl.etlDataInputFile, DefaultCSVParserOptions)
-    val records = JSONFileSource[js.Object](config.etl.dataInputFile)
+
+    val updateone = dynclient.update(uc.updateEntity, _: String, _: String, uc.upsertPreventCreate, uc.upsertPreventUpdate)
+    //val updateone = (id: String, body: String) => dynclient.createReturnId(uc.updateEntity, body)
+
+    // wraps actual file json object in another json object with the index, etc., data key is "value"
+    val records = JSONFileSource[js.Object](config.update.inputFile)
     val updater = new UpdateProcessor(context)
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
     val runme =
       records
         .through(DropTake(uc.updateDrop.getOrElse(0), uc.updateTake.getOrElse(Int.MaxValue)))
+        .map(_.asDict[js.Object]("value"))
         .through(toInput())
         .map { a =>
           counter.getAndIncrement(); a
@@ -95,21 +90,32 @@ class UpdateActions(val context: DynamicsContext) {
         .through(log[InputContext[js.Object]] { ic =>
           if (config.common.debug) println(s"Input: $ic\n${PrettyJson.render(ic.input)}")
         })
-        .through(mkPipe(FilterAttributes(uc.updateDrops, uc.updateRenames, uc.updateKeeps)))
-        .through(LogTransformResult[js.Object, js.Object]())
-        .through(EmitResultDataWithTag[js.Object, js.Object]())
+        //.through(mkPipe(FilterAttributes(uc.updateDrops, uc.updateRenames, uc.updateKeeps)))
+        //.through(LogTransformResult[js.Object, js.Object]())
+        //.through(EmitResultDataWithTag[js.Object, js.Object]())
         .map { p =>
-          InputContext(p._1, p._2)
-        }
-        .through(_ map { ic =>
+          //val ic = InputContext(p._1, p._2)
+          val ic = p
           updater.mkOne(ic, uc.updatePKColumnName, updateone)
-        })
+        }
         .map(Stream.eval(_).map(println))
 
     runme
       .join(config.common.concurrency)
-      .run
+      .compile
+      .drain
       .flatMap(_ => IO(println(s"${counter.get} input records processed.")))
+  }
+
+  def get(command: String): Action = {
+    command match {
+      case "entity" => update
+      case "test"   => test
+      case _ =>
+        Action { _ =>
+          IO(println(s"update command '${command}' not recognized."))
+        }
+    }
   }
 
 }
@@ -131,21 +137,27 @@ class UpdateProcessor(val context: DynamicsContext) {
 
   /**
     * Returning None means the pk was not found in the js object. Only handles
-    * single value PKs. Removes pk if found. Mutates input object.
+    * single value PKs. Removes pk if found. Mutates input object. Body
+    * is returned as a string via `JSON.stringify`.
     */
   def findIdAndMkBody(pkcol: String, j: js.Dictionary[String]): Option[(String, String)] = {
     val pk = j.get(pkcol).filterNot(_.isEmpty)
+    //js.Dynamic.global.console.log("findIdAndMkBody", pkcol, j)
     j -= pkcol // mutating
     pk.map { (_, JSON.stringify(j.asInstanceOf[js.Object])) }
   }
 
   /**
-    * Run an update based on an input js.Object record and print a result.
+    * Run an update based on an input js.Object record and print a result. This
+   * function looks or the PK in the record, extracts it, removes it from the
+   * record, stringifies the resulting object as the body then calls the update
+   * function provided by the caller.
+   * 
     * @param source Record source identifier, typically a string like "Record 3".
     * @param pkcol PK attribute name in input record. Must be a single valued PK.
     * @param record js.Object record. The PK will be removed for the update.
-    * @param update Function to perform the update: (id, body).
-    * @return Task unit (non-failed) whether success or failure of the update.
+    * @param update Function to perform the update: (id, body) => F[message body result as string].
+    * @return F[String] that can represent update success or failure.
     */
   def mkOne(input: InputContext[js.Object], pkcol: String, update: (String, String) => IO[String]): IO[String] = {
     //println(s"mkOne: ${input.source}")

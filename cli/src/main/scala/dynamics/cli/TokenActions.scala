@@ -25,8 +25,11 @@ class TokenActions(context: DynamicsContext) extends LazyLogger {
   import context._
   import dynclient._
 
+  val defaultOutputFile = "token.json"
+
   def doit(n: Long = 1) = Action { config =>
-    println(s"Token output file: ${config.common.outputFile}")
+    val ofile = config.common.outputFile.getOrElse(defaultOutputFile)
+    println(s"Token output file: ${ofile}")
     val auth = new AuthManager(config.common.connectInfo)
     val ctx  = auth.getAuthContext();
     val str =
@@ -34,11 +37,11 @@ class TokenActions(context: DynamicsContext) extends LazyLogger {
     str
       .take(n)
       .map { ti =>
-        println(s"Writing token to file: ${config.common.outputFile}. ${js.Date()}")
-        config.common.outputFile.foreach(f => writeToFile(f, JSON.stringify(ti)))
+        println(s"Writing token to file: ${ofile}. ${js.Date()}")
+        writeToFileSync(ofile, JSON.stringify(ti))
         1
       }
-      .run
+      .compile.drain
   }
 
   def getOne()  = doit(1)

@@ -262,7 +262,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
       .flatMap(Stream.eval(_))
 
     IO(println("Watching for changes in web resources..."))
-      .flatMap(_ => estr.run)
+      .flatMap(_ => estr.compile.drain)
   }
 
   /**
@@ -514,7 +514,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
               }
             }
             .to(Sink.lines(System.out))
-            .run
+            .compile.drain
         }
       }
       .flatMap(_ => IO.unit)

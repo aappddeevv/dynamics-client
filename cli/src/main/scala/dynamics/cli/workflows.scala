@@ -43,6 +43,11 @@ trait WorkflowJson extends js.Object {
   val wtype: UndefOr[Int] = js.undefined
 
   val _solution_id_value: UndefOr[String] = js.undefined
+  val _parentworkflowid_value: UndefOr[String] = js.undefined
+
+  val _ownerid_value: UndefOr[String] = js.undefined
+  @JSName("_ownerid_value@OData.Community.Display.V1.FormattedValue")
+  val _ownerid_str: UndefOr[String] = js.undefined
 }
 
 class ChangeWorkflowStatus(
@@ -70,7 +75,7 @@ class WorkflowActions(val context: DynamicsContext) {
   import context._
   import dynamics.common.implicits._
 
-  val ehandler = implicitly[ApplicativeError[IO, Throwable]]
+  val ehandler = implicitly[MonadError[IO, Throwable]]
 
   implicit val dec = JsObjectDecoder[WorkflowJson]
 
@@ -92,6 +97,12 @@ class WorkflowActions(val context: DynamicsContext) {
     dynclient.getOneWithKey[WorkflowJson]("workflows", id)
   }
 
+  /** Get workflow by parentvalueid, process type = activation, statecode = activated. */
+  def getByParentId(parentId: String): IO[Seq[WorkflowJson]] = {
+    val q = QuerySpec(filter=Some(s"_parentworkflowid_value eq $parentId and type eq 2 and statecode eq 1"))
+    dynclient.getList[WorkflowJson](q.url("workflows"))
+  }
+
   def getByName(name: String): IO[WorkflowJson] = {
     val q = QuerySpec(
       filter = Some(s"name eq '$name' and category eq 0")
@@ -104,7 +115,10 @@ class WorkflowActions(val context: DynamicsContext) {
 
   def list() = Action { config =>
     println("Workflows. See https://msdn.microsoft.com/en-us/library/mt622427.aspx for value definitions.")
-    val cols  = jsobj("8" -> jsobj(width = 40))
+    val cols  = jsobj(
+      "2" -> jsobj(width=30),
+      "12" -> jsobj(width = 40)
+    )
     val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat), columns = cols)
 
     lift {
@@ -120,21 +134,26 @@ class WorkflowActions(val context: DynamicsContext) {
               "category",
               "componentstate",
               "type",
-              "currentactivation",
+            "currentactivation",
+            "parentworkflowid",
+            "ownerid",
               "solutionid",
               "description").map(Chalk.bold(_))) ++
-          filtered.zipWithIndex.map {
-            case (i, idx) =>
+      filtered.zipWithIndex.map { 
+        case (i, idx) =>
+          //js.Dynamic.global.console.log(idx, i)
               Seq(
                 (idx + 1).toString,
                 i.workflowid.orEmpty,
                 i.name.orEmpty,
-                i.statecode.map(_.toString).orEmpty,
-                i.statuscode.map(_.toString).orEmpty,
-                i.category.map(_.toString).orEmpty,
-                i.componentstate.map(_.toString).orEmpty,
-                i.wtype.map(_.toString).orEmpty,
+                i.statecode.toOption.flatMap(WorkflowActions.StateCodeByInt.get(_)).getOrElse("?"),
+                i.statuscode.toOption.flatMap(WorkflowActions.StatusCodeByInt.get(_)).getOrElse("?"),
+                i.category.toOption.flatMap(WorkflowActions.CategoryByInt.get(_)).getOrElse("?"),
+                i.componentstate.toOption.flatMap(WorkflowActions.ComponentStateByInt.get(_)).getOrElse("?"),
+                i.wtype.toOption.flatMap(WorkflowActions.ProcessTypeByInt.get(_)).getOrElse("?"),
                 i._activeworkflowid_value.orEmpty,
+                i._parentworkflowid_value.orEmpty,
+                i._ownerid_str.orEmpty,
                 i._solution_id_value.orEmpty,
                 i.description.orEmpty
               )
@@ -145,38 +164,30 @@ class WorkflowActions(val context: DynamicsContext) {
   }
 
   def changeActivation() = Action { config =>
-    import dynamics.etl._
-    val updater = new UpdateProcessor(context)
-    val updateone =
-      dynclient.update("workflows",
-                       _: String,
-                       _: String,
-                       config.update.upsertPreventCreate,
-                       config.update.upsertPreventUpdate)
-    val newStateCode  = if (config.workflow.workflowActivate) WorkflowStateCode.Activated else WorkflowStateCode.Draft
-    val newStatusCode = if (config.workflow.workflowActivate) WorkflowStatusCode.Activated else WorkflowStatusCode.Draft
-
+    val (newStateCode, newStatusCode)  =
+      if (config.workflow.workflowActivate) (WorkflowStateCode.Activated, WorkflowStatusCode.Activated)
+      else (WorkflowStateCode.Draft, WorkflowStatusCode.Draft)
     val sourceFromIds = Stream.emits(config.workflow.workflowIds)
-
     val runme = sourceFromIds
       .evalMap(getById)
-      .map { w =>
-        if (w.statecode == newStateCode) {
-          println(s"[${w.name}] is already in the desired activation state.")
-          (true, w)
-        } else (false, w)
+      .map{ w =>
+        val id = w.workflowid.get
+        val baseUrl = config.common.connectInfo.acquireTokenResource.orEmpty
+        val request = WorkflowActions.mkSOAPRequest(baseUrl, "workflow", id, newStateCode, newStatusCode)
+        dynclient.http.fetch[String](request) {
+          case Status.Successful(response) => IO.pure(s"Deactivated $id (${w.name.orEmpty})")
+          case failedResponse =>
+            ehandler.raiseError(DynamicsClientError(
+              s"Unable to deactivate $id (${w.name.orEmpty})",
+              None,
+              Option(UnexpectedStatus(failedResponse.status, request = Some(request), response = Option(failedResponse))),
+              failedResponse.status
+            ))
+        }
       }
-      .collect {
-        case p if (!p._1) => p._2
-      }
-      .map(w => (w.workflowid.get, w.workflowid.get))
-      .map { p =>
-        InputContext[js.Object](new ChangeWorkflowStatus(p._1, newStateCode, newStatusCode), s"Workflow: ${p._2}")
-      }
-      .map(updater.mkOne(_, "workflowid", updateone))
       .map(Stream.eval(_).map(println))
 
-    runme.join(config.common.concurrency).run
+    runme.join(config.common.concurrency).compile.drain
   }
 
   /** Execute a workflow against the results of a query. */
@@ -234,7 +245,8 @@ class WorkflowActions(val context: DynamicsContext) {
 
     runme
       .join(config.common.concurrency)
-      .run
+      .compile
+      .drain
       .flatMap(_ =>
         IO {
           println(s"${inputs.get} input records.")
@@ -250,8 +262,98 @@ class WorkflowActions(val context: DynamicsContext) {
     dynclient.mkExecuteActionRequest(ExecuteWorkflow, Entity.fromString(body), Some(("workflows", workflowId)), opts)
   }
 
+  def get(command: String): Action = {
+    command match {
+      case "list"             => list()
+      case "execute"          => executeWorkflow()
+      case "changeactivation" => changeActivation()
+    }
+  }
+
 }
 
 object WorkflowActions {
   val ExecuteWorkflow = "Microsoft.Dynamics.CRM.ExecuteWorkflow"
+
+  val ComponentStateByInt = Map[Int, String](
+    0 -> "Published",
+    1 -> "Unpublished",
+    2 -> "Deleted",
+    3 -> "Deleted Unpublished"
+  )
+
+  val StateCodeByInt = Map[Int, String](
+    0 -> "Draft",
+    1 -> "Activated"
+  )
+
+  val StatusCodeByInt  = Map[Int, String](
+    1 -> "Draft",
+    2 -> "Activated"
+  )
+
+  val CategoryByInt = Map[Int, String](
+    0	-> "Workflow",
+    1	-> "Dialog",
+    2	-> "Business Rule",
+    3	-> "Action",
+    4	-> "Business Process Flow"
+  )
+
+  val ProcessTypeByInt = Map[Int, String](
+    1	-> "Definition",
+    2	-> "Activation",
+    3	-> "Template"
+  )
+
+  def mkSOAPRequest(baseUrl: String, ENAME: String, ID: String, STATE: Int, STATUS: Int) = {
+    val body = setStateRequest(ENAME, ID, STATE, STATUS)
+    val headers = HttpHeaders(
+      "Content-Type" -> "text/xml; charset=utf-8",
+      "SOAPAction" -> "http://schemas.microsoft.com/xrm/2011/Contracts/Services/IOrganizationService/Execute",
+      "Accept" -> "application/xml"
+    )
+    HttpRequest(Method.POST, s"$baseUrl/$SOAPEP", headers = headers, body=Entity.fromString(body))
+  }
+
+  val SOAPEP = "XRMServices/2011/Organization.svc/web"
+
+  /** Use singular logical name, like contact or account, not contacts or accounts. */
+  def setStateRequest(ENAME: String, ID: String, STATE: Int, STATUS: Int) =
+    s"""<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+               <s:Body>
+               <Execute xmlns="http://schemas.microsoft.com/xrm/2011/Contracts/Services" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+                     <request i:type="b:SetStateRequest" xmlns:a="http://schemas.microsoft.com/xrm/2011/Contracts" xmlns:b="http://schemas.microsoft.com/crm/2011/Contracts">
+                     <a:Parameters xmlns:c="http://schemas.datacontract.org/2004/07/System.Collections.Generic">
+                       <a:KeyValuePairOfstringanyType>
+                      <c:key>EntityMoniker</c:key>
+                     <c:value i:type="a:EntityReference">
+                    <a:Id>${ID}</a:Id>
+                     <a:LogicalName>${ENAME}</a:LogicalName>
+                   <a:Name i:nil="true" />
+                 </c:value>
+                </a:KeyValuePairOfstringanyType>
+                     <a:KeyValuePairOfstringanyType>
+                    <c:key>State</c:key>
+                     <c:value i:type="a:OptionSetValue">
+                    <a:Value>${STATE}</a:Value>
+                   </c:value>
+                </a:KeyValuePairOfstringanyType>
+                 <a:KeyValuePairOfstringanyType>
+                 <c:key>Status</c:key>
+                <c:value i:type="a:OptionSetValue">
+                   <a:Value>${STATUS}</a:Value>
+                   </c:value>
+                  </a:KeyValuePairOfstringanyType>
+                   </a:Parameters>
+                <a:RequestId i:nil="true" />
+                <a:RequestName>SetState</a:RequestName>
+                </request>
+                 </Execute>
+                 </s:Body>
+               </s:Envelope>
+"""
 }
+
+
+

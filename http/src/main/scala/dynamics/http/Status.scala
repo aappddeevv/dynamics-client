@@ -132,6 +132,7 @@ object Status {
   val NotFound            = StatusReasons(404)
   val RequestTimeout      = StatusReasons(408)
   val PreconditionFailed  = StatusReasons(412)
+  val TooManyRequests     = StatusReasons(429)
   val InternalServerError = StatusReasons(500)
   val BadGateway          = StatusReasons(502)
   val ServiceUnavailable  = StatusReasons(503)

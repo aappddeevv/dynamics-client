@@ -21,7 +21,10 @@ object OData {
   def attr(p: String, mod: String) = p + "@" + mod
 
   def getBasicHeaders(): HttpHeaders =
-    HttpHeaders("OData-Version" -> "4.0", "OData-MaxVersion" -> "4.0", "Cache-Control" -> "no-cache") ++
+    HttpHeaders("OData-Version" -> "4.0",
+      "OData-MaxVersion" -> "4.0",
+      "Cache-Control" -> "no-cache",
+      "If-None-Match" -> "null") ++
       AcceptHeader ++
       ContentTypeJson
 

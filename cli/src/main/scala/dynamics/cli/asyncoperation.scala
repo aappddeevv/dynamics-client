@@ -116,7 +116,8 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
 
     nAtATime
       .join(5)
-      .run
+      .compile
+      .toVector
       .map(_ => println(s"${counter.get} records processed."))
   }
 
@@ -159,7 +160,7 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
       .map(updater.mkOne(_, "asyncoperationid", updateone))
       .map(Stream.eval(_).map(println))
 
-    runme.join(config.common.concurrency).run
+    runme.join(config.common.concurrency).compile.drain
   //.flatMap(_ => Task.delay(println(s"${counter.get} records processed.")))
   }
 

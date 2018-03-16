@@ -183,11 +183,7 @@ object MainHelpers extends LazyLogger {
         }
       case "workflows" =>
         val ops = new WorkflowActions(context)
-        config.common.subcommand match {
-          case "list"             => ops.list()
-          case "execute"          => ops.executeWorkflow()
-          case "changeactivation" => ops.changeActivation()
-        }
+        ops.get(config.common.subcommand)
 
       case "importmaps" =>
         val ops = new ImportMapActions(context)
@@ -203,10 +199,7 @@ object MainHelpers extends LazyLogger {
 
       case "update" =>
         val ops = new UpdateActions(context)
-        config.common.subcommand match {
-          case "data" => ops.update
-          case "test" => ops.test
-        }
+        ops.get(config.common.subcommand)
       case "whoami" =>
         val ops = new WhoAmIActions(context)
         ops.whoami()

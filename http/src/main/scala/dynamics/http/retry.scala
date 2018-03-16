@@ -24,6 +24,9 @@ import dynamics.common._
   * but it returns 500. Otherwise, other 500 errors due to
   * other request issues may retry a bunch of times until they
   * fail but this should only affect developers.
+  *
+  *  Note that new governer limits are in place:
+  *  @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/api-limits
   */
 object RetryClient extends LazyLogger {
 
@@ -36,7 +39,9 @@ object RetryClient extends LazyLogger {
     InternalServerError, // this is problematic, could be badly composed content!
     ServiceUnavailable,
     BadGateway,
-    GatewayTimeout)
+    GatewayTimeout,
+    TooManyRequests
+  )
 
   protected def notBad(noisy: Boolean = true) = Success[DisposableResponse] { dr =>
     val x = RetriableStatuses.contains(dr.response.status)
@@ -44,6 +49,10 @@ object RetryClient extends LazyLogger {
     !x
   }
 
+  /**
+    * A Policy that decides which policy to use based data the data inside the
+    * Future, whether its a valid value or a failure.
+    */
   protected def policyWithException(policy: Policy) = retry.When {
     case dr: DisposableResponse => policy
     case c: CommunicationsFailure =>
@@ -51,14 +60,22 @@ object RetryClient extends LazyLogger {
       policy
   }
 
+  /** Middlaware based on a retry.Pause policy. */
   def pause(n: Int = 5, pause: FiniteDuration = 5.seconds, noisy: Boolean = true)(
       implicit e: ExecutionContext): Middleware =
-    client(Pause(n, pause), noisy)
+    middleware(Pause(n, pause), noisy)
 
+  /** Middleware based on retry.Directly policy. */
   def directly(n: Int = 5, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
-    client(Directly(n), noisy)
+    middleware(Directly(n), noisy)
 
-  protected def client(policy: retry.Policy, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
+  /** Middleware based on retry.Backup policy. */
+  def backoff(n: Int = 5, initialPause: FiniteDuration = 5.seconds, noisy: Boolean = true)(
+      implicit e: ExecutionContext): Middleware =
+    middleware(Backoff(n, initialPause), noisy)
+
+  /** Create a Middleware based on a retry policy. */
+  def middleware(policy: retry.Policy, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
     (c: Client) => {
       implicit val success = notBad(noisy)
       val basePolicy       = policyWithException(policy)

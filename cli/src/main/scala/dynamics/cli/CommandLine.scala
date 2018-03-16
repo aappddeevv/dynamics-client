@@ -90,8 +90,11 @@ object CommandLine {
     opt[Int]("num-retries")
       .text("Number of retries if a request fails. Default is 5.")
       .action((x, c) => c.lens(_.common.numRetries).set(x))
+    opt[String]("retry-policy")
+      .text("Retry policy, either pause or backof. Default is pause.")
+      .action((x, c) => c.lens(_.common.retryPolicy).set(x))
     opt[Int]("pause-between")
-      .text("Pause between retries in seconds. Default is 10.")
+      .text("Pause between retries in seconds or the initial retry delay if retry-policy is backoff. Default is 10.")
       .action((x, c) => c.lens(_.common.pauseBetween).set(x.seconds))
       .validate(pause =>
         if (pause < 0 || pause > 60 * 5) failure("Pause must be between 0 and 300 seconds.") else success)
@@ -242,28 +245,28 @@ object CommandLine {
 
     cmd("update")
       .text(
-        "Update dynamics records. An updated can also be an insert. Attribute processing order is drops, renames then keeps.")
+        "Update dynamics records. An update can also be an insert if you provide your own PK.")
       .action((x, c) => withCmd(c, "update"))
       .children(
         sub("entity")
           .text("Update data in dynamics.")
-          .action((x, c) => withSub(c, "data"))
+          .action((x, c) => withSub(c, "entity"))
           .children(
             arg[String]("entity")
-              .text("Entity to update. Use the entity logical name which is usually lowercase.")
+              .text("Entity to update. Use the entity set name which is usually lowercase and ends with an 's'.")
               .action((x, c) => c.copy(update = c.update.copy(updateEntity = x))),
             arg[String]("inputfile")
               .text("JSON streaming data file. JSON records separated by newlines.")
-              .action((x, c) => c.copy(update = c.update.copy(updateDataInputCSVFile = x))),
+              .action((x, c) => c.lens(_.update.inputFile).set(x)),
             opt[Boolean]("upsertpreventcreate")
-              .text("Prevent a create if the record to update is not present. Default is true.")
+              .text("Prevent a create if the record to update is not present. Default is true. If you are inserting, set this to false.")
               .action((x, c) => c.copy(update = c.update.copy(upsertPreventCreate = x))),
             opt[Boolean]("upsertpreventupdate")
-              .text("If you are inserting data using an update operation  and the record already exists, do not update. The default is false.")
+              .text("If you are inserting data using an update operation and the record already exists, do not update. The default is false.")
               .action((x, c) => c.copy(update = c.update.copy(upsertPreventUpdate = x))),
             opt[String]("pk")
               .text("Name of PK in the data input. Defaults to id (case insensitive.")
-              .action((x, c) => c.copy(update = c.update.copy(updatePKColumnName = x))),
+              .action((x, c) => c.lens(_.update.updatePKColumnName).set(x)),
             opt[Seq[String]]("drops")
               .text("Drop columns. Logical column names separate by commas. Can be specifed multiple times.")
               .action((x, c) => c.copy(update = c.update.copy(updateDrops = c.update.updateDrops ++ x))),
@@ -287,8 +290,9 @@ object CommandLine {
                 c.copy(update = c.update.copy(updateRenames = c.update.updateRenames ++ pairs))
               },
             note(
-              "This is command is really only useful for updating/inserting data exported using the export command."),
-            note("Both configuration data or Dynamics entity in json format can be used. Processing performance is good even for large datasets.")
+              "This is command updates and inserts if upsertpreventcreate is false. It can be difficult to get the json just right."),
+            note("Both configuration data or Dynamics entity in json format can be used. Processing performance is good even for large datasets."),
+              note("Attributes processing order is removes, updates, renames. WHICH IS NOT WORKING YET!")
           ),
         sub("test")
           .text("Test some update stuff")
@@ -533,7 +537,7 @@ object CommandLine {
     import helpers._
 
     cmd("settings")
-      .text("Manage settings using undocumented API.")
+      .text("Manage settings using the organization entity.")
       .action((x, c) => withCmd(c, "settings"))
       .children(
         note("\n"),
@@ -543,7 +547,7 @@ object CommandLine {
           .children(
             opt[String]("org-name")
               .text("Organization name. Secify this or it must be in the json file.")
-              .action((x,c) => c.lens(_.settings.name).set(Option(x))),
+              .action((x, c) => c.lens(_.settings.name).set(Option(x))),
             opt[String]("settings-file")
               .text("Config file with XML settings. Default is org-settings.xml")
               .action((x, c) => c.lens(_.settings.settingsFile).set(Option(x)))
@@ -554,7 +558,7 @@ object CommandLine {
           .children(
             opt[String]("org-name")
               .text("Organization name")
-              .action((x,c) => c.lens(_.settings.name).set(Option(x))),
+              .action((x, c) => c.lens(_.settings.name).set(Option(x))),
             arg[Seq[String]]("entity-list")
               .text("Comma separated list of logical entity names to allow categorized search.")
               .action((x, c) => c.lens(_.settings.entityList).modify(cur => cur ++ x))
@@ -565,7 +569,7 @@ object CommandLine {
           .children(
             opt[String]("org-name")
               .text("Organization name")
-              .action((x,c) => c.lens(_.settings.name).set(Option(x)))
+              .action((x, c) => c.lens(_.settings.name).set(Option(x)))
           )
       )
   }
@@ -795,11 +799,11 @@ object CommandLine {
               "The ODataQuery should return the id of the entity e.g. '/contacts?$select=contactid'  --pk contactid.")
           ),
         sub("change-activation")
-          .text("Change activation of a workflow.")
+          .text("Change activation of a workflow. Look for the definition workflow and use that as the id.")
           .action((x, c) => withSub(c, "changeactivation"))
           .children(
             opt[Seq[String]]("id")
-              .text("Ids of workflow to activate. Obtain from using 'list'. Comma separated or repeat option.")
+              .text("Ids of workflow definitions. Obtain from using 'list'. Comma separated or repeat option.")
               .unbounded()
               .action((x, c) => c.lens(_.workflow.workflowIds).modify(ids => ids ++ x)),
             //opt[Seq[String]]("names").
@@ -813,6 +817,8 @@ object CommandLine {
           ),
         note(
           "A workflow is typically very slow to run. The best option is to not run it again if its already been run."),
+        note("Workflow definition ids are stable across orgs. Activation ids are not."),
+        note("You may need to own the workflow before changing its activation status."),
         note("A simple cache can be optionally used to skip the entities that the workflow has already run against.")
       )
 
