@@ -29,11 +29,11 @@ object Utils {
   def options() = js.Dynamic.literal()
 
   /** Pretty print a js.Object */
-  def pprint(o: js.Object, opts: util.InspectOptions = new util.InspectOptions(depth = null, maxArrayLength = 10)) =
+  def pprint(o: js.Object, opts: nodejs.util.InspectOptions = new nodejs.util.InspectOptions(depth = null, maxArrayLength = 10)) =
     nodejs.util.Util.inspect(o, opts)
 
   /** Render a js.Any into a string using nodejs Inspect. */
-  def render(o: js.Any, opts: util.InspectOptions = new util.InspectOptions(depth = null, maxArrayLength = 10)) =
+  def render(o: js.Any, opts: nodejs.util.InspectOptions = new nodejs.util.InspectOptions(depth = null, maxArrayLength = 10)) =
     nodejs.util.Util.inspect(o, opts)
 
   /** Pretty print a js.Dynamic object. */

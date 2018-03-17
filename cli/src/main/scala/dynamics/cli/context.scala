@@ -37,8 +37,9 @@ object DynamicsContext {
   import dynamics.client._
 
   /**
-    * Create a default DynamicsContext. Middleware for request retry and ADAL are
-    * automatically addded.
+    * Create a default DynamicsContext. Middleware for request retry and ADAL
+    * are automatically addded. Allowed policies are ''backoff'' and any other
+    * policy string is translated into a ''pause'' policy.
     */
   def default(config: AppConfig)(implicit e: ExecutionContext): DynamicsContext =
     new DynamicsContext {

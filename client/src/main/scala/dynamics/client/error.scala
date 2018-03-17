@@ -42,7 +42,7 @@ trait InnerErrorOData extends js.Object {
 /** Inner error returned by the dynamics server. Scala side. */
 case class InnerError(etype: String, message: String, stacktrace: String)
 
-/** Response Error. Scala side. */
+/** Error object created from response body. Scala side.*/
 case class DynamicsServerError(code: String, message: String, innererror: Option[InnerError] = None)
 
 object DynamicsServerError {
@@ -84,6 +84,9 @@ sealed abstract class DynamicsError extends RuntimeException {
   def hasServerError = cause.isDefined
 }
 
+/**
+ * Concrete implementation of errors thrown by a dynamics client.
+ */
 final case class DynamicsClientError(details: String,
                                      val cause: Option[DynamicsServerError] = None,
                                      underlying: Option[Throwable] = None,

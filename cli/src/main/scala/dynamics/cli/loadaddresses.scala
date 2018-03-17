@@ -142,7 +142,7 @@ class LoadAddressesActions(val context: DynamicsContext) {
 
     IO(println("Loading addresses"))
       .flatMap { _ =>
-        program.join(config.common.concurrency).run
+        program.join(config.common.concurrency).compile.drain
       }
       .flatMap { _ =>
         IO(println(s"# records loaded: ${counter.get()}"))

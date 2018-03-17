@@ -2,15 +2,65 @@
 layout: docs
 title: importdata
 ---
-importdata allows you to importdata. Combined with other CLI programs such as csv_splitter.py (included) and the program "parallel", you can easily create and execute parallel loads using the standard data import facility. This allows you to import a substantial amount of data quickly using the standard data import wizard design tools on the dynamics platform. Most importantly its free and you do not need to engage expensive ETL developers. If you are able to load data through a spreadsheet, you can use `importdata` to perform high-speed loading.
+
+importdata allows you to importdata. Combined with other CLI programs such as
+csv_splitter.py (included) and the program "parallel", you can easily create and
+execute parallel loads using the standard data import facility. This allows you
+to import a substantial amount of data quickly using the standard data import
+wizard design tools on the dynamics platform. Most importantly its free and you
+do not need to engage expensive ETL developers. If you are able to load data
+through a spreadsheet, you can use `importdata` to perform high-speed loading.
 
 "parallel" is a program you can install on both Windows, Linux and MacOS systems to run commands in parallel.
 
-To import gigabytes of data quickly, break your load .csv load files into smaller portions below the 22 MB import limit for dynamics online, then use parallel to run dynamicscli in parallel. For example, if you have a large file that is broken into 40 chunks, you can use parallel to load 10 chunks simultaneously. If one chunk finishes earlier than the others, parallel starts running another chunk.
+To import gigabytes of data quickly, break your load .csv load files into
+smaller portions below the 22 MB import limit for dynamics online, then use
+parallel to run dynamicscli in parallel. For example, if you have a large file
+that is broken into 40 chunks, you can use parallel to load 10 chunks
+simultaneously. If one chunk finishes earlier than the others, parallel starts
+running another chunk.
 
-You will need to find the limit of your system, some online systems during certain parts of the day are more tolerant of fast data loading than other times. A small amount of experimentaton to determine the optimal # chunks/# simultaneous chunk combinations.
+You will need to find the limit of your system, some online systems during
+certain parts of the day are more tolerant of fast data loading than other
+times. A small amount of experimentaton to determine the optimal # chunks/#
+simultaneous chunk combinations.
 
 ## Subcommands
+* list-imports: List import maps.
+* list-importfiles: List import files. These are typically created as part of creating an import job.
+* bulkdelete: Create a bulkdelete job from a query file.
+* delete: Delete imports (jobs) by name.
+* import: Import data. Specify a data file and an available import map. The
+  import map must already be loaded.
+* resume: Resume in imported job at the last processing stage. I'm not sure how
+  well this works.
+
+## delete
+
+delete is often used after a bad import. It can be just as fast as a bulk delete and you can specify the delete query using the web api syntax:
+
+Examples:
+* `dynamicscli entity delete contact --query '/contacts?$select=contactid' -c $CRMCON`: Delete all accounts. Note how the query selects the amount of data it pulls from the server by *only* specifying the contactid as the returned value.
+
+You can also specify the queries to delete from a json file. The keys are used to sort and report back the deletion counts.
 
 
-## Examples
+## import
+
+You can combine this command with `parallel` (available for most major OSes) and perform highly parallel loads. Using `csv_splitter.py` to splt your file into file parts with only 5-10K rows of data each seems to provide a good throughput on loads.
+
+Examples:
+* `dynamicscli entity import accounts.csv accounts-map -c $CRMCON`: Load the CSV file `accounts.csv` using the previously loaded import map `accounts-map`.
+
+Using the `parallel` program you can do:
+
+```sh
+parallel --jobs 10 --results logs/accounts_{} $CLI importdata import {} accounts-map -c $CRMCON ::: "$DATADIR"/accounts.csv_*.csv
+```
+
+Where accounts.csv_*.csv are the file parts created by `csv_splitter.py` from the file `accounts.csv`. The command line looks complex because it uses a "generator" at the end to generate pathnames that are substituted back in the '{}' characters, but don't let it fool you. The complexity is all about creating log files for each program that is run in parallel with an unique set of arguments, that's it!.
+
+`parallel` can  be obtained from:
+* https://www.gnu.org/software/parallel: GNU version, written in perl.
+* https://github.com/mmstick/parallel: A GNU parallel clone written in RUST but with the same syntax.
+

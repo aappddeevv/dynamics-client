@@ -57,22 +57,27 @@ case class DynamicsOptions(
   * Dynamics specific client. Its a thin layer over a basic HTTP client that
   * formulates the HTTP request and minimually interprets the response.
   *
-  * All of the methods either return a IO or a Steam. The IO or Stream
-  * must be run in order to execute the operation.
+  * All of the methods either return a IO or a Steam. The IO or Stream must be
+  * run in order to execute the operation.
   *
-  * You must make sure you have a `MonadError[IO, Throwable]` in implicit scope when you create the client.
-  * If you need to you can always `val ehandler = MonadError[IO, Throwable]` when creating the client
-  *  to instill your own strategy for raising an error. If you have cats.effect in scope, you should
-  *  pick up the default one automatically.
+  * You must make sure you have a `MonadError[IO, Throwable]` in implicit scope
+  * when you create the client.  If you need to you can always `val ehandler =
+  * MonadError[IO, Throwable]` when creating the client to instill your own
+  * strategy for raising an error. If you have cats.effect in scope, you should
+  * pick up the default one automatically. All errors from responses are
+  * captured in this layer and converted to instances of DynamicsClientError (a
+  * Throwable). Errors generated from lower levels can be thrown and are *not*
+ * captured in this layer.
+ * 
   */
 case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo, debug: Boolean = false)(
-    implicit ehandler: MonadError[IO, Throwable],
+    implicit ehandler: ApplicativeError[IO, Throwable],
     e: ExecutionContext)
     extends LazyLogger
     with DynamicsClientRequests {
 
   /**
-    * Create a failed task and try to pull out a dynamics server error message from the body.
+    * Create a failed effect and pull out a dynamics server error message from the body, if present.
     */
   def responseToFailedTask[A](resp: HttpResponse, msg: String, req: Option[HttpRequest]): IO[A] = {
     resp.body.flatMap { body =>
@@ -326,7 +331,8 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
             case Status.Successful(resp) =>
               resp.body.map { str =>
                 val odata = js.JSON.parse(str).asInstanceOf[ValueArrayResponse[A]]
-                logger.debug(s"getListStream: body=$str\nodata=${PrettyJson.render(odata)}")
+                if(logger.isDebugEnabled())
+                  logger.debug(s"getListStream: body=$str\nodata=${PrettyJson.render(odata)}")
                 val a = odata.value.map(_.toSeq) getOrElse Seq()
                 //println(s"getList: a=$a,\n${PrettyJson.render(a(0).asInstanceOf[js.Object])}")
                 Option((a, odata.nextLink.toOption))

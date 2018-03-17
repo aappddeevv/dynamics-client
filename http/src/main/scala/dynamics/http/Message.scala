@@ -98,7 +98,8 @@ case class HttpResponse(status: Status, headers: HttpHeaders, body: Entity) exte
 
 /**
   * A response that allows the response object to used then calls an effect
-  * after its has been consumed.
+  * after its has been consumed via `apply`. This is essentially a resource
+  * management hook.
   */
 case class DisposableResponse(response: HttpResponse, dispose: IO[Unit]) {
   def apply[A](f: HttpResponse => IO[A])(implicit ehandler: ApplicativeError[IO, Throwable]): IO[A] = {

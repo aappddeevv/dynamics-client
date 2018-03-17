@@ -11,8 +11,8 @@ object Dependencies {
 
     "org.scalatest"          %%% "scalatest"    % "latest.release" % "test",
     "co.fs2" %%% "fs2-core" % "0.10.0-RC1",
-    "org.typelevel" %%% "cats-core" % "1.0.1",
-    "org.typelevel" %%% "cats-effect" % "0.8",
+    "org.typelevel" %%% "cats-core" % "1.1.0",
+    "org.typelevel" %%% "cats-effect" % "0.10",
     //"com.github.mpilquist" %%% "simulacrum" % "0.10.0",
     "com.typesafe.play" %%% "play-json" % "2.6.0",
     "com.softwaremill.retry" %%% "retry" % "0.3.0",

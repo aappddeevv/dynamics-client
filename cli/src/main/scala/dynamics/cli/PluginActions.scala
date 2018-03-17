@@ -140,7 +140,7 @@ class PluginActions(val context: DynamicsContext) {
       .flatMap(Stream.eval(_))
 
     IO(println(s"Watching for changes at: ${source}"))
-      .flatMap(_ => runme.run)
+      .flatMap(_ => runme.compile.drain)
   }
 
   val upload = Action { config =>

@@ -30,4 +30,9 @@ package object http {
     */
   type DecodeResult[A] = EitherT[IO, DecodeFailure, A]
 
+  /** 
+   * Retry policies are added to an effect so that when run, a retry
+   * occurs as needed.
+   */
+  type RetryPolicy[F[_], A] = F[A] => F[A]
 }

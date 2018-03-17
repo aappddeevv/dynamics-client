@@ -17,7 +17,7 @@ final case class UnexpectedStatus(status: Status,
                                   response: Option[HttpResponse] = None)
     extends RuntimeException
 
-/** Message failure. */
+/** Message failure in the http layer. */
 sealed abstract class MessageFailure extends RuntimeException {
   def message: String
   final override def getMessage: String = message
@@ -25,7 +25,7 @@ sealed abstract class MessageFailure extends RuntimeException {
 
 /** Error for a Client to throw when something happens underneath it e.g. in the OS. */
 final case class CommunicationsFailure(details: String, val cause: Option[Throwable] = None) extends MessageFailure {
-  cause.foreach(initCause)
+  cause.foreach(initCause) // java's associate a throwable with this exception
   def message: String = s"Communications failure: $details"
 }
 

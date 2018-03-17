@@ -6,9 +6,11 @@ dynamics-client two personalities:
 * A CLI that can be used from any OS. While one could use PowerShell for everything, its much easier to add commands or make commands robust using an application directly.
 * An extensive client library that is performant on the nodejs platform. You can use this as a framework for developing small Dynamics applications like ETL or platform management. For example, I added a command to help manage the dynamics platform in around 30 minutes and it worked the first time.
 
-dynamicscli is written in scala.js which is a small language with more extensive type-safety, immutability and greater consistency. It is a great language for writing logic heavy code.
+dynamicscli is written in scala.js which is a small language with more extensive type-safety, immutability and greater consistency. It is a great language for writing logic and effects heavy code.
 
 Why nodejs? nodejs has an extensive array of web oriented resources and is lightweight on memory while still being fast enough. You could also use the client framework for CRM web applications directly. You can also use it for hot-reload, local development that seamlessly integrates with CRM so you get easy development of new CRM UI extensions. Running a nodejs instance on azure also means that you can deploy dynamicscli to azure and have a continuously running Dynamics platform processing platform ready to go.
+
+dynamicscli automatically handles paging through multi-paged results from dynamics as well as automatic retry.
 
 ## Installing
 Currently, you need to build the solution from github. We will publish the CLI progarm on npm shortly.

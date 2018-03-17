@@ -394,7 +394,7 @@ object CommandLine {
           .action((x, c) => withSub(c, "deleteByQuery"))
           .children(
             arg[String]("entity")
-              .text("Entity name to delete. This is used to obtain the primary key and entity set name.")
+              .text("Entity name (not entity set name) to delete. This is used to obtain the primary key and entity set name.")
               .action((x, c) => c.lens(_.export.entity).set(x)),
             opt[String]("query")
               .text("Web api format query string e.g. /contacts?$select=...&$filter=...")
@@ -405,6 +405,9 @@ object CommandLine {
           ),
         note("""Skip must read records then skip them."""),
         note("count does not handle navigation properties or path properties."),
+        note("count pulls the id to count, it does not use the count function since the count"),
+        note("function does handle queries. If you delete by query, only return the PK in your query,"),
+        note("e.g. '/contacs?$select=contactid'."),
         note("For delete, you must specify a --query or --query-file, otherwise nothing will be deleted.")
       )
 

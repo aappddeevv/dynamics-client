@@ -51,7 +51,7 @@ class ImportDataActions(val context: DynamicsContext) {
       val statelabel  = AsyncOperation.StateCodes(a.statecode.get)
       val statuslabel = AsyncOperation.StatusCodes(a.statuscode.get)
       val msg         = s"${js.Date()}: Waiting for job to complete: state = $statelabel, status = ${statuslabel}."
-      if (a.statecode == 3) None else Some((a.statuscode.get, msg, a))
+      if (a.statecode.getOrElse(-1) == 3) None else Some((a.statuscode.get, msg, a))
     case Left(t: DynamicsError) =>
       if (t.status == Status.NotFound) {
         //println(s"${js.Date()}: Job with id $id not found.")
