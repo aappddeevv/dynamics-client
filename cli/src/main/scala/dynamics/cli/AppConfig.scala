@@ -27,7 +27,7 @@ import dynamics.common._
     logFile: String = "dynamicscli.log",
     noclobber: Boolean = false,
   numRetries: Int = 5,
-  retryPolicy: String = "pause", // pause, backoff
+  retryPolicy: String = "backoff", // pause, backoff
     pauseBetween: FiniteDuration = 10.seconds, // or initial value if backoff
     command: String = "", // should rename to "command"
     subcommand: String = "",
@@ -175,10 +175,16 @@ import dynamics.common._
     workflowBatch: Boolean = false,
     workflowCache: Boolean = false,
     workflowCacheFilename: Option[String] = None,
-    workflowActivate: Boolean = true,
+    activate: Boolean = true,
     workflowIds: Seq[String] = Nil,
     workflowNames: Seq[String] = Nil,
     workflowActivateFilterName: Option[String] = None
+)
+
+@Lenses case class AppModuleConfig(
+  roleName: Seq[String] = Nil,
+  change: Option[String] = None,
+  appName: Option[String] = None,
 )
 
 @Lenses case class TokenConfig(
@@ -206,7 +212,8 @@ import dynamics.common._
     test: TestConfig = TestConfig(),
     systemjob: SystemJobConfig = SystemJobConfig(),
     action: ActionConfig = ActionConfig(),
-    settings: SettingsConfig = SettingsConfig(),
+  settings: SettingsConfig = SettingsConfig(),
+  appModule: AppModuleConfig = AppModuleConfig(),
 ) {
   def debug       = common.debug
   def noisy       = !common.quiet

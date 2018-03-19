@@ -28,6 +28,7 @@ simultaneous chunk combinations.
 ## Subcommands
 * list-imports: List import maps.
 * list-importfiles: List import files. These are typically created as part of creating an import job.
+* dump-errors: Dump detailed info about importfiles that import errors. In the UI, you can only export the rows, this dump gets everything.
 * bulkdelete: Create a bulkdelete job from a query file.
 * delete: Delete imports (jobs) by name.
 * import: Import data. Specify a data file and an available import map. The

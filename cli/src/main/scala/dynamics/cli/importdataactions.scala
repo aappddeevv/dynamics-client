@@ -83,7 +83,7 @@ class ImportDataActions(val context: DynamicsContext) {
     }
 
   def reportErrors(importfileid: String) =
-    dynclient.getList[ImportLogJSON](s"/importlogs?$$filter=importfileid/importfileid eq $importfileid").map { i =>
+    dynclient.getList[ImportLogJS](s"/importlogs?$$filter=importfileid/importfileid eq $importfileid").map { i =>
       println("TODO: Make this a table.")
       println(s"${Utils.render(i)}")
     }
@@ -120,9 +120,9 @@ class ImportDataActions(val context: DynamicsContext) {
       val importRec = new ImportJson(s"$name", modecode = modecode)
       val waitforit = waitForJobStreamPrint(_: String, config.importdata.importDataPollingInterval.seconds) //curry
 
-      val x = lift {
-        new TestJS(name = "blah")
-      }
+      // val x = lift {
+      //   new TestJS(name = "blah")
+      // }
 
       if (!Utils.fexists(path))
         IO(println(s"File $path is not accessible for importing."))
@@ -142,26 +142,26 @@ class ImportDataActions(val context: DynamicsContext) {
           val mappingXml = unlift(new ImportMapActions(context).getImportMapXml(importmapid))
           val (s, t)     = ImportMapUtils.getSourceAndTarget(mappingXml, importmapname)
 
-          val x = new TestJS(name = "blah")
+          //val x = new TestJS(name = "blah")
 
           val content = Utils.slurp(path)
-          val importfile = new ImportFileJson(
-            name = s"$name import",
-            source = filename.get,
-            filetypecode = ftypeint,
-            content = content,
-            isfirstrowheader = true,
-            usesystemmap = false,
-            enableduplicatedetection = config.importdata.importDataEnableDuplicateDetection,
-            sourceentityname = s, // must be the same as in the mapping file
-            targetentityname = t, // must be the same as the mapping file
-            fielddelimitercode = FieldDelimiter.comma,
-            datadelimitercode = DataDelimiter.doublequote,
-            processcode = ProcessCode.Process,
-            importid = s"/imports($importid)",
-            importmapid = s"/importmaps($importmapid)",
+          val importfile = new ImportFileJson {
+            name = s"$name import"
+            source = filename.get
+            filetypecode = ftypeint
+            content = content
+            isfirstrowheader = true
+            usesystemmap = false
+            enableduplicatedetection = config.importdata.importDataEnableDuplicateDetection
+            sourceentityname = s // must be the same as in the mapping file
+            targetentityname = t // must be the same as the mapping file
+            fielddelimitercode = FieldDelimiter.comma
+            datadelimitercode = DataDelimiter.doublequote
+            processcode = ProcessCode.Process
+            importid = s"/imports($importid)"
+            importmapid = s"/importmaps($importmapid)"
             recordsownerid_systemuser = s"/systemusers(${whoami.UserId})"
-          )
+          }
           println("Starting import file stage.")
           val ifileid = unlift(dynclient.createReturnId("importfiles", JSON.stringify(importfile)))
           println(s"Processing import file: $ifileid")
@@ -230,16 +230,18 @@ class ImportDataActions(val context: DynamicsContext) {
 
   val listImportFiles: Action = Kleisli { config =>
     val opts   = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
-    val header = Seq("#", "importfileid", "name", "statuscode", "createdon")
+    val header = Seq("#", "importfileid", "name", "failurecounut", "partialfailurecount", "statuscode", "createdon")
 
-    dynclient.getList[ImportFileJson]("/importfiles").map { list =>
+    dynclient.getList[ImportFileJson]("/importfiles?$orderby=createdon asc").map { list =>
       val data = list.zipWithIndex.map {
         case (i, idx) =>
           Seq((idx + 1).toString,
-              i.importfileid.getOrElse("null"),
-              i.name.getOrElse("null"),
-              i.statuscode.toString,
-              i.createdon.getOrElse("null"))
+              i.importfileid.orEmpty,
+            i.name.orEmpty,
+            i.failurecount.map(_.toString).orEmpty,
+            i.partialfailurecount.map(_.toString).orEmpty,
+              i.statuscode_fv.orEmpty,
+              i.createdon.orEmpty)
       }
       println(tablehelpers.render(header, data, opts))
     }
@@ -341,6 +343,26 @@ class ImportDataActions(val context: DynamicsContext) {
     }
   }
 
+  val dumpErrors = Action { config =>
+    val outdir = config.common.outputDir
+    val qs = QuerySpec(
+      filter=Some("(failurecount gt 0) or (partialfailurecount gt 0)"),
+      expand = Seq(Expand("ImportFile_ImportData"))
+    )
+    lift {
+      val list = unlift(dynclient.getList[ImportFileJson](qs.url("importfiles")))
+      list.foreach(i => js.Dynamic.global.console.log("importfile", i))
+      //val edata = unlift(list.map(ifile => dynclient.getList[ImportDataJS](ifile.ImportFile_ImportData_nl.get)).toList.sequence)
+      // if there is alot of errors, perhasp this is non-performant?
+      val edata = unlift(list.map{ifile =>
+        val qsdata = QuerySpec(filter=Some(s"_importfileid_value eq ${ifile.importfileid.get}"))
+        dynclient.getList[ImportLogJS](qsdata.url("importlogs"))
+      }.toList.sequence)
+      IO(println("blah"))
+        .map(_ => edata.foreach(id => js.Dynamic.global.console.log("importdata", id)))
+    }
+  }
+
   def get(command: String): Action =
     command match {
       case "import"          => importData
@@ -349,6 +371,11 @@ class ImportDataActions(val context: DynamicsContext) {
       case "bulkdelete"      => bulkDelete
       case "resume"          => resume
       case "delete"          => delete
+      case "dumperrors" => dumpErrors
+      case _ =>
+        Action { _ =>
+          IO(println(s"importdata command '${command}' not recognized."))
+        }        
     }
 
 }

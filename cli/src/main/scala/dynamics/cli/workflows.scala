@@ -165,8 +165,9 @@ class WorkflowActions(val context: DynamicsContext) {
 
   def changeActivation() = Action { config =>
     val (newStateCode, newStatusCode)  =
-      if (config.workflow.workflowActivate) (WorkflowStateCode.Activated, WorkflowStatusCode.Activated)
+      if (config.workflow.activate) (WorkflowStateCode.Activated, WorkflowStatusCode.Activated)
       else (WorkflowStateCode.Draft, WorkflowStatusCode.Draft)
+    val actionName = if(config.workflow.activate) "Activated" else "Deactivated"
     val sourceFromIds = Stream.emits(config.workflow.workflowIds)
     val runme = sourceFromIds
       .evalMap(getById)
@@ -175,10 +176,10 @@ class WorkflowActions(val context: DynamicsContext) {
         val baseUrl = config.common.connectInfo.acquireTokenResource.orEmpty
         val request = WorkflowActions.mkSOAPRequest(baseUrl, "workflow", id, newStateCode, newStatusCode)
         dynclient.http.fetch[String](request) {
-          case Status.Successful(response) => IO.pure(s"Deactivated $id (${w.name.orEmpty})")
+          case Status.Successful(response) => IO.pure(s"$actionName $id (${w.name.orEmpty})")
           case failedResponse =>
             ehandler.raiseError(DynamicsClientError(
-              s"Unable to deactivate $id (${w.name.orEmpty})",
+              s"Unable to change $id (${w.name.orEmpty})",
               None,
               Option(UnexpectedStatus(failedResponse.status, request = Some(request), response = Option(failedResponse))),
               failedResponse.status
@@ -207,7 +208,7 @@ class WorkflowActions(val context: DynamicsContext) {
 
     // single shot or batch, batch does not seem to work right now...
     val finalStep: Pipe[IO, (String, Int), IO[String]] =
-      if (!config.workflow.workflowBatch) {
+      if (!config.common.batch) {
         _ map { p =>
           val entityId = p._1
           val body     = s"""{ "EntityId": "$entityId" }"""
@@ -219,12 +220,16 @@ class WorkflowActions(val context: DynamicsContext) {
       } else {
         val pt1: Pipe[IO, (String, Int), (HttpRequest, String)] =
           _ map { p: (String, Int) =>
-            val source  = s"Entity ${p._2}"
+            val source  = s"${p._1}" // identifier is the id
             val request = mkExecuteWorkflowRequest(workflowId, p._1)
             (request.copy(path = dynclient.base + request.path), source) // make full URL for odata patch
           }
         val pt2: Pipe[IO, (HttpRequest, String), IO[String]] =
-          _.vectorChunkN(config.common.batchSize).map(updater.mkBatchFromRequests(_))
+          _.vectorChunkN(config.common.batchSize).map{ v =>
+            val ids = v.map(_._2).mkString(", ")
+            updater.mkBatchFromRequests(v, false)
+            .map(_ => s"Executed batch request against entities: $ids")
+          }
         pt1 andThen pt2
       }
 
@@ -267,6 +272,10 @@ class WorkflowActions(val context: DynamicsContext) {
       case "list"             => list()
       case "execute"          => executeWorkflow()
       case "changeactivation" => changeActivation()
+      case _ =>
+        Action { _ =>
+          IO(println(s"workflows command '${command}' not recognized."))
+        }
     }
   }
 

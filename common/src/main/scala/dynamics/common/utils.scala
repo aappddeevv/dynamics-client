@@ -93,8 +93,9 @@ object Utils {
   }
 
   /**
-    * Given a sequence of data items and associated values to compare against regexs,
-    * return the data items that matched. If filters is empty, matches on everything.
+    * Given a sequence of data items and related "use these strings for
+    * comparison" values, return the data items that matched. If filters is
+    * empty, every item matches.
     */
   def filterForMatches[A](wr: Traversable[(A, Seq[String])], filters: Traversable[String] = Nil): Seq[A] = {
     val counter = matchCount(filters)

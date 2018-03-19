@@ -185,6 +185,10 @@ object MainHelpers extends LazyLogger {
         val ops = new WorkflowActions(context)
         ops.get(config.common.subcommand)
 
+      case "applications" =>
+        val ops = new ApplicationActions(context)
+        ops.get(config.common.subcommand)
+
       case "importmaps" =>
         val ops = new ImportMapActions(context)
         config.common.subcommand match {

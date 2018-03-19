@@ -96,8 +96,34 @@ class ImportMappingsImportMap(
 ) extends js.Object
 
 @js.native
-trait ImportLogJSON extends js.Object {
+trait ImportLogJS extends js.Object {
   val name: String = js.native
+  val additionalinfo: js.UndefOr[String] = js.native
+  val columnvalue: js.UndefOr[String] = js.native
+  val createdon: js.UndefOr[js.Date] = js.native // translated automatically in http layer
+  val errordescription: js.UndefOr[String] = js.native
+  val errornumber: js.UndefOr[Int] = js.native
+  val headercolumn: js.UndefOr[String] = js.native
+  val importlogid: js.UndefOr[String] = js.native
+  val importlogidunique: js.UndefOr[String] = js.native
+  val linenumber: js.UndefOr[Int] = js.native
+  val logphasecode: js.UndefOr[Int] = js.native
+  @JSName("logphasecode@OData.Community.Display.V1.FormattedValue")
+  val logphasecode_fv: js.UndefOr[Int] = js.native
+  val sequencenumber: js.UndefOr[Int] = js.native
+  val solutionid: js.UndefOr[String] = js.native
+}
+
+/** A single line of data imported from a file. */
+@js.native
+trait ImportDataJS extends js.Object {
+  val data: js.UndefOr[String] = js.native
+  val errortype: js.UndefOr[Int] = js.native
+  val haserror: js.UndefOr[Boolean] = js.native
+  val importdataid: js.UndefOr[String] = js.native
+  val linenumber: js.UndefOr[Int] = js.native
+  val recordid: js.UndefOr[String] = js.native
+  val solutionid: js.UndefOr[String] = js.native
 }
 
 @js.native
@@ -443,39 +469,52 @@ class TestJS(
     val name: js.UndefOr[String] = js.undefined
 ) extends js.Object
 
-class ImportFileJson(
-    val name: js.UndefOr[String] = js.undefined,
-    val content: js.UndefOr[String] = js.undefined,
-    val filetypecode: js.UndefOr[Int] = FileType.csv,
-    val isfirstrowheader: js.UndefOr[Boolean] = true,
-    val processcode: js.UndefOr[Int] = js.undefined,
-    val fielddelimitercode: js.UndefOr[Int] = js.undefined,
-    val datadelimitercode: js.UndefOr[Int] = js.undefined,
-    val processingstatus: js.UndefOr[Int] = js.undefined,
-    val progresscounter: js.UndefOr[Int] = js.undefined,
-    val source: js.UndefOr[String] = js.undefined,
-    val size: js.UndefOr[Int] = js.undefined,
-    val sourceentityname: js.UndefOr[String] = js.undefined,
-    val targetentityname: js.UndefOr[String] = js.undefined,
-    val successcount: js.UndefOr[Int] = js.undefined,
-    val totalcount: js.UndefOr[Int] = js.undefined,
-    val failurecount: js.UndefOr[Int] = js.undefined,
-    val statuscode: js.UndefOr[Int] = js.undefined,
-    val partialfailurecode: js.UndefOr[Int] = js.undefined,
-    val usesystemmap: js.UndefOr[Boolean] = false,
-    val parsedtablename: js.UndefOr[String] = js.undefined,
-    val parsedcolumnsnumber: js.UndefOr[Int] = js.undefined,
-    val parsedcolumnprefix: js.UndefOr[String] = js.undefined,
-    val headerrow: js.UndefOr[String] = js.undefined,
-    val enableduplicatedetection: js.UndefOr[Boolean] = js.undefined,
-    val additionalheaderrow: js.UndefOr[String] = js.undefined,
-    @JSName("recordsownerid_systemuser@odata.bind") val recordsownerid_systemuser: js.UndefOr[String] = js.undefined,
-    @JSName("recordsownerid_team@odata.bind") val recordsownerid_team: js.UndefOr[String] = js.undefined,
-    @JSName("importmapid@odata.bind") val importmapid: js.UndefOr[String] = js.undefined,
-    @JSName("importid@odata.bind") val importid: js.UndefOr[String] = js.undefined,
-    val createdon: js.UndefOr[String] = js.undefined,
-    val importfileid: js.UndefOr[String] = js.undefined
-) extends js.Object
+trait ImportFileJson extends js.Object with ImportFileJsonFV {
+    var name: js.UndefOr[String] = js.undefined
+    var content: js.UndefOr[String] = js.undefined
+    var filetypecode: js.UndefOr[Int] = js.undefined
+    var isfirstrowheader: js.UndefOr[Boolean] = js.undefined
+    var processcode: js.UndefOr[Int] = js.undefined
+    var fielddelimitercode: js.UndefOr[Int] = js.undefined
+    var datadelimitercode: js.UndefOr[Int] = js.undefined
+    var processingstatus: js.UndefOr[Int] = js.undefined
+    var progresscounter: js.UndefOr[Int] = js.undefined
+    var source: js.UndefOr[String] = js.undefined
+    var size: js.UndefOr[Int] = js.undefined
+    var sourceentityname: js.UndefOr[String] = js.undefined
+    var targetentityname: js.UndefOr[String] = js.undefined
+    var successcount: js.UndefOr[Int] = js.undefined
+    var totalcount: js.UndefOr[Int] = js.undefined
+    var failurecount: js.UndefOr[Int] = js.undefined
+    var statuscode: js.UndefOr[Int] = js.undefined
+    var partialfailurecount: js.UndefOr[Int] = js.undefined
+    var usesystemmap: js.UndefOr[Boolean] = js.undefined
+    var parsedtablename: js.UndefOr[String] = js.undefined
+    var parsedcolumnsnumber: js.UndefOr[Int] = js.undefined
+    var parsedcolumnprefix: js.UndefOr[String] = js.undefined
+    var headerrow: js.UndefOr[String] = js.undefined
+    var enableduplicatedetection: js.UndefOr[Boolean] = js.undefined
+    var additionalheaderrow: js.UndefOr[String] = js.undefined
+    var createdon: js.UndefOr[String] = js.undefined
+    var importfileid: js.UndefOr[String] = js.undefined
+}
+
+trait ImportFileJsonFV extends js.Object {
+  @JSName("recordsownerid_systemuser@odata.bind")
+  var recordsownerid_systemuser: js.UndefOr[String] = js.undefined
+  @JSName("recordsownerid_team@odata.bind")
+  var recordsownerid_team: js.UndefOr[String] = js.undefined
+  @JSName("importmapid@odata.bind")
+  var importmapid: js.UndefOr[String] = js.undefined
+  @JSName("importid@odata.bind")
+  var importid: js.UndefOr[String] = js.undefined
+
+  @JSName("statuscode@OData.Community.Display.V1.FormattedValue")
+  var statuscode_fv: js.UndefOr[String] = js.undefined
+
+  @JSName("ImportLog_ImportFile@odata.nextLink")
+  var ImportLog_ImportFile_nl: js.UndefOr[String] = js.undefined
+}
 
 object DataDelimiter {
   val doublequote = 1
@@ -677,3 +716,38 @@ object StreamJsonObjects extends js.Object {
 object StreamArray extends js.Object {
   def make(options: js.UndefOr[RawOptions] = js.undefined): Source = js.native
 }
+
+trait AppModule extends js.Object {
+  var appmoduleid: js.UndefOr[String] = js.undefined
+  var appmoduleidunique: js.UndefOr[String] = js.undefined
+  var appmoduleversion: js.UndefOr[String] = js.undefined
+  var appmodulexmlmanaged: js.UndefOr[String] = js.undefined
+  var clienttype: js.UndefOr[Int] = js.undefined
+  var componentstate: js.UndefOr[Int] = js.undefined
+  var configxml: js.UndefOr[String] = js.undefined
+  var description: js.UndefOr[String] = js.undefined
+  var isdefault: js.UndefOr[Boolean] = js.undefined
+  var isfeatured: js.UndefOr[Boolean] = js.undefined
+  var ismanaged: js.UndefOr[Boolean] = js.undefined
+  var name: js.UndefOr[String] = js.undefined
+  var solutionid: js.UndefOr[String] = js.undefined
+  var uniquename: js.UndefOr[String] = js.undefined
+  var url: js.UndefOr[String] = js.undefined
+  var webresourceid: js.UndefOr[String] = js.undefined
+  var welcomepagedid: js.UndefOr[String] = js.undefined
+
+  val _organizationid_value: js.UndefOr[String] = js.undefined
+  @JSName("_organizationid_value@OData.Community.Display.V1.FormattedValue")
+  val _organizationid_value_fv: js.UndefOr[String] = js.undefined
+  @JSName("componentstate@OData.Community.Display.V1.FormattedValue")
+  val componentstate_fv: js.UndefOr[String] = js.undefined
+  @JSName("formfactor@OData.Community.Display.V1.FormattedValue")
+  val formfactor_fv: js.UndefOr[String] = js.undefined
+  @JSName("isdefault@OData.Community.Display.V1.FormattedValue")
+  val isdefault_fv: js.UndefOr[String] = js.undefined
+  @JSName("isfeature@OData.Community.Display.V1.FormattedValue")
+  val isfeature_fv: js.UndefOr[String] = js.undefined
+  @JSName("ismanaged@OData.Community.Display.V1.FormattedValue")
+  val ismanaged_fv: js.UndefOr[String] = js.undefined
+}
+

@@ -110,9 +110,15 @@ object CommandLine {
     opt[Int]("batchsize")
       .text("If batching is used, this is the batch size.")
       .action((x, c) => c.lens(_.common.batchSize).set(x))
+    opt[Int]("batch-size")
+      .text("If batching is used, this is the batch size.")
+      .action((x, c) => c.lens(_.common.batchSize).set(x))
     opt[Unit]("batch")
-      .text("If set, try to run things using batch OData.")
+      .text("If set, try to run things using batch OData if applicable to the command being run.")
       .action((x, c) => c.lens(_.common.batch).set(true))
+    opt[Unit]("no-batch")
+      .text("Explicitly turn off batch processing.")
+      .action((x, c) => c.lens(_.common.batch).set(false))
     opt[String]("outputdir")
       .text("Output directory for any content output.")
       .action((x, c) => c.lens(_.common.outputDir).set(x))
@@ -426,6 +432,9 @@ object CommandLine {
         sub("list-imports")
           .text("List all imports.")
           .action((x, c) => withSub(c, "listimports")),
+        sub("dump-errors")
+          .text("Dump logs of any import file that has errors.")
+          .action((x,c) => withSub(c, "dumperrors")),
         sub("list-importfiles")
           .text("List all import filess.")
           .action((x, c) => withSub(c, "listimportfiles")),
@@ -761,6 +770,36 @@ object CommandLine {
       )
   }
 
+  def applications(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    val helpers = CliHelpers(op)
+    import helpers._
+
+    cmd("applications")
+      .text("Manage applications.")
+      .action((x,c) => withCmd(c, "applications"))
+      .children(
+        sub("list")
+          .text("List applications")
+          .action((x,c) => withSub(c, "list"))
+          .children(mkFilterOpt()),
+        sub("role")
+          .text("Add/remove role to an application by name.")
+          .action((x,c) => withSub(c, "role"))
+          .children(
+            arg[String]("change")
+              .text("add or remove")
+              .action((x,c) => c.lens(_.appModule.change).set(Option(x))),
+            arg[Seq[String]]("rolename")
+              .text("Role names. Comma separated if more than one.")
+              .action((x,c) => c.lens(_.appModule.roleName).modify(names => names ++ x)),
+            arg[String]("application- name")
+              .text("Application name")
+              .action((x,c) => c.lens(_.appModule.appName).set(Option(x))),              
+          )
+      )
+  }
+
   def workflows(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     val helpers = CliHelpers(op)
@@ -776,8 +815,12 @@ object CommandLine {
           .action((x, c) => withSub(c, "list"))
           .children(mkFilterOpt()),
         sub("execute")
-          .text("Execute a workflow against the results of a query. A cache can be used.")
-          .action((x, c) => withSub(c, "execute"))
+          .text("Execute a workflow against the results of a query. A cache can be used. Batch mode (1000) is automatically used.")
+          .action{(x, c) =>
+            withSub(c, "execute")
+              .lens(_.common.batch).set(true)
+              .lens(_.common.batchSize).set(1000)
+          }
           .children(
             arg[String]("id")
               .text("Id of workflow to execute. Use the one with type=1 => template.")
@@ -790,8 +833,6 @@ object CommandLine {
               .required()
               .action((x, c) => c.lens(_.workflow.workflowPkName).set(x))
               .required(),
-            opt[Unit]("batch").text("Run this batch.")
-              action ((x, c) => c.lens(_.workflow.workflowBatch).set(true)),
             opt[Unit]("cache")
               .text("Use a local cache.")
               .action((x, c) => c.lens(_.workflow.workflowCache).set(true)),
@@ -816,7 +857,7 @@ object CommandLine {
             mkFilterOpt(),
             arg[Boolean]("activate")
               .text("true of false to activate/deactivate.")
-              .action((x, c) => c.lens(_.workflow.workflowActivate).set(x))
+              .action((x, c) => c.lens(_.workflow.activate).set(x))
           ),
         note(
           "A workflow is typically very slow to run. The best option is to not run it again if its already been run."),
@@ -995,15 +1036,17 @@ object CommandLine {
 
   /** All base options. */
   val stdOps: Seq[scopt.OptionParser[AppConfig] => Unit] = Seq(
+    applications,
     entity,
-    general,
     importdata,
     importmaps,
+    general,
     metadata,
     optionsets,
     plugins,
     publishers,
     sdkmessages,
+    settings,
     solutions,
     systemjobs,
     test,
@@ -1012,7 +1055,7 @@ object CommandLine {
     webresources,
     whoami,
     workflows,
-    settings,
+
   )
 
   /** Add scopt head, help and a list of options, which by default is all base commands. */

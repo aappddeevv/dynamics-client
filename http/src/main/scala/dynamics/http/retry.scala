@@ -39,7 +39,11 @@ trait RetryClient extends LazyLogger {
 
   protected[this] val RetriableStatuses = Set(
     RequestTimeout,
-    InternalServerError, // this is problematic, could be badly composed content!
+    /** 
+     * This is problematic, could be badly composed content! but then would we retry?
+     * May have to read error to know which toasts everyone downstream of the retry.
+     */
+    InternalServerError, 
     ServiceUnavailable,
     BadGateway,
     GatewayTimeout,
@@ -67,15 +71,16 @@ trait RetryClient extends LazyLogger {
   def isRetryable(s: Status): Boolean = RetriableStatuses.contains(s)
 
   /**
-   * Create a retry policy that retries on `CommunicationFailure` or
-   * `DecodeFailure` failures.
+   * Create a retry policy that retries on `CommunicationFailure`,
+   * `DecodeFailure` or UnexectedStatus (if isRetryable(status) is
+   * true)failures.
    */
   def retryIfRetryableThrowables[F[_], A](retry: F[A] => F[A])
     (implicit eh: ApplicativeError[F, Throwable]): F[A] => F[A] =
     fa => fa.recoverWith {
       case c: CommunicationsFailure => retry(fa)
       case d: MessageBodyFailure => retry(fa)
-      case u: UnexpectedStatus => retry(fa)
+      case u@UnexpectedStatus(status,_,_) if(isRetryable(status)) => retry(fa)
     }
 
   /** 
@@ -89,10 +94,10 @@ trait RetryClient extends LazyLogger {
    * effect carrying a `DisposableResponse` has converted the effect to contain
    * an error for specific status codes.
    */
-  def ensureSuccessfulStatus[F[_]](predicate: Status => Boolean = isRetryable)
+  def makeSomeStatusesErrors[F[_]](isError: Status => Boolean = isRetryable)
     (implicit eh: ApplicativeError[F, Throwable]):
       Kleisli[F, DisposableResponse, DisposableResponse] = Kleisli { dr =>
-    if(predicate(dr.response.status)) eh.pure(dr)
+    if(!isError(dr.response.status)) eh.pure(dr)
     else eh.raiseError(UnexpectedStatus(dr.response.status, None, Some(dr.response)))
   }
 
@@ -152,7 +157,7 @@ trait RetryClient extends LazyLogger {
       (implicit eh: ApplicativeError[IO, Throwable]): Middleware =
     client => {
       client.copy(Kleisli { req: HttpRequest =>
-        (client.open andThen ensureSuccessfulStatus[IO](isRetryable) mapF retry)(req)
+        (client.open andThen makeSomeStatusesErrors[IO](isRetryable) mapF retry)(req)
       },
         client.dispose)
     }

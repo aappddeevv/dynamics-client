@@ -50,8 +50,8 @@ object DynamicsContext {
       val fetchOpts = NodeFetchClientOptions(timeoutInMillis = config.common.requestTimeOutInMillis.getOrElse(0))
 
       val retryPolicyMiddleware = config.common.retryPolicy match {
-        case "backoff" => RetryClient.backoff(config.common.numRetries, config.common.pauseBetween/*, config.common.debug*/)
-        case _ => RetryClient.pause(config.common.numRetries, config.common.pauseBetween/*, config.common.debug*/)
+        case "backoff" => RetryClient.unstable_backoff(config.common.numRetries, config.common.pauseBetween/*, config.common.debug*/)
+        case _ => RetryClient.unstable_pause(config.common.numRetries, config.common.pauseBetween/*, config.common.debug*/)
       }
       val middleware =
         retryPolicyMiddleware andThen ADAL(config.common.connectInfo)
