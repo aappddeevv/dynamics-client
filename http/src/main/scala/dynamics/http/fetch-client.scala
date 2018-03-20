@@ -165,7 +165,7 @@ object NodeFetchClient extends LazyLogger {
     * @param debug Temporary parameter to turn debugging on or off in this client.
     * @param defaultHeaders Headers applied to every request.
     */
-  def newClient(info: ConnectionInfo,
+  def create(info: ConnectionInfo,
                 debug: Boolean = false,
                 defaultHeaders: HttpHeaders = HttpHeaders.empty,
                 opts: NodeFetchClientOptions = DefaultNodeFetchClientOptions)(implicit ec: ExecutionContext,

@@ -50,14 +50,19 @@ object DynamicsContext {
       val fetchOpts = NodeFetchClientOptions(timeoutInMillis = config.common.requestTimeOutInMillis.getOrElse(0))
 
       val retryPolicyMiddleware = config.common.retryPolicy match {
-        case "backoff" => RetryClient.unstable_backoff(config.common.numRetries, config.common.pauseBetween/*, config.common.debug*/)
-        case _ => RetryClient.unstable_pause(config.common.numRetries, config.common.pauseBetween/*, config.common.debug*/)
+        case "backoff" => RetryClient.unstable_backoff(config.common.numRetries, config.common.pauseBetween)
+        case _ => RetryClient.unstable_pause(config.common.numRetries, config.common.pauseBetween)
       }
+      // order matters in composition, retry should always grab a new token
       val middleware =
-        retryPolicyMiddleware andThen ADAL(config.common.connectInfo)
+        ADAL(config.common.connectInfo) andThen retryPolicyMiddleware
 
       val httpclient: Client =
-        middleware(NodeFetchClient.newClient(config.common.connectInfo, config.common.debug, opts = fetchOpts))
+        middleware(NodeFetchClient.create(
+          info=config.common.connectInfo,
+          debug=config.common.debug,
+          defaultHeaders = config.common.impersonate.map(id => HttpHeaders("MSCRMCallerID"->id)).getOrElse(HttpHeaders.empty),
+          opts = fetchOpts))
 
       implicit val dynclient: DynamicsClient =
         DynamicsClient(httpclient, config.common.connectInfo, config.common.debug)

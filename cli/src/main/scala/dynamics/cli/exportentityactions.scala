@@ -211,7 +211,10 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       columns.map { cols =>
         logger.debug(s"Columns: $cols")
         val soptions =
-          new StringifyOptions(columns = js.Dictionary[String](cols: _*), header = true)
+          new StringifyOptions(
+            columns = js.Dictionary[String](cols: _*),
+            header = config.export.header
+          )
         CSVStringify(soptions)
       }
 
@@ -291,7 +294,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       .fold(0L)(_ + _)
       .map(count => (e, count))
 
-  def fromEntityNames(entityNames: Seq[String]) = {
+  def fromEntityNames(entityNames: Seq[String]): Stream[IO, Stream[IO, (String, Long)]] = {
     import metadata._
     val m = new MetadataCache(context)
     val entityList = Stream
@@ -301,6 +304,23 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       .map(entity => (entity.LogicalCollectionName, entity.PrimaryId))
 
     entityList.map(p => mkCountingStreamForEntity(p._1, p._2))
+  }
+
+  def getCountFromFunctionForEntity(entitySet: Seq[String] = Nil) = {
+    val collection = s"""EntityNames=[${entitySet.map("'"+_+"'").mkString(",")}]"""
+    val request = HttpRequest(Method.GET, s"/RetrieveTotalRecordCount($collection)")
+    dynclient.http.expect[RetrieveTotalRecordCountResponse](request)(
+      http.instances.entityDecoder.JsObjectDecoder[RetrieveTotalRecordCountResponse])
+  }
+
+  def fromFunction(entityNames: Seq[String]): Stream[IO, Stream[IO, (String, Long)]] = {
+    Stream.eval(getCountFromFunctionForEntity(entityNames)
+      .map{ resp =>
+        //js.Dynamic.global.console.log("content from cname", resp)
+        val counts = resp.EntityRecordCountCollection
+        val rvals = (0 until counts.Count).map(i => (counts.Keys(i), counts.Values(i).toLong))
+        Stream.emits(rvals).covary[IO]
+      })
   }
 
   def fromMap(queries: Map[String, String]) = {
@@ -321,7 +341,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
   /** Convert to function: RetrieveTotalRecordCount if possible. */
   def count() = Action { config =>
     val countersQueries  = fromMap(config.export.queries)
-    val countersEntity   = fromEntityNames(config.common.filter)
+    val countersEntity   =
+      if(config.export.useFunction) fromFunction(config.common.filter)
+      else fromEntityNames(config.common.filter)
     val countersFromJson = config.export.queryFile.map(fromJsonFile(_)).getOrElse(Stream.empty)
     val all              = countersQueries ++ countersEntity ++ countersFromJson
     val runCounts = all

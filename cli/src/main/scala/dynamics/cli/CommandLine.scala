@@ -125,6 +125,15 @@ object CommandLine {
     opt[String]("outputfile")
       .text("Output file.")
       .action((x, c) => c.lens(_.common.outputFile).set(Some(x)))
+    opt[String]("output-file")
+      .text("Output file.")
+      .action((x, c) => c.lens(_.common.outputFile).set(Some(x)))
+    opt[String]("outfile")
+      .text("Output file.")
+      .action((x, c) => c.lens(_.common.outputFile).set(Some(x)))
+    opt[String]("impersonate")
+      .text("Impersonate another user.")
+      .action((x,c) => c.lens(_.common.impersonate).set(Some(x)))
   }
 
   /**
@@ -219,6 +228,7 @@ object CommandLine {
     import op._
     val h = CliHelpers(op)
     import h.sub
+
     cmd("token")
       .text("Manage tokens.")
       .action((x, c) => withCmd(c, "token"))
@@ -343,6 +353,9 @@ object CommandLine {
             opt[String]("fetchxml")
               .text("Fetch XML for query focused on entity.")
               .action((x, c) => c.lens(_.export.fetchXml).set(Option(x))),
+            opt[Boolean]("header")
+              .text("Include header if true (default), or skip writing an output header if false.")
+              .action((x,c) => c.lens(_.export.header).set(x)),
             top,
             skip,
             opt[String]("filter")
@@ -392,6 +405,9 @@ object CommandLine {
             opt[String]("query-file")
               .text("Obtain queries from key-value pairs from the json file.")
               .action((x, c) => c.lens(_.export.queryFile).set(Some(x))),
+            opt[Boolean]("function")
+              .text("Return count via the web api count function. If true, --filter can only have entity names. Default is false.")
+              .action((x,c) => c.lens(_.export.useFunction).set(x)),
             mkFilterOptBase()
               .text("List of entity names to count. Use entity logical names.")
           ),
@@ -815,11 +831,11 @@ object CommandLine {
           .action((x, c) => withSub(c, "list"))
           .children(mkFilterOpt()),
         sub("execute")
-          .text("Execute a workflow against the results of a query. A cache can be used. Batch mode (1000) is automatically used.")
+          .text("Execute a workflow against the results of a query. A cache can be used. Batch mode (100) is automatically used.")
           .action{(x, c) =>
             withSub(c, "execute")
               .lens(_.common.batch).set(true)
-              .lens(_.common.batchSize).set(1000)
+              .lens(_.common.batchSize).set(100)
           }
           .children(
             arg[String]("id")

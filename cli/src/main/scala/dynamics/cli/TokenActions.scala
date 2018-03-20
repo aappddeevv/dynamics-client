@@ -32,8 +32,12 @@ class TokenActions(context: DynamicsContext) extends LazyLogger {
     println(s"Token output file: ${ofile}")
     val auth = new AuthManager(config.common.connectInfo)
     val ctx  = auth.getAuthContext();
+    val refresh = config.token.refreshIntervalInMinutes
     val str =
-      AuthManager.tokenStream(auth.getTokenWithRetry(ctx, Pause(3, 2.seconds)), _ => FiniteDuration(55, TU.MINUTES))
+      AuthManager.tokenStream(
+        auth.getTokenWithRetry(ctx,
+          dynamics.http.retry.retryWithPause(5.seconds, 10)))
+          //,_ => FiniteDuration(1, TU.MINUTES))
     str
       .take(n)
       .map { ti =>

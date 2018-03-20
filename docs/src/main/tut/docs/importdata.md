@@ -56,12 +56,14 @@ Examples:
 Using the `parallel` program you can do:
 
 ```sh
-parallel --jobs 10 --results logs/accounts_{} $CLI importdata import {} accounts-map -c $CRMCON ::: "$DATADIR"/accounts.csv_*.csv
+parallel --jobs 10 --results logs/{/} $CLI importdata import {} accounts-map -c $CRMCON ::: "$DATADIR"/accounts.csv_*.csv
 ```
+
+The log files for each "part" will be placed into the directory "logs" and each path under logs will represent the "input" files "$DATADIR/accounts.csv_1.csv" and so on. That way, you can see the stdout/stderr for each process that was run.
 
 Where accounts.csv_*.csv are the file parts created by `csv_splitter.py` from the file `accounts.csv`. The command line looks complex because it uses a "generator" at the end to generate pathnames that are substituted back in the '{}' characters, but don't let it fool you. The complexity is all about creating log files for each program that is run in parallel with an unique set of arguments, that's it!.
 
 `parallel` can  be obtained from:
-* https://www.gnu.org/software/parallel: GNU version, written in perl.
-* https://github.com/mmstick/parallel: A GNU parallel clone written in RUST but with the same syntax.
+* [GNU parallel](https://www.gnu.org/software/parallel): GNU version, written in perl.
+* [rust parallel rewrite](https://github.com/mmstick/parallel): A GNU parallel clone written in RUST but with the same syntax.
 

@@ -14,25 +14,12 @@ import cats.data._
 import cats.syntax.all._
 import cats._
 import cats.effect._
-import retry._
 import org.slf4j._
 
 import dynamics.common._
 
-/** 
- * Implement retry transparently for a Client as Middleware.  For dynamics, this
-  * is a bit hard as the server could be busy but it returns 500. Otherwise,
-  * other 500 errors due to other request issues may retry a bunch of times
-  * until they fail but this should only affect developers. The retry policies
-  * herein are based on specific status, specific OS (likely) errors and errors
-  * caused potentially by mangled message bodies.
-  *
-  *  The new dynamics governer limits are in place and these retry policies take
-  *  them into account via status TooManyRequests:
-  *  @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/api-limits
-  */
-trait RetryClient extends LazyLogger {
 
+trait Retry extends LazyLogger {
   import Status._
 
   protected implicit val timer = odelay.js.JsTimer.newTimer
@@ -49,23 +36,6 @@ trait RetryClient extends LazyLogger {
     GatewayTimeout,
     TooManyRequests
   )
-
-  protected def notBad(noisy: Boolean = true) = Success[DisposableResponse] { dr =>
-    val x = isRetryable(dr.response.status)
-    if (x) { logger.warn(s"Retry: Response: ${dr.response.status.show}.") }
-    !x
-  }
-
-  /**
-    * A Policy that decides which policy to use based data the data inside the
-    * Future, whether its a valid value or a failure.
-    */
-  protected def policyWithException(policy: Policy) = retry.When {
-    case dr: DisposableResponse => policy
-    case c: CommunicationsFailure =>
-      logger.warn("Retry: " + c.getMessage());
-      policy
-  }
 
   /** Return true if the status *suggests* that the request should be retried. */
   def isRetryable(s: Status): Boolean = RetriableStatuses.contains(s)
@@ -145,6 +115,42 @@ trait RetryClient extends LazyLogger {
       else IO.raiseError(error)
     }
 
+}
+
+object retry extends Retry
+
+
+/** 
+ * Implement retry transparently for a Client as Middleware.  For dynamics, this
+  * is a bit hard as the server could be busy but it returns 500. Otherwise,
+  * other 500 errors due to other request issues may retry a bunch of times
+  * until they fail but this should only affect developers. The retry policies
+  * herein are based on specific status, specific OS (likely) errors and errors
+  * caused potentially by mangled message bodies.
+  *
+  *  The new dynamics governer limits are in place and these retry policies take
+  *  them into account via status TooManyRequests:
+  *  @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/api-limits
+  */
+trait RetryClient extends LazyLogger with Retry {
+
+  // protected def notBad(noisy: Boolean = true) = Success[DisposableResponse] { dr =>
+  //   val x = isRetryable(dr.response.status)
+  //   if (x) { logger.warn(s"Retry: Response: ${dr.response.status.show}.") }
+  //   !x
+  // }
+
+  // /**
+  //   * A Policy that decides which policy to use based data the data inside the
+  //   * Future, whether its a valid value or a failure.
+  //   */
+  // protected def policyWithException(policy: Policy) = retry.When {
+  //   case dr: DisposableResponse => policy
+  //   case c: CommunicationsFailure =>
+  //     logger.warn("Retry: " + c.getMessage());
+  //     policy
+  // }
+
   /**
    * Construct middleware with retry strategies which ensure that responses with
    * statuses known to be retryable are retried. The retry policy is embedded in
@@ -174,36 +180,36 @@ trait RetryClient extends LazyLogger {
     (implicit eh: ApplicativeError[IO, Throwable]): Middleware =
     makeMiddleware(retryIfRetryableThrowables(retryWithBackoff(initialDelay, maxRetries)))
 
-  /** Middlaware based on a retry.Pause policy. */
-  def pause(n: Int = 5, pause: FiniteDuration = 5.seconds, noisy: Boolean = true)(
-      implicit e: ExecutionContext): Middleware =
-    middleware(Pause(n, pause), noisy)
+  // /** Middlaware based on a retry.Pause policy. */
+  // def pause(n: Int = 5, pause: FiniteDuration = 5.seconds, noisy: Boolean = true)(
+  //     implicit e: ExecutionContext): Middleware =
+  //   middleware(Pause(n, pause), noisy)
 
-  /** Middleware based on retry.Directly policy. */
-  def directly(n: Int = 5, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
-    middleware(Directly(n), noisy)
+  // /** Middleware based on retry.Directly policy. */
+  // def directly(n: Int = 5, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
+  //   middleware(Directly(n), noisy)
 
-  /** Middleware based on retry.Backup policy. */
-  def backoff(n: Int = 5, initialPause: FiniteDuration = 5.seconds, noisy: Boolean = true)(
-      implicit e: ExecutionContext): Middleware =
-    middleware(Backoff(n, initialPause), noisy)
+  // /** Middleware based on retry.Backup policy. */
+  // def backoff(n: Int = 5, initialPause: FiniteDuration = 5.seconds, noisy: Boolean = true)(
+  //     implicit e: ExecutionContext): Middleware =
+  //   middleware(Backoff(n, initialPause), noisy)
 
-  /** Create a Middleware based on a retry policy. */
-  protected def middleware(policy: retry.Policy, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
-    (c: Client) => {
-      implicit val success = notBad(noisy)
-      val basePolicy       = policyWithException(policy)
-      val x: Service[HttpRequest, DisposableResponse] = Kleisli { req: HttpRequest =>
-        {
-          IO.fromFuture(IO(basePolicy(c.open(req).unsafeToFuture)))
-          //IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeRunAsyncFuture)))
-          // Task.fromFuture(policy[DisposableResponse]{ () =>
-          //   c.open(req).unsafeRunAsyncFuture
-          // })
-        }
-      }
-      c.copy(x, c.dispose)
-    }
+  // /** Create a Middleware based on a retry policy. */
+  // protected def middleware(policy: retry.Policy, noisy: Boolean = true)(implicit e: ExecutionContext): Middleware =
+  //   (c: Client) => {
+  //     implicit val success = notBad(noisy)
+  //     val basePolicy       = policyWithException(policy)
+  //     val x: Service[HttpRequest, DisposableResponse] = Kleisli { req: HttpRequest =>
+  //       {
+  //         IO.fromFuture(IO(basePolicy(c.open(req).unsafeToFuture)))
+  //         //IO.fromFuture(Eval.always(basePolicy(c.open(req).unsafeRunAsyncFuture)))
+  //         // Task.fromFuture(policy[DisposableResponse]{ () =>
+  //         //   c.open(req).unsafeRunAsyncFuture
+  //         // })
+  //       }
+  //     }
+  //     c.copy(x, c.dispose)
+  //   }
 
 }
 

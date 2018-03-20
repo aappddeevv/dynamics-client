@@ -31,6 +31,7 @@ You can specify any/all `--query`, `--query-file` or ``--filter` to select the e
 * `--query`: key=value pairs. The key will be used to sort the count results.
 * `--query-file`: A JSON file with key, value pairs.
 * `--filter`: Specify only the entity. A query will be created e.g. `--filter contact` === `--query contact='/contacts?$select=contactid`.
+* `--function` with `--filter`: Use the fast function approach, but if you do, you cannot use queries to count, you can only count the entire entity.
 
 Shell expansion can make specifying the query difficult on the command
 line. `--query-file` allows you to use single quotes in your query much
@@ -59,8 +60,12 @@ You cannot use navigation properties to in the queries to count child
 entities. Reverse the query and run the count on the child record.
 
 Note that there is a function provided in the API to count objects but it does
-not take 'query' arguments so its not overly useful. To keep the code simpler,
-the code always pulls records to perform the count.
+not take 'query' arguments so its not overly useful. It is very fast though, so
+if you need to count the entire set of entities, use it:
+
+```sh
+dynamicscli entity count --function true --filter contact,account -c $CRMCON
+```
 
 ### export, export-from-query
 Exporting data comes in two flavors. Exporting using a query created from parts

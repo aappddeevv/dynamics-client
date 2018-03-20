@@ -44,6 +44,7 @@ import dynamics.common._
     metadataCacheFile: Option[String] = None,
     ignoreMetadataCache: Boolean = false,
   actionSelector: Option[ActionSelector] = Some(MainHelpers.defaultActionSelector),
+  impersonate: Option[String] = None,
 )
 
 @Lenses case class PluginConfig(
@@ -123,7 +124,9 @@ import dynamics.common._
     queryFile: Option[String] = None,
     wrap: Boolean = false,
     repeat: Boolean = false,
-    repeatDelay: Int = 60,
+  repeatDelay: Int = 60,
+  header: Boolean = true,
+  useFunction: Boolean = false,
 )
 
 @Lenses case class UpdateConfig(
@@ -188,7 +191,8 @@ import dynamics.common._
 )
 
 @Lenses case class TokenConfig(
-    tokenOutputFile: String = "crm-token.json"
+  tokenOutputFile: String = "crm-token.json",
+  refreshIntervalInMinutes: Int = 55,
 )
 
 @Lenses case class SettingsConfig(
@@ -214,6 +218,7 @@ import dynamics.common._
     action: ActionConfig = ActionConfig(),
   settings: SettingsConfig = SettingsConfig(),
   appModule: AppModuleConfig = AppModuleConfig(),
+  token: TokenConfig = TokenConfig(),
 ) {
   def debug       = common.debug
   def noisy       = !common.quiet

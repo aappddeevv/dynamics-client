@@ -314,25 +314,6 @@ object processhack extends js.Object {
   def hrtime(previous: UndefOr[Array[Int]] = js.undefined): Array[Int] = js.native
 }
 
-/**
-  *  From js ADAL library. For details on using ADAL in general: https://msdn.microsoft.com/en-us/library/gg327838.aspx.
-  */
-@js.native
-@JSImport("adal-node", "AuthenticationContext")
-class AuthenticationContext(authority: String, validateAuthority: Boolean = true) extends js.Object {
-  def authority: js.Object          = js.native
-  def options: js.Object            = js.native
-  def options_=(o: js.Object): Unit = js.native
-  def cache: js.Object              = js.native
-  def acquireTokenWithUsernamePassword(resource: String,
-                                       username: String,
-                                       password: String,
-                                       applicationId: String,
-                                       callback: js.Function2[js.Error, // can be null but not undefined
-                                                              UndefOr[ErrorResponse | TokenInfo],
-                                                              Unit]): Unit = js.native
-}
-
 trait WhoAmI extends js.Object {
   val BusinessUnitId: String
   val OrganizationId: String
@@ -354,7 +335,7 @@ trait TokenInfo extends js.Object {
   val tokenType: String        = js.native
   val userId: String           = js.native
   val identityProvider: String = js.native
-  val expiresIn: Long          = js.native
+  val expiresIn: Int          = js.native
 }
 
 @js.native
@@ -751,3 +732,15 @@ trait AppModule extends js.Object {
   val ismanaged_fv: js.UndefOr[String] = js.undefined
 }
 
+@js.native
+trait EntityRecordCountCollection extends js.Object {
+  val Count: Int
+  val IsReadOnly: Boolean
+  val Keys: js.Array[String]
+  val Values: js.Array[Int]
+}
+
+@js.native
+trait RetrieveTotalRecordCountResponse extends js.Object {
+  val EntityRecordCountCollection: EntityRecordCountCollection
+}

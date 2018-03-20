@@ -104,8 +104,7 @@ trait DynamicsClientRequests {
     // (parm, parmvalue)
     val q: Seq[(String, String)] = parameters.keys.zipWithIndex
       .map(x => (x._1, x._2 + 1))
-      . // start from 1
-      map {
+      .map {
         case (k, i) =>
           parameters(k) match {
             case s: String => (s"$k=@p$i", s"@p$i='$s'")
@@ -118,9 +117,9 @@ trait DynamicsClientRequests {
     val pvals        = (if (q.size > 0) "?" else "") + q.map(_._2).mkString("&")
     val functionPart = s"/$function($pvars)$pvals"
 
-    val entityPart = entity.map(p => s"${p._1}(${p._2})").getOrElse("")
+    val entityPart = entity.map(p => s"/${p._1}(${p._2})").getOrElse("")
 
-    val url = s"/$entityPart$functionPart"
+    val url = s"$entityPart$functionPart"
     HttpRequest(Method.GET, url)
   }
 
