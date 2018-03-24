@@ -26,6 +26,12 @@ options:
   - title: systemjobs
     url: docs/systemjobs.html
 
+  - title: update
+    url: docs/update.html
+
+  - title: users
+    url: docs/users.html
+
   - title: webresources
     url: docs/webresources.html
 

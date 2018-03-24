@@ -26,8 +26,8 @@ times. A small amount of experimentaton to determine the optimal # chunks/#
 simultaneous chunk combinations.
 
 ## Subcommands
-* list-imports: List import maps.
-* list-importfiles: List import files. These are typically created as part of creating an import job.
+* list-imports: List imports, status and ownership information for an import job.
+* list-importfiles: List import files. These are typically created as part of creating an import job. You should run this command when you want to see the status of the import files e.g. what's being processed, error counts, etc.
 * dump-errors: Dump detailed info about importfiles that import errors. In the UI, you can only export the rows, this dump gets everything.
 * bulkdelete: Create a bulkdelete job from a query file.
 * delete: Delete imports (jobs) by name.
@@ -41,22 +41,24 @@ simultaneous chunk combinations.
 delete is often used after a bad import. It can be just as fast as a bulk delete and you can specify the delete query using the web api syntax:
 
 Examples:
-* `dynamicscli entity delete contact --query '/contacts?$select=contactid' -c $CRMCON`: Delete all accounts. Note how the query selects the amount of data it pulls from the server by *only* specifying the contactid as the returned value.
+* `dynamicscli entity delete contact --query '/contacts?$select=contactid'`: Delete all accounts. Note how the query selects the amount of data it pulls from the server by *only* specifying the contactid as the returned value.
 
 You can also specify the queries to delete from a json file. The keys are used to sort and report back the deletion counts.
 
 
 ## import
 
-You can combine this command with `parallel` (available for most major OSes) and perform highly parallel loads. Using `csv_splitter.py` to splt your file into file parts with only 5-10K rows of data each seems to provide a good throughput on loads.
+You can combine this command with `parallel` (available for most major OSes) and perform highly parallel loads. Using `csv_splitter.py` to split your file into file parts with only 5-10K rows of data each seems to provide a good throughput on loads.
 
 Examples:
-* `dynamicscli entity import accounts.csv accounts-map -c $CRMCON`: Load the CSV file `accounts.csv` using the previously loaded import map `accounts-map`.
+* `dynamicscli entity import accounts.csv accounts-map`: Load the CSV file `accounts.csv` using the previously loaded import map `accounts-map`.
+
+If your import does not set the "owner" for the records, they will default to the user performing the import. To change that, use `--recordsownerid <guid>`. You can obtain the owner guid from a dump using dynamicscli or by looking at the security views. To dump the systemeuser records, use `dynamicscli entity export-from-query '/systemusers?$select=lastname,firstname,systemuserid' --output-file users.json` and look for the user of interest.
 
 Using the `parallel` program you can do:
 
 ```sh
-parallel --jobs 10 --results logs/{/} $CLI importdata import {} accounts-map -c $CRMCON ::: "$DATADIR"/accounts.csv_*.csv
+parallel --jobs 10 --results logs/{/} $CLI importdata import {} accounts-map ::: "$DATADIR"/accounts.csv_*.csv
 ```
 
 The log files for each "part" will be placed into the directory "logs" and each path under logs will represent the "input" files "$DATADIR/accounts.csv_1.csv" and so on. That way, you can see the stdout/stderr for each process that was run.
@@ -67,3 +69,9 @@ Where accounts.csv_*.csv are the file parts created by `csv_splitter.py` from th
 * [GNU parallel](https://www.gnu.org/software/parallel): GNU version, written in perl.
 * [rust parallel rewrite](https://github.com/mmstick/parallel): A GNU parallel clone written in RUST but with the same syntax.
 
+## list-importfiles
+
+List import files. In the example below, DYNAMICS_CRMCONFIG has been set.
+
+Examples:
+* `dynamicscli importdata list-importfiles`

@@ -7,6 +7,7 @@ package common
 
 import scala.scalajs.js
 import js._
+import js.|
 import JSConverters._
 import io.scalajs.nodejs._
 import scala.concurrent._
@@ -19,6 +20,8 @@ import cats.effect._
 import io.scalajs.npm.chalk._
 import js.Dynamic.{literal => jsobj}
 
+import Utils._
+
 final case class StreamOps[F[_], O](s: Stream[F, O]) {
   def vectorChunkN(n: Int): Stream[F, Vector[O]] = s.segmentN(n).map(_.force.toVector)
   def groupBy[O2](f: O => O2)(implicit eq: Eq[O2]): Stream[F, (O2, Vector[O])] =
@@ -30,15 +33,20 @@ trait StreamSyntax {
 }
 
 final case class JsAnyOps(a: js.Any) {
-  def asJsObj: js.Object        = a.asInstanceOf[js.Object]
-  def asDyn: js.Dynamic         = a.asInstanceOf[js.Dynamic]
-  def asString: String          = a.asInstanceOf[String]
-  def asNumer: Number           = a.asInstanceOf[Number]
-  def asInt: Int                = a.asInstanceOf[Int]
-  def asDouble: Double          = a.asInstanceOf[Double]
-  def asBoolean: Boolean        = a.asInstanceOf[Boolean]
-  def asJsArray[A]: js.Array[A] = a.asInstanceOf[js.Array[A]]
-  def asJson: String            = js.JSON.stringify(a)
+  @inline def asJsObj: js.Object        = a.asInstanceOf[js.Object]
+  @inline def asDyn: js.Dynamic         = a.asInstanceOf[js.Dynamic]
+  @inline def asString: String          = a.asInstanceOf[String]
+  @inline def asNumer: Number           = a.asInstanceOf[Number]
+  @inline def asInt: Int                = a.asInstanceOf[Int]
+  @inline def asDouble: Double          = a.asInstanceOf[Double]
+  @inline def asBoolean: Boolean        = a.asInstanceOf[Boolean]
+  @inline def asJsArray[A]: js.Array[A] = a.asInstanceOf[js.Array[A]]
+  @inline def asJson: String            = js.JSON.stringify(a)
+  @inline def toNonNullOption[T <: js.Any]: Option[T] = {
+    // also defined in react package, repeated here
+    if (js.isUndefined(a)) None
+    else Option(a.asInstanceOf[T])
+  }
 }
 
 trait JsAnySyntax {
@@ -46,14 +54,18 @@ trait JsAnySyntax {
 }
 
 final case class JsObjectOps(o: js.Object) {
-  def asDict[A] = o.asInstanceOf[js.Dictionary[A]]
-  def asAnyDict = o.asInstanceOf[js.Dictionary[js.Any]]
-  def asDyn     = o.asInstanceOf[js.Dynamic]
+  @inline def asDict[A] = o.asInstanceOf[js.Dictionary[A]]
+  @inline def asAnyDict = o.asInstanceOf[js.Dictionary[js.Any]]
+  @inline def asDyn     = o.asInstanceOf[js.Dynamic]
+  @inline def add(that: js.Object) = merge(o, that)
+  @inline def add(that: js.Dictionary[_]) = merge(o, that.asInstanceOf[js.Object])
 }
 
 final case class JsDictionaryOps(o: js.Dictionary[_]) {
-  def asJsObj = o.asInstanceOf[js.Object]
-  def asDyn   = o.asInstanceOf[js.Dynamic]
+  @inline def asJsObj = o.asInstanceOf[js.Object]
+  @inline def asDyn   = o.asInstanceOf[js.Dynamic]
+  @inline def add(that: js.Dictionary[_]) =
+    merge(o.asInstanceOf[js.Object], that.asInstanceOf[js.Object]).asInstanceOf[js.Dictionary[_]]
 }
 
 trait JsObjectSyntax {
@@ -67,8 +79,10 @@ final case class JsUndefOrStringOps(a: UndefOr[String]) {
 
 /** Not sure this is really going to do much for me. */
 final case class JsUndefOrOps[A](a: UndefOr[A]) {
-  def isNull  = a == null
-  def isEmpty = isNull || !a.isDefined
+  @inline def isNull  = a == null
+  @inline def isEmpty = isNull || !a.isDefined
+  @inline def toNonNullOption = if (a.isEmpty) None else a.toOption
+  @inline def toStringJs      = a.asInstanceOf[js.Any].toString()
 }
 
 trait JsUndefOrSyntax {
@@ -77,18 +91,22 @@ trait JsUndefOrSyntax {
 }
 
 final case class JsDynamicOps(val jsdyn: js.Dynamic) {
-  def asString: String        = jsdyn.asInstanceOf[String]
-  def asInt: Int              = jsdyn.asInstanceOf[Int]
-  def asArray[A]: js.Array[A] = jsdyn.asInstanceOf[js.Array[A]]
-  def asBoolean: Boolean      = jsdyn.asInstanceOf[Boolean]
+  @inline def asString: String        = jsdyn.asInstanceOf[String]
+  @inline  def asInt: Int              = jsdyn.asInstanceOf[Int]
+  @inline  def asArray[A]: js.Array[A] = jsdyn.asInstanceOf[js.Array[A]]
+  @inline  def asBoolean: Boolean      = jsdyn.asInstanceOf[Boolean]
 
   /** @deprecated use asJsObj */
-  def asJSObj: js.Object          = jsdyn.asInstanceOf[js.Object]
-  def asJsObj: js.Object          = jsdyn.asInstanceOf[js.Object]
-  def asDict[A]: js.Dictionary[A] = jsdyn.asInstanceOf[js.Dictionary[A]]
-  def asUndefOr[A]: js.UndefOr[A] = jsdyn.asInstanceOf[js.UndefOr[A]]
-  def asJsObjSub[A <: js.Object]  = jsdyn.asInstanceOf[A] // assumes its there!
-  def asJsArray[A <: js.Object]   = jsdyn.asInstanceOf[js.Array[A]]
+  @inline  def asJSObj: js.Object          = jsdyn.asInstanceOf[js.Object]
+  @inline  def asJsObj: js.Object          = jsdyn.asInstanceOf[js.Object]
+  @inline  def asDict[A]: js.Dictionary[A] = jsdyn.asInstanceOf[js.Dictionary[A]]
+  @inline  def asUndefOr[A]: js.UndefOr[A] = jsdyn.asInstanceOf[js.UndefOr[A]]
+  @inline  def asJsObjSub[A <: js.Object]  = jsdyn.asInstanceOf[A] // assumes its there!
+  @inline  def asJsArray[A <: js.Object]   = jsdyn.asInstanceOf[js.Array[A]]
+  @inline  def asOption[T <: js.Object]: Option[T] =
+    if (js.DynamicImplicits.truthValue(jsdyn)) Some(jsdyn.asInstanceOf[T])
+    else None
+  @inline def add(that: js.Dynamic) = mergeJSObjects(jsdyn, that)
 }
 
 trait JsDynamicSyntax {

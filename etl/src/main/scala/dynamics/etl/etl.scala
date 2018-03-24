@@ -126,4 +126,11 @@ package object etl {
       IO { println(s"$marker $a"); a }
     }
 
+
+  /**
+   * Lookup a text value and return (fieldname, value) for use in a JSON payload.
+   */
+  type LookupText = String => Either[String, (String, String)]
+  type LookupOption = String => Either[String, Int]
+
 }

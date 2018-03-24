@@ -21,7 +21,7 @@ import dynamics.common._
     quiet: Boolean = false,
     verbose: Boolean = false,
     verbosity: Int = 0,
-    crmConfigFile: String = "dynamics.json",
+    crmConfigFile: Option[String] = None,
     outputDir: String = "./",
     outputFile: Option[String] = None,
     logFile: String = "dynamicscli.log",
@@ -101,7 +101,8 @@ import dynamics.common._
     importDataDeleteStartTime: Option[String] = None,
     importDataDeleteQueryJson: Option[String] = None,
     importDataResumeImportId: String = "",
-    importDataResumeImportFileId: String = ""
+  importDataResumeImportFileId: String = "",
+    recordsOwnerId: Option[String] = None,
 )
 
 @Lenses case class MetadataConfig(
@@ -162,10 +163,19 @@ import dynamics.common._
     queryFile: Option[String] = None,
     connectionUrl: Option[String] = None,
     connectionFile: Option[String] = None,
-)
+) {
+  val defaultConnectionFile = "sqlserver-connection.json"
+
+  def connectionFileOrDefault: String = connectionFile.getOrElse(defaultConnectionFile)
+}
 
 @Lenses case class SDKMessageConfig(
     id: String = "",
+)
+
+@Lenses case class UserConfig(
+  userid: Option[String] = None,
+  roleNames: Seq[String] = Nil
 )
 
 @Lenses case class TestConfig(
@@ -219,6 +229,7 @@ import dynamics.common._
   settings: SettingsConfig = SettingsConfig(),
   appModule: AppModuleConfig = AppModuleConfig(),
   token: TokenConfig = TokenConfig(),
+  user: UserConfig = UserConfig()
 ) {
   def debug       = common.debug
   def noisy       = !common.quiet

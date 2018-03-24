@@ -82,7 +82,7 @@ object CommandLine {
     opt[String]('c', "crm-config")
       .valueName("<file>")
       .text("CRM connection configuration file")
-      .action((x, c) => c.lens(_.common.crmConfigFile).set(x))
+      .action((x, c) => c.lens(_.common.crmConfigFile).set(Some(x)))
     opt[String]("table-format")
       .valueName("honeywell|norc|ramac|void")
       .text("Change the table output format. void = no table adornments.")
@@ -269,7 +269,7 @@ object CommandLine {
           .action((x, c) => withSub(c, "entity"))
           .children(
             arg[String]("entity")
-              .text("Entity to update. Use the entity set name which is usually lowercase and ends with an 's'.")
+              .text("Entity set to update. Use the entity set name which is usually lowercase and ends with an 's'.")
               .action((x, c) => c.copy(update = c.update.copy(updateEntity = x))),
             arg[String]("inputfile")
               .text("JSON streaming data file. JSON records separated by newlines.")
@@ -284,7 +284,7 @@ object CommandLine {
               .text("Name of PK in the data input. Defaults to id (case insensitive.")
               .action((x, c) => c.lens(_.update.updatePKColumnName).set(x)),
             opt[Seq[String]]("drops")
-              .text("Drop columns. Logical column names separate by commas. Can be specifed multiple times.")
+              .text("Drop columns. Logical column names separate by commas. Can be specifed multiple times. PK column is automatically dropped.")
               .action((x, c) => c.copy(update = c.update.copy(updateDrops = c.update.updateDrops ++ x))),
             opt[Seq[String]]("keeps")
               .text("Keep columns. Logical column names separate by commas. Can be specifed multiple times.")
@@ -445,15 +445,6 @@ object CommandLine {
       .text("Import data using the CRM Data Import capability. Limited but still very useful.")
       .action((x, c) => withCmd(c, "importdata"))
       .children(
-        sub("list-imports")
-          .text("List all imports.")
-          .action((x, c) => withSub(c, "listimports")),
-        sub("dump-errors")
-          .text("Dump logs of any import file that has errors.")
-          .action((x,c) => withSub(c, "dumperrors")),
-        sub("list-importfiles")
-          .text("List all import filess.")
-          .action((x, c) => withSub(c, "listimportfiles")),
         sub("bulkdelete")
           .text("Delete an import by the import id.")
           .action((x, c) => withSub(c, "bulkdelete"))
@@ -480,6 +471,9 @@ object CommandLine {
           .children(
             mkFilterOpt().required()
           ),
+        sub("dump-errors")
+          .text("Dump logs of any import file that has errors.")
+          .action((x,c) => withSub(c, "dumperrors")),
         sub("import")
           .text("Import data.")
           .action((x, c) => withSub(c, "import"))
@@ -499,12 +493,21 @@ object CommandLine {
               .validate(x =>
                 if (x < 1 || x > 60) failure("Polling frequency must be between 1 and 60 seconds.") else success),
             opt[Unit]("update")
-              .text("Import data in update mode. Default is create mode. I don't think this works.")
+              .text("Import data in update mode. Default is create mode. I don't think this works!!!")
               .action((x, c) => c.lens(_.importdata.importDataCreate).set(false)),
+            opt[String]("recordsownerid")
+              .text("systemuser id for records whose owner ids are not set in the mapping. This *cannot* be a team id.")
+              .action((x,c) => c.lens(_.importdata.recordsOwnerId).set(Some(x))),
             opt[Boolean]("dupedetection")
               .text("Enable disable duplication detectiond. Default is disabled!.")
               .action((x, c) => c.lens(_.importdata.importDataEnableDuplicateDetection).set(x))
           ),
+        sub("list-imports")
+          .text("List all imports.")
+          .action((x, c) => withSub(c, "listimports")),
+        sub("list-importfiles")
+          .text("List all import filess.")
+          .action((x, c) => withSub(c, "listimportfiles")),
         sub("resume")
           .text("Resume a data import at the last processing stage.")
           .action((x, c) => withSub(c, "resume"))
@@ -646,10 +649,10 @@ object CommandLine {
           .text("File that holds a query to run.")
           .action((x, c) => c.lens(_.etl.queryFile).set(Some(x))),
         opt[String]("connection-url")
-          .text("Connecition URL.")
+          .text("Connection URL.")
           .action((x, c) => c.lens(_.etl.connectionUrl).set(Some(x))),
         opt[String]("connection-file")
-          .text("Connecition file. See https://www.npmjs.com/package/mssql#connection-pools for json format.")
+          .text("Connection file. See https://www.npmjs.com/package/mssql#connection-pools for json format.")
           .action((x, c) => c.lens(_.etl.connectionFile).set(Some(x))),
       )
   }
@@ -958,6 +961,31 @@ object CommandLine {
       )
   }
 
+  def users(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    val h = CliHelpers(op)
+    import h.sub
+    cmd("users")
+      .text("Manage users.")
+      .action((x, c) => withCmd(c, "users"))
+      .children(
+        sub("list")
+          .text("List users")
+          .action((x,c) => withSub(c, "list")),
+        sub("add-roles")
+          .text("Add one or more roles to a user.")
+          .action((x, c) => withSub(c, "add-roles"))
+          .children(
+            arg[String]("user-email")
+              .text("User email (internalemailaddress) to  modify")
+              .action((x,c) => c.lens(_.user.userid).set(Some(x))),
+            arg[Seq[String]]("roles")
+              .text("Role list using names (not ids). Separate by comma and shell quote the values if needed.")
+              .action((x, c) => c.lens(_.user.roleNames).modify(rlist => rlist ++ x))
+          )
+      )
+  }
+
   def webresources(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     val helpers = CliHelpers(op)
@@ -1068,10 +1096,10 @@ object CommandLine {
     test,
     token,
     update,
+    users,
     webresources,
     whoami,
     workflows,
-
   )
 
   /** Add scopt head, help and a list of options, which by default is all base commands. */
@@ -1091,10 +1119,9 @@ object CommandLine {
   }
 
   /**
-    * Read connection info from file in json format.
-    * If there is an error, cannot read the file or if there is no password in the
-    * config file or the enviroment variable DYNAMICS_PASSWORD,
-    * return an error string.
+    * Read connection info from file in json format.  If there is an error,
+    * cannot read the file or if there is no password in the config file or the
+    * enviroment variable DYNAMICS_PASSWORD, return an error string.
     */
   def readConnectionInfo(file: String): Either[String, ConnectionInfo] = {
     import scala.util.{Try, Success, Failure}
@@ -1114,10 +1141,13 @@ object CommandLine {
   }
 
   /**
-    * Read the connection information or exit the application.
-    */
-  def readConnectionInfoOrExit(file: String): ConnectionInfo = {
-    readConnectionInfo(file) match {
+   * Read the connection information or exit the application. Uses file, then
+   * DYNAMICS_CRMCONFIG then the default config file in sequence to find the
+   * file.
+   */
+  def readConnectionInfoOrExit(file: Option[String] = None): ConnectionInfo = {
+    val configFile = (file orElse nodejs.process.env.get("DYNAMICS_CRMCONFIG")).getOrElse(defaultConfigFile)
+    readConnectionInfo(configFile) match {
       case Right(c) => c
       case Left(e) =>
         println(e)

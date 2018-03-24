@@ -15,7 +15,11 @@ import dynamics.common._
 final case class UnexpectedStatus(status: Status,
                                   request: Option[HttpRequest] = None,
                                   response: Option[HttpResponse] = None)
-    extends RuntimeException
+    extends RuntimeException {
+  override def toString(): String = {
+    s"""UnexpectedStatus: status=$status${Option(status.reason).map("(" + _ + ")").getOrElse("")}, request=${request.toString()}, response=${response.toString()}"""
+  }
+}
 
 /** Message failure in the http layer. */
 sealed abstract class MessageFailure extends RuntimeException {

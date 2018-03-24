@@ -49,11 +49,18 @@ created):
 which you can run counts using:
 
 ```sh
-dynamicscli entity count --query-file addressqueries.json -c crm.json
+dynamicscli entity count --query-file addressqueries.json
 ...
 accountAddress, 1000
 accountAddressGt2, 100
 ...
+```
+
+I often use counts when I think there is a load issue. For example, I was
+concerned that a load set the ownerid incorrectly, so I ran a count:
+
+```sh
+dynamicscli entity count --query c='/mycustomactivity?$select=activityid&$filter=_ownerid_value eq 9f077006-2fe5-44e4-b836-54a542743460'
 ```
 
 You cannot use navigation properties to in the queries to count child
@@ -64,7 +71,7 @@ not take 'query' arguments so its not overly useful. It is very fast though, so
 if you need to count the entire set of entities, use it:
 
 ```sh
-dynamicscli entity count --function true --filter contact,account -c $CRMCON
+dynamicscli entity count --function true --filter contact,account
 ```
 
 ### export, export-from-query
@@ -84,7 +91,7 @@ output. Then use the rest of the parameters to compose a web api query to select
 data to be exported.
 
 Examples:
-* `dynamicscli entity export contacts -c $CRMCON --outputfile contacts.csv`: Export all contacts to csv file.
+* `dynamicscli entity export contacts --outputfile contacts.csv`: Export all contacts to csv file.
 
 #### export-from-query
 * query: Specify the query here. Watch out for shell escapes if you use single
@@ -97,7 +104,7 @@ Examples:
 The default is to output JSON strings separated by newlines.
 
 Examples:
-* `dynamicscli entity export-from-query '/contacts' -c $CRMCON --outputfile contacts-from-query.json`: Dump all contacts to json file.
+* `dynamicscli entity export-from-query '/contacts' --outputfile contacts-from-query.json`: Dump all contacts to json file.
 
 ### delete
 By providing a web api, you can delete those records selected by the query. Each

@@ -10,6 +10,7 @@ Import maps can be downloaded from dynamics or created manually locally. General
 Once you are ready to lead data, load the import maps first. The use the CLI to load the data.
 
 Example:
+
 ```sh
-dynamicscli importmaps upload ./accountsmap.xml -c dynamicsorg.json
+dynamicscli importmaps upload ./accountsmap.xml
 ```

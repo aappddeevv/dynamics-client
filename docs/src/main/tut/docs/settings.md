@@ -37,7 +37,7 @@ Assuming org-settings.json contains a 10MB upload limit:
 Example:
 
 ```sh
-dynamicscli settings post -c $CRMCON
+dynamicscli settings post
 ```
 
 ## list
@@ -46,12 +46,14 @@ List all settings for all orgs:
 Example:
 
 ```sh
-dynamicscli settings list -c $CRMCON
+dynamicscli settings list
 ```
 
 ## categorizedsearch
 
+NOT WORKING!
+
 Set the categorized search entity list. You must provide the entire list. A good default list is: account,contact,systemuser,activitypointer,lead,incident,opportunity,competitor,appointment.
 
 Examples:
-* dynamicscli categorizedsearch account,contact,systemuser,activitypointer,lead,incident,opportunity,competitor,appointment  -c $CRMCON
+* dynamicscli categorizedsearch account,contact,systemuser,activitypointer,lead,incident,opportunity,competitor,appointment

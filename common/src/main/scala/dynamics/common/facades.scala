@@ -493,6 +493,9 @@ trait ImportFileJsonFV extends js.Object {
   @JSName("statuscode@OData.Community.Display.V1.FormattedValue")
   var statuscode_fv: js.UndefOr[String] = js.undefined
 
+  @JSName("processingstatus@OData.Community.Display.V1.FormattedValue")
+  var processingstatus_fv: js.UndefOr[String] = js.undefined
+
   @JSName("ImportLog_ImportFile@odata.nextLink")
   var ImportLog_ImportFile_nl: js.UndefOr[String] = js.undefined
 }
@@ -606,68 +609,6 @@ trait PluginType extends js.Object {
   val overwritetime: js.UndefOr[String] = js.undefined
   @JSName("overwritetime@OData.Community.Display.V1.FormattedValue")
   val overwritetime_f: js.UndefOr[String] = js.undefined
-}
-
-class MSSQLConfig(
-    val user: js.UndefOr[String] = js.undefined,
-    val password: js.UndefOr[String] = js.undefined,
-    val server: js.UndefOr[String] = js.undefined,
-    val database: js.UndefOr[String] = js.undefined,
-    val port: js.UndefOr[Int] = js.undefined,
-    val domain: js.UndefOr[String] = js.undefined,
-    val connectionTimeout: js.UndefOr[Int] = js.undefined,
-    val requestTimeout: js.UndefOr[Int] = js.undefined,
-    val parseJSON: js.UndefOr[Boolean] = js.undefined,
-    val stream: js.UndefOr[Boolean] = js.undefined,
-    val pool: js.UndefOr[PoolOptions] = js.undefined,
-    val options: js.UndefOr[RawOptions] = js.undefined
-) extends js.Object
-
-class PoolOptions(
-    val max: js.UndefOr[Int] = js.undefined,
-    val min: js.UndefOr[Int] = js.undefined,
-    val idleTimeoutMillis: js.UndefOr[Int] = js.undefined,
-    val acquireTimeoutMillis: js.UndefOr[Int] = js.undefined,
-    val fifo: js.UndefOr[Boolean] = js.undefined,
-    val priorityRange: js.UndefOr[Int] = js.undefined,
-    val autostart: js.UndefOr[Boolean] = js.undefined
-    // ...more should go here...
-) extends js.Object
-
-@js.native
-@JSImport("mssql", JSImport.Namespace)
-object MSSQL extends js.Object with IEventEmitter {
-  def connect(config: RawOptions | String): js.Promise[ConnectionPool]              = js.native
-  def Request(): Request                                                            = js.native
-  def ConnectionPool(options: js.UndefOr[PoolOptions | RawOptions]): ConnectionPool = js.native
-}
-
-@js.native
-trait ConnectionPool extends js.Object with IEventEmitter {
-  def request(): Request                    = js.native
-  def close(): js.Promise[Unit]             = js.native
-  def connect(): js.Promise[ConnectionPool] = js.native
-  val connected: Boolean                    = js.native
-  val connecting: Boolean                   = js.native
-  val driver: String                        = js.native
-}
-
-@js.native
-trait Result[A] extends js.Object {
-  val recordsets: js.Array[js.Any]
-  val recordset: js.Any
-  val rowsAffected: js.Array[Int]
-  val output: js.Dictionary[js.Any]
-}
-
-@js.native
-trait Request extends js.Object with IEventEmitter {
-  def input(p: String, t: Int, value: js.Any): Result[js.Any] = js.native
-  var stream: js.UndefOr[Boolean]                             = js.native
-  var cancelled: js.UndefOr[Boolean]                          = js.native
-  var verbose: js.UndefOr[Boolean]                            = js.native
-  def query[A](q: String): js.Promise[Result[A]]              = js.native
-  def cancel(): Unit                                          = js.native
 }
 
 /**

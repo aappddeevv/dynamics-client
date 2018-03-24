@@ -30,6 +30,7 @@ trait EntityEncoder[A] { self =>
     */
   def encode(a: A): (Entity, HttpHeaders)
 
+  /** Create a new encoder from another encoder. */
   def contramap[B](f: B => A): EntityEncoder[B] = new EntityEncoder[B] {
     override def encode(a: B): (Entity, HttpHeaders) = self.encode(f(a))
   }
@@ -103,7 +104,9 @@ object EntityBody {
  }*/
 
 object Entity {
+  /** Empty body. */
   val empty: Entity = IO.pure("")
 
+  /** Create an Entity from a strict string value. */
   def fromString(s: String): Entity = IO.pure(s)
 }

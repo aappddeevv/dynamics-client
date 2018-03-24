@@ -157,6 +157,7 @@ object Utils {
   def filename(path: String): Option[String] =
     Option(Path.basename(path)).filterNot(_.isEmpty)
 
+  /*
   /** Merge two js.Objects in scale. */
   def mergeJSObjects[A <: js.Object](objs: A*): A = {
     val result = js.Dictionary.empty[Any]
@@ -165,6 +166,30 @@ object Utils {
         result(key) = value
     }
     result.asInstanceOf[A]
+  }
+   */
+
+   /**
+    * https://stackoverflow.com/questions/36561209/is-it-possible-to-combine-two-js-dynamic-objects
+    */
+  @inline def mergeJSObjects(objs: js.Dynamic*): js.Dynamic = {
+    // not js.Any? maybe keep js or scala values in here....
+    val result = js.Dictionary.empty[Any]
+    for (source <- objs) {
+      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])
+        result(key) = value
+    }
+    result.asInstanceOf[js.Dynamic]
+  }
+
+  /** Merge objects and Ts together. Good for merging props with data- attributes. */
+  @inline def merge[T <: js.Object](objs: T | js.Dynamic *): T = {
+    val result = js.Dictionary.empty[Any]
+    for (source <- objs) {
+      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])
+        result(key) = value
+    }
+    result.asInstanceOf[T]
   }
 
   /** Generate a new CRM GUID. */

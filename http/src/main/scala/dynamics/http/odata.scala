@@ -106,42 +106,54 @@ object Boundary extends RenderConstants {
 }
 
 /**
-  * One part of a multipart request. There are only two subtypes, one
-  * for a request directly in the multipart message and the other for
-  * a changeset. Deletes, updates and inserts must be in a changeset.
+  * One part of a multipart request. There are only two subtypes, one for a
+  * request directly in the multipart message and the other for a
+  * changeset. Deletes, updates and inserts must be in a changeset.
   */
 sealed trait Part {
   def xtra: HttpHeaders
 }
 
-/** Single request. Either standalone or in a changeset. Content-Type and Content-Transfer-Encoding
-  * is added to each part prior to the request being written. Headers in request can be overriden and
-  * added to using xtra.
+object Part {
+  /** Make changeset from SingleParts. */
+  //def mkChangeset(parts: Seq[SinglePart], b: Boundary = Boundary.mkBoundary("changeset_")) = ChangeSet(parts, b)
+
+  /** An empty part. */
+  val empty = EmptyPart
+}
+
+
+/** Single request. Either standalone or in a changeset. Content-Type and
+  * Content-Transfer-Encoding is added to each part prior to the request being
+  * written. Headers in request can be overriden and added to using xtra.
   * @paarm request HttpRequest
   * @param xtra Extra headers after the boundary but not in the actual request.
   */
 final case class SinglePart(request: HttpRequest, xtra: HttpHeaders = HttpHeaders.empty) extends Part
 
 /**
-  * Changeset. Headers are written for Content-Type and Content-Transfer-Encoding at the start of each Part's
-  * boundary. These can be overwritten or added to using xtra. A random Content-ID is added if one is not present.
+  * Changeset "part". Headers are written for Content-Type and
+  * Content-Transfer-Encoding at the start of each Part's boundary. These can be
+  * overwritten or added to using xtra. A random Content-ID is added if one is
+  * not present.
   * @param requests Set of changset requests.
   * @param bounday The changeset boundary.
   * @param xtra Extra headers after the changeset boundary but not in the actual requests.
   */
-final case class ChangeSet(parts: Seq[SinglePart], boundary: Boundary, xtra: HttpHeaders = HttpHeaders.empty)
-    extends Part
+final case class ChangeSet(
+  parts: Seq[SinglePart],
+  boundary: Boundary = Boundary.mkBoundary("changeset_"),
+  xtra: HttpHeaders = HttpHeaders.empty) extends Part
 
 /** Renders to empty. */
 private[dynamics] final object EmptyPart extends Part { val xtra = HttpHeaders.empty }
 
-object Part {
-  //val empty: Part = EmptyPart()
-  def mkChangeset(parts: Seq[SinglePart], b: Boundary = Boundary.mkBoundary("changeset_")) = ChangeSet(parts, b)
+object ChangeSet {
 
-  /** An empty part. */
-  val empty = EmptyPart
+  /** ChangeSet from requests. */
+  def fromRequests(requests: Seq[HttpRequest]): ChangeSet = ChangeSet(requests.map(SinglePart(_)))
 }
+
 
 /**
   * Multipart composed of a list of parts: individual requests and changesets.
@@ -158,6 +170,9 @@ trait RenderConstants {
 
 object Multipart extends RenderConstants {
   import Boundary.renderBoundary
+
+  /** Requests are bundled into a changeset. */
+  def fromRequests(requests: Seq[HttpRequest]): Multipart = Multipart(Seq(ChangeSet.fromRequests(requests)))
 
   /**
     * Render a batch boundary for each part, render each part, render the closing batch boundary.

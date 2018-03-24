@@ -145,6 +145,7 @@ class ImportDataActions(val context: DynamicsContext) {
           //val x = new TestJS(name = "blah")
 
           val content = Utils.slurp(path)
+          val recordsOwnerId = config.importdata.recordsOwnerId.getOrElse(whoami.UserId)
           val importfile = new ImportFileJson {
             name = s"$name import"
             source = filename.get
@@ -160,7 +161,7 @@ class ImportDataActions(val context: DynamicsContext) {
             processcode = ProcessCode.Process
             importid = s"/imports($importid)"
             importmapid = s"/importmaps($importmapid)"
-            recordsownerid_systemuser = s"/systemusers(${whoami.UserId})"
+            recordsownerid_systemuser = s"/systemusers($recordsOwnerId)"
           }
           println("Starting import file stage.")
           val ifileid = unlift(dynclient.createReturnId("importfiles", JSON.stringify(importfile)))
@@ -230,7 +231,8 @@ class ImportDataActions(val context: DynamicsContext) {
 
   val listImportFiles: Action = Kleisli { config =>
     val opts   = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
-    val header = Seq("#", "importfileid", "name", "failurecounut", "partialfailurecount", "statuscode", "createdon")
+    val header = Seq("#", "importfileid", "name", "processingstatus",
+      "failurecounut", "partialfailurecount", "totalcount", "statuscode", "createdon")
 
     dynclient.getList[ImportFileJson]("/importfiles?$orderby=createdon asc").map { list =>
       val data = list.zipWithIndex.map {
@@ -238,10 +240,12 @@ class ImportDataActions(val context: DynamicsContext) {
           Seq((idx + 1).toString,
               i.importfileid.orEmpty,
             i.name.orEmpty,
+            i.processingstatus_fv.orEmpty,
             i.failurecount.map(_.toString).orEmpty,
             i.partialfailurecount.map(_.toString).orEmpty,
-              i.statuscode_fv.orEmpty,
-              i.createdon.orEmpty)
+            i.totalcount.map(_.toString).orEmpty,
+            i.statuscode_fv.orEmpty,
+            i.createdon.orEmpty)
       }
       println(tablehelpers.render(header, data, opts))
     }

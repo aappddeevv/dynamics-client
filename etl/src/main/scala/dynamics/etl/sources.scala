@@ -197,7 +197,7 @@ object sources {
   }
 
   def MSSQLSourceRequest[A](qstr: String, config: js.Object | RawOptions | String)(
-      implicit ec: ExecutionContext): IO[common.Request] = {
+      implicit ec: ExecutionContext): IO[etl.Request] = {
     MSSQL.connect(config).toIO.map { pool =>
       val request = pool.request()
       request.stream = true
@@ -220,8 +220,8 @@ object sources {
       request
     }
     Stream.bracket(create())(
-      (q: common.Request) => queryToStream[IO, A](q, qsize),
-      (q: common.Request) => IO.pure(()) // close something?
+      (q: etl.Request) => queryToStream[IO, A](q, qsize),
+      (q: etl.Request) => IO.pure(()) // close something?
     )
   }
 

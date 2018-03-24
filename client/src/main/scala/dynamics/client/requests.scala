@@ -52,7 +52,10 @@ trait DynamicsClientRequests {
     //++ o.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
   }
 
-  /** Not sure adding $base to the @odata.id is correct. */
+  /** 
+   * Not sure adding $base to the @odata.id is absolutely needed. Probably is.
+   * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/webapi/associate-disassociate-entities-using-web-api?view=dynamics-ce-odata-9
+   */
   def mkAssociateRequest(fromEntitySet: String,
                          fromEntityId: String,
                          navProperty: String,
@@ -64,6 +67,10 @@ trait DynamicsClientRequests {
     HttpRequest(Method.PUT, url, body = Entity.fromString(body))
   }
 
+  /**
+   * Provide `to` if its a collection-valued navigation property, otherwise it
+   * removes a single-valued navigation property.
+   */
   def mkDisassocatiateRequest(fromEntitySet: String,
                               fromEntityId: String,
                               navProperty: String,
@@ -123,16 +130,19 @@ trait DynamicsClientRequests {
     HttpRequest(Method.GET, url)
   }
 
+  /** @depecated. Use `mkBatch`. */
+  def mkBatchRequest[A](headers: HttpHeaders, m: Multipart): HttpRequest = mkBatch(m, headers)
+
   /**
     * Body in HttpRequest is ignored and is instead generated from m.
     * Since the parts will have requests, you need to ensure that the
     * base URL used in those requests have a consistent base URL.
     */
-  def mkBatchRequest[A](headers: HttpHeaders, m: Multipart): HttpRequest = {
+  def mkBatch[A](m: Multipart, headers: HttpHeaders = HttpHeaders.empty): HttpRequest = {
     import dynamics.http.instances.entityEncoder._
     val (mrendered, xtra) = EntityEncoder[Multipart].encode(m)
     HttpRequest(Method.POST, "/$batch", headers = headers ++ xtra, body = mrendered)
   }
 }
 
-object DynamicsClientRequests extends DynamicsClientRequests
+object requests extends DynamicsClientRequests

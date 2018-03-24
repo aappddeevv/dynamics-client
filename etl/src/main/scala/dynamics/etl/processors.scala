@@ -71,6 +71,6 @@ object Processors {
           Multipart(ChangeSet(reqs, Boundary.mkBoundary("changeset_")) :: Nil, Boundary(label))
         else
           Multipart(reqs, Boundary(label))
-      DynamicsClientRequests.mkBatchRequest(HttpHeaders.empty, m)
+      requests.mkBatchRequest(HttpHeaders.empty, m)
     }
 }

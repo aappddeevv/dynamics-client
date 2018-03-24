@@ -71,6 +71,10 @@ trait Retry extends LazyLogger {
     else eh.raiseError(UnexpectedStatus(dr.response.status, None, Some(dr.response)))
   }
 
+  def getMessage(t: Throwable, fallback: String = "no message"): String = {
+    (Option(t.getMessage()) orElse Option(t.getCause()).map(_.getMessage()) orElse Option(t.toString())).getOrElse(fallback)
+  }
+
   /**
    * If your IO carries an error, retry. If you want to have retry based a bad
    * status, ensure your IO has converted the desired statuses to an effect
@@ -80,7 +84,8 @@ trait Retry extends LazyLogger {
     (implicit timer: Timer[IO]): IO[A] =
     ioa.handleErrorWith { error =>
       if(maxRetries > 0) {
-        if(logger.isWarnEnabled()) logger.warn(s"Request failed: ${error.getMessage()}. Retrying with backoff. ${maxRetries}")
+        val msg = getMessage(error)
+        if(logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying with backoff. ${maxRetries}")
           IO.sleep(initialDelay) *> retryWithBackoff(initialDelay * 2, maxRetries - 1)(ioa)
         }
         else IO.raiseError(error)
@@ -95,7 +100,8 @@ trait Retry extends LazyLogger {
     (implicit timer: Timer[IO]): IO[A] =
     ioa.handleErrorWith { error =>
       if(maxRetries > 0) {
-        if(logger.isWarnEnabled()) logger.warn(s"Request failed: ${error.getMessage()}. Retrying with pause. ${maxRetries}")
+        val msg = getMessage(error)
+        if(logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying with pause. ${maxRetries}")
         IO.sleep(delayBetween) *> retryWithPause(delayBetween, maxRetries - 1)(ioa)
       }
       else IO.raiseError(error)
@@ -109,7 +115,8 @@ trait Retry extends LazyLogger {
   def retryDirectly[A](maxRetries: Int=5)(ioa: IO[A]): IO[A] =
     ioa.handleErrorWith { error =>
       if(maxRetries > 0) {
-        if(logger.isWarnEnabled()) logger.warn(s"Request failed: ${error.getMessage()}. Retrying directly. ${maxRetries}")
+        val msg = getMessage(error)
+        if(logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying directly. ${maxRetries}")
         retryDirectly(maxRetries-1)(ioa)
       }
       else IO.raiseError(error)

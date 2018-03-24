@@ -121,7 +121,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
     jsonconfig.CustomizationFile = slurp(config.solution.solutionUploadFile, "base64")
     jsonconfig.PublishWorkflows = config.solution.solutionPublishWorkflows
 
-    val merged = mergeJSObjects(new ImportSolution(), jsonconfig)
+    val merged = merge(new ImportSolution(), jsonconfig)
     val x      = new ImportDataActions(context)
 
     println(s"Uploading solution file: ${config.solution.solutionUploadFile}.")
@@ -141,7 +141,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
     logger.debug(s"configfile content: ${Utils.render(jsonconfig)}")
     if (!jsonconfig.SolutionName.isDefined) jsonconfig.SolutionName = config.solution.solutionName
     if (!jsonconfig.Managed.isDefined) jsonconfig.Managed = config.solution.solutionExportManaged
-    val merged = mergeJSObjects(new ExportSolution(), jsonconfig)
+    val merged = merge(new ExportSolution(), jsonconfig)
 
     val dec = ValueWrapper[SolutionOData]
 

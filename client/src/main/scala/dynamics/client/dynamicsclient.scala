@@ -245,7 +245,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     http.expect(req)(d)
   }
 
-  /** Associate an existing entity to another through a navigation property. */
+  /** Associate an existing entity to another through a single valued navigation property. */
   def associate(fromEntitySet: String,
                 fromEntityId: String,
                 navProperty: String,

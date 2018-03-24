@@ -12,16 +12,10 @@ The `webresources` command allows you to list, download and upload (one-time and
 * list: List web resources.
 * delete-source-maps: Delete .js.map files from a specific solution's set of webresources.
 
-### upload
+## upload
 
-### delete
+## delete
 
-### list
+## list
 
-### delete-source-maps
-
-## Examples
-
-
-## Futures
-* delete a webresource by name or regexp
+## delete-source-maps

@@ -79,7 +79,13 @@ object MainHelpers extends LazyLogger {
       logger.warn("Password appears to be empty.")
     }
 
-    val context = DynamicsContext.default(config)(scala.concurrent.ExecutionContext.Implicits.global)
+    // Add environment variables
+    val impersonateOpt = config.common.impersonate orElse nodejs.process.env.get("DYNAMICS_IMPERSONATE")
+    val config2 =
+      config
+        .lens(_.common.impersonate).set(impersonateOpt)
+
+    val context = DynamicsContext.default(config2)(scala.concurrent.ExecutionContext.Implicits.global)
 
     // io.scalajs.nodejs.process.onUnhandledRejection{(reason: String, p: js.Any) =>
     //   println(s"Unhandled promise error: $reason, $p")
@@ -88,13 +94,13 @@ object MainHelpers extends LazyLogger {
 
     // Determine the action.
     val action: Action =
-      (moreCommands.flatMap(_(config, context)) orElse
-        config.common.actionSelector.flatMap(_(config, context)))
+      (moreCommands.flatMap(_(config2, context)) orElse
+        config2.common.actionSelector.flatMap(_(config2, context)))
         .getOrElse(NoArgAction(println(s"No actions registered to select from.")))
 
     // Run the action, then cleanup, then print messages/errors
-    action(config).flatMap(_ => context.close()).unsafeRunAsync { attempt =>
-      actionPostProcessor[Unit](config.noisy, start)(attempt)
+    action(config2).flatMap(_ => context.close()).unsafeRunAsync { attempt =>
+      actionPostProcessor[Unit](config2.noisy, start)(attempt)
       process.exit(0) // since this is running in the background
     }
   }
@@ -221,6 +227,10 @@ object MainHelpers extends LazyLogger {
           case "activate"   => ops.activate()
           case "deactivate" => ops.deactivate()
         }
+      case "users" =>
+        val ops = new UsersActions(context)
+        ops.get(config.common.subcommand)
+
       case "token" =>
         val ops = new TokenActions(context)
         config.common.subcommand match {

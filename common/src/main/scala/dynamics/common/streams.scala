@@ -84,4 +84,8 @@ object fs2helpers {
     }, _ => poll)
   }
 
+  /** Throttle a stream. Default value is for dynamics throttling. */
+  def throttle[A](delay: FiniteDuration = 5.millis)(implicit sch: Scheduler, ec: ExecutionContext): Pipe[IO, A, A] =
+    _.zip(sch.awakeEvery[IO](delay)).map(_._1)
+
 }

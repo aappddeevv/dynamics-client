@@ -352,6 +352,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       .toVector
       .map(_.sortBy(_._1))
       .flatMap(results => IO { results.foreach(p => println(s"${p._1}, ${p._2}")) })
+
     if (config.export.repeat)
       (Stream.eval(runCounts) ++ sch.sleep_[IO](config.export.repeatDelay seconds)).repeat.compile.drain
     else
