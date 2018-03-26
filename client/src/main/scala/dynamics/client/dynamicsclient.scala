@@ -67,8 +67,8 @@ case class DynamicsOptions(
   * pick up the default one automatically. All errors from responses are
   * captured in this layer and converted to instances of DynamicsClientError (a
   * Throwable). Errors generated from lower levels can be thrown and are *not*
- * captured in this layer.
- * 
+  * captured in this layer.
+  *
   */
 case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo, debug: Boolean = false)(
     implicit ehandler: ApplicativeError[IO, Throwable],
@@ -93,10 +93,10 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     }
   }
 
-  /** 
-   * Not sure when this might apply. Do we get errors where the error property
-   * is embedded on a Message (capital?) field?
-   */
+  /**
+    * Not sure when this might apply. Do we get errors where the error property
+    * is embedded on a Message (capital?) field?
+    */
   protected def findSimpleMessage(body: js.Dynamic): Option[String] = {
     val error: js.UndefOr[js.Dynamic] = body.Message
     error.map(_.asInstanceOf[String]).toOption
@@ -104,11 +104,10 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
 
   /** Find an optional dynamics error message in the body. */
   protected def findDynamicsError(body: js.Dynamic): Option[ErrorOData] = {
-    if(js.DynamicImplicits.truthValue(body.error)) {
+    if (js.DynamicImplicits.truthValue(body.error)) {
       val error: js.UndefOr[js.Dynamic] = body.error
       error.map(_.asInstanceOf[ErrorOData]).toOption
-    }
-    else None
+    } else None
   }
 
   /** Exposed so you can formulate batch request from standard HttpRequest objects which must have
@@ -245,13 +244,18 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     http.expect(req)(d)
   }
 
-  /** Associate an existing entity to another through a single valued navigation property. */
+  /**
+    * Associate an existing entity to another through a single or collection
+    * valued navigation property.
+    */
   def associate(fromEntitySet: String,
                 fromEntityId: String,
                 navProperty: String,
                 toEntitySet: String,
-                toEntityId: String): IO[Boolean] = {
-    val request = mkAssociateRequest(fromEntitySet, fromEntityId, navProperty, toEntitySet, toEntityId, base)
+                toEntityId: String,
+                singleNavProperty: Boolean): IO[Boolean] = {
+    val request =
+      mkAssociateRequest(fromEntitySet, fromEntityId, navProperty, toEntitySet, toEntityId, base, singleNavProperty)
     http.fetch(request) {
       case Status.Successful(resp) => IO.pure(true)
       case failedResponse =>
@@ -265,8 +269,8 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
   def disassociate(fromEntitySet: String,
                    fromEntityId: String,
                    navProperty: String,
-                   to: Option[(String, String)]): IO[Boolean] = {
-    val request = mkDisassocatiateRequest(fromEntitySet, fromEntityId, navProperty, to, base)
+                   to: Option[String] = None): IO[Boolean] = {
+    val request = mkDisassocatiateRequest(fromEntitySet, fromEntityId, navProperty, to)
     http.fetch(request) {
       case Status.Successful(resp) => IO.pure(true)
       case failedResponse =>
@@ -331,7 +335,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
             case Status.Successful(resp) =>
               resp.body.map { str =>
                 val odata = js.JSON.parse(str).asInstanceOf[ValueArrayResponse[A]]
-                if(logger.isDebugEnabled())
+                if (logger.isDebugEnabled())
                   logger.debug(s"getListStream: body=$str\nodata=${PrettyJson.render(odata)}")
                 val a = odata.value.map(_.toSeq) getOrElse Seq()
                 //println(s"getList: a=$a,\n${PrettyJson.render(a(0).asInstanceOf[js.Object])}")

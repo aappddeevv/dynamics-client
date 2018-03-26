@@ -307,20 +307,21 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
   }
 
   def getCountFromFunctionForEntity(entitySet: Seq[String] = Nil) = {
-    val collection = s"""EntityNames=[${entitySet.map("'"+_+"'").mkString(",")}]"""
-    val request = HttpRequest(Method.GET, s"/RetrieveTotalRecordCount($collection)")
+    val collection = s"""EntityNames=[${entitySet.map("'" + _ + "'").mkString(",")}]"""
+    val request    = HttpRequest(Method.GET, s"/RetrieveTotalRecordCount($collection)")
     dynclient.http.expect[RetrieveTotalRecordCountResponse](request)(
       http.instances.entityDecoder.JsObjectDecoder[RetrieveTotalRecordCountResponse])
   }
 
   def fromFunction(entityNames: Seq[String]): Stream[IO, Stream[IO, (String, Long)]] = {
-    Stream.eval(getCountFromFunctionForEntity(entityNames)
-      .map{ resp =>
-        //js.Dynamic.global.console.log("content from cname", resp)
-        val counts = resp.EntityRecordCountCollection
-        val rvals = (0 until counts.Count).map(i => (counts.Keys(i), counts.Values(i).toLong))
-        Stream.emits(rvals).covary[IO]
-      })
+    Stream.eval(
+      getCountFromFunctionForEntity(entityNames)
+        .map { resp =>
+          //js.Dynamic.global.console.log("content from cname", resp)
+          val counts = resp.EntityRecordCountCollection
+          val rvals  = (0 until counts.Count).map(i => (counts.Keys(i), counts.Values(i).toLong))
+          Stream.emits(rvals).covary[IO]
+        })
   }
 
   def fromMap(queries: Map[String, String]) = {
@@ -340,9 +341,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   /** Convert to function: RetrieveTotalRecordCount if possible. */
   def count() = Action { config =>
-    val countersQueries  = fromMap(config.export.queries)
-    val countersEntity   =
-      if(config.export.useFunction) fromFunction(config.common.filter)
+    val countersQueries = fromMap(config.export.queries)
+    val countersEntity =
+      if (config.export.useFunction) fromFunction(config.common.filter)
       else fromEntityNames(config.common.filter)
     val countersFromJson = config.export.queryFile.map(fromJsonFile(_)).getOrElse(Stream.empty)
     val all              = countersQueries ++ countersEntity ++ countersFromJson

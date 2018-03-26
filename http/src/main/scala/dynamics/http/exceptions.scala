@@ -17,7 +17,8 @@ final case class UnexpectedStatus(status: Status,
                                   response: Option[HttpResponse] = None)
     extends RuntimeException {
   override def toString(): String = {
-    s"""UnexpectedStatus: status=$status${Option(status.reason).map("(" + _ + ")").getOrElse("")}, request=${request.toString()}, response=${response.toString()}"""
+    s"""UnexpectedStatus: status=$status${Option(status.reason).map("(" + _ + ")").getOrElse("")}, request=${request
+      .toString()}, response=${response.toString()}"""
   }
 }
 

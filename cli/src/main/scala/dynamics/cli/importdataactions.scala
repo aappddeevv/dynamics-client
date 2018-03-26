@@ -144,7 +144,7 @@ class ImportDataActions(val context: DynamicsContext) {
 
           //val x = new TestJS(name = "blah")
 
-          val content = Utils.slurp(path)
+          val content        = Utils.slurp(path)
           val recordsOwnerId = config.importdata.recordsOwnerId.getOrElse(whoami.UserId)
           val importfile = new ImportFileJson {
             name = s"$name import"
@@ -230,22 +230,31 @@ class ImportDataActions(val context: DynamicsContext) {
   }
 
   val listImportFiles: Action = Kleisli { config =>
-    val opts   = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
-    val header = Seq("#", "importfileid", "name", "processingstatus",
-      "failurecounut", "partialfailurecount", "totalcount", "statuscode", "createdon")
+    val opts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
+    val header = Seq("#",
+                     "importfileid",
+                     "name",
+                     "processingstatus",
+                     "failurecounut",
+                     "partialfailurecount",
+                     "totalcount",
+                     "statuscode",
+                     "createdon")
 
     dynclient.getList[ImportFileJson]("/importfiles?$orderby=createdon asc").map { list =>
       val data = list.zipWithIndex.map {
         case (i, idx) =>
-          Seq((idx + 1).toString,
-              i.importfileid.orEmpty,
+          Seq(
+            (idx + 1).toString,
+            i.importfileid.orEmpty,
             i.name.orEmpty,
             i.processingstatus_fv.orEmpty,
             i.failurecount.map(_.toString).orEmpty,
             i.partialfailurecount.map(_.toString).orEmpty,
             i.totalcount.map(_.toString).orEmpty,
             i.statuscode_fv.orEmpty,
-            i.createdon.orEmpty)
+            i.createdon.orEmpty
+          )
       }
       println(tablehelpers.render(header, data, opts))
     }
@@ -350,7 +359,7 @@ class ImportDataActions(val context: DynamicsContext) {
   val dumpErrors = Action { config =>
     val outdir = config.common.outputDir
     val qs = QuerySpec(
-      filter=Some("(failurecount gt 0) or (partialfailurecount gt 0)"),
+      filter = Some("(failurecount gt 0) or (partialfailurecount gt 0)"),
       expand = Seq(Expand("ImportFile_ImportData"))
     )
     lift {
@@ -358,10 +367,14 @@ class ImportDataActions(val context: DynamicsContext) {
       list.foreach(i => js.Dynamic.global.console.log("importfile", i))
       //val edata = unlift(list.map(ifile => dynclient.getList[ImportDataJS](ifile.ImportFile_ImportData_nl.get)).toList.sequence)
       // if there is alot of errors, perhasp this is non-performant?
-      val edata = unlift(list.map{ifile =>
-        val qsdata = QuerySpec(filter=Some(s"_importfileid_value eq ${ifile.importfileid.get}"))
-        dynclient.getList[ImportLogJS](qsdata.url("importlogs"))
-      }.toList.sequence)
+      val edata = unlift(
+        list
+          .map { ifile =>
+            val qsdata = QuerySpec(filter = Some(s"_importfileid_value eq ${ifile.importfileid.get}"))
+            dynclient.getList[ImportLogJS](qsdata.url("importlogs"))
+          }
+          .toList
+          .sequence)
       IO(println("blah"))
         .map(_ => edata.foreach(id => js.Dynamic.global.console.log("importdata", id)))
     }
@@ -375,11 +388,11 @@ class ImportDataActions(val context: DynamicsContext) {
       case "bulkdelete"      => bulkDelete
       case "resume"          => resume
       case "delete"          => delete
-      case "dumperrors" => dumpErrors
+      case "dumperrors"      => dumpErrors
       case _ =>
         Action { _ =>
           IO(println(s"importdata command '${command}' not recognized."))
-        }        
+        }
     }
 
 }

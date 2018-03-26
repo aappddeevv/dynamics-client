@@ -25,9 +25,9 @@ package object cli {
   }
 
   /** An action that does need the arguments. */
-  def NoArgAction(block: => Unit) = Action {  _ =>
-      IO { block }
-    }
+  def NoArgAction(block: => Unit) = Action { _ =>
+    IO { block }
+  }
 
   /** Select an action to run or return None. */
   type ActionSelector = (AppConfig, DynamicsContext) => Option[Action]
@@ -36,7 +36,6 @@ package object cli {
 
   /** Must not be null or js.undefined. */
   def isDefined(a: js.Any): Boolean = a != null && !js.isUndefined(a)
-
 
   /** Default connection config resource. */
   val defaultConfigFile = "dynamics.json"

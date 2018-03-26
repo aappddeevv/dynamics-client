@@ -83,7 +83,8 @@ object MainHelpers extends LazyLogger {
     val impersonateOpt = config.common.impersonate orElse nodejs.process.env.get("DYNAMICS_IMPERSONATE")
     val config2 =
       config
-        .lens(_.common.impersonate).set(impersonateOpt)
+        .lens(_.common.impersonate)
+        .set(impersonateOpt)
 
     val context = DynamicsContext.default(config2)(scala.concurrent.ExecutionContext.Implicits.global)
 

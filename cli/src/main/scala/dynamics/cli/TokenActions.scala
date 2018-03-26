@@ -30,14 +30,12 @@ class TokenActions(context: DynamicsContext) extends LazyLogger {
   def doit(n: Long = 1) = Action { config =>
     val ofile = config.common.outputFile.getOrElse(defaultOutputFile)
     println(s"Token output file: ${ofile}")
-    val auth = new AuthManager(config.common.connectInfo)
-    val ctx  = auth.getAuthContext();
+    val auth    = new AuthManager(config.common.connectInfo)
+    val ctx     = auth.getAuthContext();
     val refresh = config.token.refreshIntervalInMinutes
     val str =
-      AuthManager.tokenStream(
-        auth.getTokenWithRetry(ctx,
-          dynamics.http.retry.retryWithPause(5.seconds, 10)))
-          //,_ => FiniteDuration(1, TU.MINUTES))
+      AuthManager.tokenStream(auth.getTokenWithRetry(ctx, dynamics.http.retry.retryWithPause(5.seconds, 10)))
+    //,_ => FiniteDuration(1, TU.MINUTES))
     str
       .take(n)
       .map { ti =>
@@ -45,7 +43,8 @@ class TokenActions(context: DynamicsContext) extends LazyLogger {
         writeToFileSync(ofile, JSON.stringify(ti))
         1
       }
-      .compile.drain
+      .compile
+      .drain
   }
 
   def getOne()  = doit(1)

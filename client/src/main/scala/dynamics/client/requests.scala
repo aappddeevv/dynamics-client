@@ -52,32 +52,35 @@ trait DynamicsClientRequests {
     //++ o.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
   }
 
-  /** 
-   * Not sure adding $base to the @odata.id is absolutely needed. Probably is.
-   * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/webapi/associate-disassociate-entities-using-web-api?view=dynamics-ce-odata-9
-   */
+  /**
+    * Not sure adding $base to the @odata.id is absolutely needed. Probably is.
+    * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/webapi/associate-disassociate-entities-using-web-api?view=dynamics-ce-odata-9
+    */
   def mkAssociateRequest(fromEntitySet: String,
                          fromEntityId: String,
                          navProperty: String,
                          toEntitySet: String,
                          toEntityId: String,
-                         base: String): HttpRequest = {
+                         base: String,
+                         singleValuedNavProperty: Boolean = true): HttpRequest = {
     val url  = s"/${fromEntitySet}(${fromEntityId})/$navProperty/$$ref"
-    val body = s"""'data' : {'@odata.id': '$base/$toEntitySet($toEntityId)'}"""
-    HttpRequest(Method.PUT, url, body = Entity.fromString(body))
+    val body = s"""{"@odata.id": "$base/$toEntitySet($toEntityId)"}"""
+    val method =
+      if (singleValuedNavProperty) Method.PUT
+      else Method.POST
+    HttpRequest(method, url, body = Entity.fromString(body))
   }
 
   /**
-   * Provide `to` if its a collection-valued navigation property, otherwise it
-   * removes a single-valued navigation property.
-   */
+    * Provide `to` if its a collection-valued navigation property, otherwise it
+    * removes a single-valued navigation property.
+    */
   def mkDisassocatiateRequest(fromEntitySet: String,
                               fromEntityId: String,
                               navProperty: String,
-                              to: Option[(String, String)],
-                              base: String): HttpRequest = {
-    val url = s"/$fromEntitySet($fromEntityId)/$navProperty/$$ref" +
-      to.map { case (eset, id) => s"?$$id=$base/$eset($id)" }.getOrElse("")
+                              toId: Option[String]): HttpRequest = {
+    val navPropertyStr = toId.map(id => s"$navProperty($id)").getOrElse(navProperty)
+    val url            = s"/$fromEntitySet($fromEntityId)/$navPropertyStr/$$ref"
     HttpRequest(Method.DELETE, url, body = Entity.empty)
   }
 

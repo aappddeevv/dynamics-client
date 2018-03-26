@@ -104,6 +104,7 @@ object EntityBody {
  }*/
 
 object Entity {
+
   /** Empty body. */
   val empty: Entity = IO.pure("")
 

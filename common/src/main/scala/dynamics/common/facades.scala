@@ -97,33 +97,33 @@ class ImportMappingsImportMap(
 
 @js.native
 trait ImportLogJS extends js.Object {
-  val name: String = js.native
-  val additionalinfo: js.UndefOr[String] = js.native
-  val columnvalue: js.UndefOr[String] = js.native
-  val createdon: js.UndefOr[js.Date] = js.native // translated automatically in http layer
-  val errordescription: js.UndefOr[String] = js.native
-  val errornumber: js.UndefOr[Int] = js.native
-  val headercolumn: js.UndefOr[String] = js.native
-  val importlogid: js.UndefOr[String] = js.native
+  val name: String                          = js.native
+  val additionalinfo: js.UndefOr[String]    = js.native
+  val columnvalue: js.UndefOr[String]       = js.native
+  val createdon: js.UndefOr[js.Date]        = js.native // translated automatically in http layer
+  val errordescription: js.UndefOr[String]  = js.native
+  val errornumber: js.UndefOr[Int]          = js.native
+  val headercolumn: js.UndefOr[String]      = js.native
+  val importlogid: js.UndefOr[String]       = js.native
   val importlogidunique: js.UndefOr[String] = js.native
-  val linenumber: js.UndefOr[Int] = js.native
-  val logphasecode: js.UndefOr[Int] = js.native
+  val linenumber: js.UndefOr[Int]           = js.native
+  val logphasecode: js.UndefOr[Int]         = js.native
   @JSName("logphasecode@OData.Community.Display.V1.FormattedValue")
   val logphasecode_fv: js.UndefOr[Int] = js.native
-  val sequencenumber: js.UndefOr[Int] = js.native
-  val solutionid: js.UndefOr[String] = js.native
+  val sequencenumber: js.UndefOr[Int]  = js.native
+  val solutionid: js.UndefOr[String]   = js.native
 }
 
 /** A single line of data imported from a file. */
 @js.native
 trait ImportDataJS extends js.Object {
-  val data: js.UndefOr[String] = js.native
-  val errortype: js.UndefOr[Int] = js.native
-  val haserror: js.UndefOr[Boolean] = js.native
+  val data: js.UndefOr[String]         = js.native
+  val errortype: js.UndefOr[Int]       = js.native
+  val haserror: js.UndefOr[Boolean]    = js.native
   val importdataid: js.UndefOr[String] = js.native
-  val linenumber: js.UndefOr[Int] = js.native
-  val recordid: js.UndefOr[String] = js.native
-  val solutionid: js.UndefOr[String] = js.native
+  val linenumber: js.UndefOr[Int]      = js.native
+  val recordid: js.UndefOr[String]     = js.native
+  val solutionid: js.UndefOr[String]   = js.native
 }
 
 @js.native
@@ -335,7 +335,7 @@ trait TokenInfo extends js.Object {
   val tokenType: String        = js.native
   val userId: String           = js.native
   val identityProvider: String = js.native
-  val expiresIn: Int          = js.native
+  val expiresIn: Int           = js.native
 }
 
 @js.native
@@ -451,33 +451,33 @@ class TestJS(
 ) extends js.Object
 
 trait ImportFileJson extends js.Object with ImportFileJsonFV {
-    var name: js.UndefOr[String] = js.undefined
-    var content: js.UndefOr[String] = js.undefined
-    var filetypecode: js.UndefOr[Int] = js.undefined
-    var isfirstrowheader: js.UndefOr[Boolean] = js.undefined
-    var processcode: js.UndefOr[Int] = js.undefined
-    var fielddelimitercode: js.UndefOr[Int] = js.undefined
-    var datadelimitercode: js.UndefOr[Int] = js.undefined
-    var processingstatus: js.UndefOr[Int] = js.undefined
-    var progresscounter: js.UndefOr[Int] = js.undefined
-    var source: js.UndefOr[String] = js.undefined
-    var size: js.UndefOr[Int] = js.undefined
-    var sourceentityname: js.UndefOr[String] = js.undefined
-    var targetentityname: js.UndefOr[String] = js.undefined
-    var successcount: js.UndefOr[Int] = js.undefined
-    var totalcount: js.UndefOr[Int] = js.undefined
-    var failurecount: js.UndefOr[Int] = js.undefined
-    var statuscode: js.UndefOr[Int] = js.undefined
-    var partialfailurecount: js.UndefOr[Int] = js.undefined
-    var usesystemmap: js.UndefOr[Boolean] = js.undefined
-    var parsedtablename: js.UndefOr[String] = js.undefined
-    var parsedcolumnsnumber: js.UndefOr[Int] = js.undefined
-    var parsedcolumnprefix: js.UndefOr[String] = js.undefined
-    var headerrow: js.UndefOr[String] = js.undefined
-    var enableduplicatedetection: js.UndefOr[Boolean] = js.undefined
-    var additionalheaderrow: js.UndefOr[String] = js.undefined
-    var createdon: js.UndefOr[String] = js.undefined
-    var importfileid: js.UndefOr[String] = js.undefined
+  var name: js.UndefOr[String]                      = js.undefined
+  var content: js.UndefOr[String]                   = js.undefined
+  var filetypecode: js.UndefOr[Int]                 = js.undefined
+  var isfirstrowheader: js.UndefOr[Boolean]         = js.undefined
+  var processcode: js.UndefOr[Int]                  = js.undefined
+  var fielddelimitercode: js.UndefOr[Int]           = js.undefined
+  var datadelimitercode: js.UndefOr[Int]            = js.undefined
+  var processingstatus: js.UndefOr[Int]             = js.undefined
+  var progresscounter: js.UndefOr[Int]              = js.undefined
+  var source: js.UndefOr[String]                    = js.undefined
+  var size: js.UndefOr[Int]                         = js.undefined
+  var sourceentityname: js.UndefOr[String]          = js.undefined
+  var targetentityname: js.UndefOr[String]          = js.undefined
+  var successcount: js.UndefOr[Int]                 = js.undefined
+  var totalcount: js.UndefOr[Int]                   = js.undefined
+  var failurecount: js.UndefOr[Int]                 = js.undefined
+  var statuscode: js.UndefOr[Int]                   = js.undefined
+  var partialfailurecount: js.UndefOr[Int]          = js.undefined
+  var usesystemmap: js.UndefOr[Boolean]             = js.undefined
+  var parsedtablename: js.UndefOr[String]           = js.undefined
+  var parsedcolumnsnumber: js.UndefOr[Int]          = js.undefined
+  var parsedcolumnprefix: js.UndefOr[String]        = js.undefined
+  var headerrow: js.UndefOr[String]                 = js.undefined
+  var enableduplicatedetection: js.UndefOr[Boolean] = js.undefined
+  var additionalheaderrow: js.UndefOr[String]       = js.undefined
+  var createdon: js.UndefOr[String]                 = js.undefined
+  var importfileid: js.UndefOr[String]              = js.undefined
 }
 
 trait ImportFileJsonFV extends js.Object {
@@ -640,23 +640,23 @@ object StreamArray extends js.Object {
 }
 
 trait AppModule extends js.Object {
-  var appmoduleid: js.UndefOr[String] = js.undefined
-  var appmoduleidunique: js.UndefOr[String] = js.undefined
-  var appmoduleversion: js.UndefOr[String] = js.undefined
+  var appmoduleid: js.UndefOr[String]         = js.undefined
+  var appmoduleidunique: js.UndefOr[String]   = js.undefined
+  var appmoduleversion: js.UndefOr[String]    = js.undefined
   var appmodulexmlmanaged: js.UndefOr[String] = js.undefined
-  var clienttype: js.UndefOr[Int] = js.undefined
-  var componentstate: js.UndefOr[Int] = js.undefined
-  var configxml: js.UndefOr[String] = js.undefined
-  var description: js.UndefOr[String] = js.undefined
-  var isdefault: js.UndefOr[Boolean] = js.undefined
-  var isfeatured: js.UndefOr[Boolean] = js.undefined
-  var ismanaged: js.UndefOr[Boolean] = js.undefined
-  var name: js.UndefOr[String] = js.undefined
-  var solutionid: js.UndefOr[String] = js.undefined
-  var uniquename: js.UndefOr[String] = js.undefined
-  var url: js.UndefOr[String] = js.undefined
-  var webresourceid: js.UndefOr[String] = js.undefined
-  var welcomepagedid: js.UndefOr[String] = js.undefined
+  var clienttype: js.UndefOr[Int]             = js.undefined
+  var componentstate: js.UndefOr[Int]         = js.undefined
+  var configxml: js.UndefOr[String]           = js.undefined
+  var description: js.UndefOr[String]         = js.undefined
+  var isdefault: js.UndefOr[Boolean]          = js.undefined
+  var isfeatured: js.UndefOr[Boolean]         = js.undefined
+  var ismanaged: js.UndefOr[Boolean]          = js.undefined
+  var name: js.UndefOr[String]                = js.undefined
+  var solutionid: js.UndefOr[String]          = js.undefined
+  var uniquename: js.UndefOr[String]          = js.undefined
+  var url: js.UndefOr[String]                 = js.undefined
+  var webresourceid: js.UndefOr[String]       = js.undefined
+  var welcomepagedid: js.UndefOr[String]      = js.undefined
 
   val _organizationid_value: js.UndefOr[String] = js.undefined
   @JSName("_organizationid_value@OData.Community.Display.V1.FormattedValue")

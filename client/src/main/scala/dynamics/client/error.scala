@@ -85,8 +85,8 @@ sealed abstract class DynamicsError extends RuntimeException {
 }
 
 /**
- * Concrete implementation of errors thrown by a dynamics client.
- */
+  * Concrete implementation of errors thrown by a dynamics client.
+  */
 final case class DynamicsClientError(details: String,
                                      val cause: Option[DynamicsServerError] = None,
                                      underlying: Option[Throwable] = None,

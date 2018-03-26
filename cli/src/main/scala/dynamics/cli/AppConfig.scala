@@ -26,8 +26,8 @@ import dynamics.common._
     outputFile: Option[String] = None,
     logFile: String = "dynamicscli.log",
     noclobber: Boolean = false,
-  numRetries: Int = 5,
-  retryPolicy: String = "backoff", // pause, backoff
+    numRetries: Int = 5,
+    retryPolicy: String = "backoff", // pause, backoff
     pauseBetween: FiniteDuration = 10.seconds, // or initial value if backoff
     command: String = "", // should rename to "command"
     subcommand: String = "",
@@ -43,8 +43,8 @@ import dynamics.common._
     batch: Boolean = false,
     metadataCacheFile: Option[String] = None,
     ignoreMetadataCache: Boolean = false,
-  actionSelector: Option[ActionSelector] = Some(MainHelpers.defaultActionSelector),
-  impersonate: Option[String] = None,
+    actionSelector: Option[ActionSelector] = Some(MainHelpers.defaultActionSelector),
+    impersonate: Option[String] = None,
 )
 
 @Lenses case class PluginConfig(
@@ -101,7 +101,7 @@ import dynamics.common._
     importDataDeleteStartTime: Option[String] = None,
     importDataDeleteQueryJson: Option[String] = None,
     importDataResumeImportId: String = "",
-  importDataResumeImportFileId: String = "",
+    importDataResumeImportFileId: String = "",
     recordsOwnerId: Option[String] = None,
 )
 
@@ -125,9 +125,9 @@ import dynamics.common._
     queryFile: Option[String] = None,
     wrap: Boolean = false,
     repeat: Boolean = false,
-  repeatDelay: Int = 60,
-  header: Boolean = true,
-  useFunction: Boolean = false,
+    repeatDelay: Int = 60,
+    header: Boolean = true,
+    useFunction: Boolean = false,
 )
 
 @Lenses case class UpdateConfig(
@@ -174,8 +174,8 @@ import dynamics.common._
 )
 
 @Lenses case class UserConfig(
-  userid: Option[String] = None,
-  roleNames: Seq[String] = Nil
+    userid: Option[String] = None,
+    roleNames: Seq[String] = Nil
 )
 
 @Lenses case class TestConfig(
@@ -195,14 +195,14 @@ import dynamics.common._
 )
 
 @Lenses case class AppModuleConfig(
-  roleName: Seq[String] = Nil,
-  change: Option[String] = None,
-  appName: Option[String] = None,
+    roleName: Seq[String] = Nil,
+    change: Option[String] = None,
+    appName: Option[String] = None,
 )
 
 @Lenses case class TokenConfig(
-  tokenOutputFile: String = "crm-token.json",
-  refreshIntervalInMinutes: Int = 55,
+    tokenOutputFile: String = "crm-token.json",
+    refreshIntervalInMinutes: Int = 55,
 )
 
 @Lenses case class SettingsConfig(
@@ -226,10 +226,10 @@ import dynamics.common._
     test: TestConfig = TestConfig(),
     systemjob: SystemJobConfig = SystemJobConfig(),
     action: ActionConfig = ActionConfig(),
-  settings: SettingsConfig = SettingsConfig(),
-  appModule: AppModuleConfig = AppModuleConfig(),
-  token: TokenConfig = TokenConfig(),
-  user: UserConfig = UserConfig()
+    settings: SettingsConfig = SettingsConfig(),
+    appModule: AppModuleConfig = AppModuleConfig(),
+    token: TokenConfig = TokenConfig(),
+    user: UserConfig = UserConfig()
 ) {
   def debug       = common.debug
   def noisy       = !common.quiet

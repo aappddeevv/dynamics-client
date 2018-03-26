@@ -514,7 +514,8 @@ class WebResourcesCommand(val context: DynamicsContext) {
               }
             }
             .to(Sink.lines(System.out))
-            .compile.drain
+            .compile
+            .drain
         }
       }
       .flatMap(_ => IO.unit)

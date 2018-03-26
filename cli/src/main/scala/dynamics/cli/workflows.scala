@@ -42,7 +42,7 @@ trait WorkflowJson extends js.Object {
   @JSName("type")
   val wtype: UndefOr[Int] = js.undefined
 
-  val _solution_id_value: UndefOr[String] = js.undefined
+  val _solution_id_value: UndefOr[String]      = js.undefined
   val _parentworkflowid_value: UndefOr[String] = js.undefined
 
   val _ownerid_value: UndefOr[String] = js.undefined
@@ -99,7 +99,7 @@ class WorkflowActions(val context: DynamicsContext) {
 
   /** Get workflow by parentvalueid, process type = activation, statecode = activated. */
   def getByParentId(parentId: String): IO[Seq[WorkflowJson]] = {
-    val q = QuerySpec(filter=Some(s"_parentworkflowid_value eq $parentId and type eq 2 and statecode eq 1"))
+    val q = QuerySpec(filter = Some(s"_parentworkflowid_value eq $parentId and type eq 2 and statecode eq 1"))
     dynclient.getList[WorkflowJson](q.url("workflows"))
   }
 
@@ -115,8 +115,8 @@ class WorkflowActions(val context: DynamicsContext) {
 
   def list() = Action { config =>
     println("Workflows. See https://msdn.microsoft.com/en-us/library/mt622427.aspx for value definitions.")
-    val cols  = jsobj(
-      "2" -> jsobj(width=30),
+    val cols = jsobj(
+      "2"  -> jsobj(width = 30),
       "12" -> jsobj(width = 40)
     )
     val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat), columns = cols)
@@ -126,22 +126,24 @@ class WorkflowActions(val context: DynamicsContext) {
       val filtered = filter(res, config.common.filter)
       val data =
         Seq(
-          Seq("#",
-              "workflowid",
-              "name",
-              "statecode",
-              "statuscode",
-              "category",
-              "componentstate",
-              "type",
+          Seq(
+            "#",
+            "workflowid",
+            "name",
+            "statecode",
+            "statuscode",
+            "category",
+            "componentstate",
+            "type",
             "currentactivation",
             "parentworkflowid",
             "ownerid",
-              "solutionid",
-              "description").map(Chalk.bold(_))) ++
-      filtered.zipWithIndex.map { 
-        case (i, idx) =>
-          //js.Dynamic.global.console.log(idx, i)
+            "solutionid",
+            "description"
+          ).map(Chalk.bold(_))) ++
+          filtered.zipWithIndex.map {
+            case (i, idx) =>
+              //js.Dynamic.global.console.log(idx, i)
               Seq(
                 (idx + 1).toString,
                 i.workflowid.orEmpty,
@@ -164,15 +166,15 @@ class WorkflowActions(val context: DynamicsContext) {
   }
 
   def changeActivation() = Action { config =>
-    val (newStateCode, newStatusCode)  =
+    val (newStateCode, newStatusCode) =
       if (config.workflow.activate) (WorkflowStateCode.Activated, WorkflowStatusCode.Activated)
       else (WorkflowStateCode.Draft, WorkflowStatusCode.Draft)
-    val actionName = if(config.workflow.activate) "Activated" else "Deactivated"
+    val actionName    = if (config.workflow.activate) "Activated" else "Deactivated"
     val sourceFromIds = Stream.emits(config.workflow.workflowIds)
     val runme = sourceFromIds
       .evalMap(getById)
-      .map{ w =>
-        val id = w.workflowid.get
+      .map { w =>
+        val id      = w.workflowid.get
         val baseUrl = config.common.connectInfo.acquireTokenResource.orEmpty
         val request = WorkflowActions.mkSOAPRequest(baseUrl, "workflow", id, newStateCode, newStatusCode)
         dynclient.http.fetch[String](request) {
@@ -181,7 +183,8 @@ class WorkflowActions(val context: DynamicsContext) {
             ehandler.raiseError(DynamicsClientError(
               s"Unable to change $id (${w.name.orEmpty})",
               None,
-              Option(UnexpectedStatus(failedResponse.status, request = Some(request), response = Option(failedResponse))),
+              Option(
+                UnexpectedStatus(failedResponse.status, request = Some(request), response = Option(failedResponse))),
               failedResponse.status
             ))
         }
@@ -225,10 +228,11 @@ class WorkflowActions(val context: DynamicsContext) {
             (request.copy(path = dynclient.base + request.path), source) // make full URL for odata patch
           }
         val pt2: Pipe[IO, (HttpRequest, String), IO[String]] =
-          _.vectorChunkN(config.common.batchSize).map{ v =>
+          _.vectorChunkN(config.common.batchSize).map { v =>
             val ids = v.map(_._2).mkString(", ")
-            updater.mkBatchFromRequests(v, false)
-            .map(_ => s"Executed batch request against entities: $ids")
+            updater
+              .mkBatchFromRequests(v, false)
+              .map(_ => s"Executed batch request against entities: $ids")
           }
         pt1 andThen pt2
       }
@@ -296,33 +300,33 @@ object WorkflowActions {
     1 -> "Activated"
   )
 
-  val StatusCodeByInt  = Map[Int, String](
+  val StatusCodeByInt = Map[Int, String](
     1 -> "Draft",
     2 -> "Activated"
   )
 
   val CategoryByInt = Map[Int, String](
-    0	-> "Workflow",
-    1	-> "Dialog",
-    2	-> "Business Rule",
-    3	-> "Action",
-    4	-> "Business Process Flow"
+    0 -> "Workflow",
+    1 -> "Dialog",
+    2 -> "Business Rule",
+    3 -> "Action",
+    4 -> "Business Process Flow"
   )
 
   val ProcessTypeByInt = Map[Int, String](
-    1	-> "Definition",
-    2	-> "Activation",
-    3	-> "Template"
+    1 -> "Definition",
+    2 -> "Activation",
+    3 -> "Template"
   )
 
   def mkSOAPRequest(baseUrl: String, ENAME: String, ID: String, STATE: Int, STATUS: Int) = {
     val body = setStateRequest(ENAME, ID, STATE, STATUS)
     val headers = HttpHeaders(
       "Content-Type" -> "text/xml; charset=utf-8",
-      "SOAPAction" -> "http://schemas.microsoft.com/xrm/2011/Contracts/Services/IOrganizationService/Execute",
-      "Accept" -> "application/xml"
+      "SOAPAction"   -> "http://schemas.microsoft.com/xrm/2011/Contracts/Services/IOrganizationService/Execute",
+      "Accept"       -> "application/xml"
     )
-    HttpRequest(Method.POST, s"$baseUrl/$SOAPEP", headers = headers, body=Entity.fromString(body))
+    HttpRequest(Method.POST, s"$baseUrl/$SOAPEP", headers = headers, body = Entity.fromString(body))
   }
 
   val SOAPEP = "XRMServices/2011/Organization.svc/web"
@@ -363,6 +367,3 @@ object WorkflowActions {
                </s:Envelope>
 """
 }
-
-
-

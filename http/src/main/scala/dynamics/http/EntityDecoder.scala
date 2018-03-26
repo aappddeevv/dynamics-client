@@ -20,18 +20,6 @@ import scala.collection.mutable
 import dynamics.common._
 
 /**
-  * Helper objects to make creating DecodeResults easier. DecodeResult is a complex type.
-  */
-object DecodeResult {
-  def apply[A](fa: IO[Either[DecodeFailure, A]]): DecodeResult[A] = EitherT(fa)
-  def success[A](a: IO[A]): DecodeResult[A]                       = DecodeResult(a.map(Either.right(_)))
-  def success[A](a: A): DecodeResult[A]                           = success(IO.pure(a))
-  def failure[A](e: IO[DecodeFailure]): DecodeResult[A]           = DecodeResult(e.map(Either.left(_)))
-  def failure[A](e: DecodeFailure): DecodeResult[A]               = failure(IO.pure(e))
-  def fail[A]: DecodeResult[A]                                    = failure(IO.pure(MessageBodyFailure("Intentionally failed.")))
-}
-
-/**
   *  Decode a Message to a DecodeResult.
   */
 @implicitNotFound("Cannot find instance of EntityDecoder[${T}].")
@@ -53,7 +41,7 @@ trait EntityDecoder[T] { self =>
 
   /**
     * Due to the process-once nature of the body, the orElse must
-    * really checked headers or other information to allow orElse
+    * really check headers or other information to allow orElse
     * to compose correctly.
     */
   def orElse[T2 >: T](other: EntityDecoder[T2]): EntityDecoder[T2] = {
@@ -66,6 +54,12 @@ trait EntityDecoder[T] { self =>
 
   def widen[T2 >: T]: EntityDecoder[T2] = this.asInstanceOf[EntityDecoder[T2]]
 
+  def transform[T2](t: Either[DecodeFailure, T] => Either[DecodeFailure, T2]): EntityDecoder[T2] =
+    new EntityDecoder[T2] {
+      override def decode(message: Message): DecodeResult[T2] =
+        self.decode(message).transform(t)
+    }
+
 }
 
 object EntityDecoder {
@@ -75,7 +69,7 @@ object EntityDecoder {
 
   /**
     * Lift function to create a decoder. You can use another EntityDecoder
-    * as the arguent.
+    * as the argument.
     */
   def instance[T](run: Message => DecodeResult[T]): EntityDecoder[T] =
     new EntityDecoder[T] {

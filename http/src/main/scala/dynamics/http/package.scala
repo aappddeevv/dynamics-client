@@ -13,6 +13,7 @@ import cats.effect._
 
 package object http {
 
+  @deprecated("Use Kleisli directly e.g. Kleisli[F, A, B]")
   type Service[A, B]      = Kleisli[IO, A, B]
   type Middleware         = Client => Client
   type HttpService        = Service[HttpRequest, HttpResponse]
@@ -30,9 +31,9 @@ package object http {
     */
   type DecodeResult[A] = EitherT[IO, DecodeFailure, A]
 
-  /** 
-   * Retry policies are added to an effect so that when run, a retry
-   * occurs as needed.
-   */
+  /**
+    * Retry policies are added to an effect so that when run, a retry
+    * occurs as needed.
+    */
   type RetryPolicy[F[_], A] = F[A] => F[A]
 }

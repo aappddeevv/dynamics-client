@@ -72,7 +72,8 @@ class UpdateActions(val context: DynamicsContext) {
     val uc    = config.update
     val pkcol = uc.updatePKColumnName
 
-    val updateone = dynclient.update(uc.updateEntity, _: String, _: String, uc.upsertPreventCreate, uc.upsertPreventUpdate)
+    val updateone =
+      dynclient.update(uc.updateEntity, _: String, _: String, uc.upsertPreventCreate, uc.upsertPreventUpdate)
     //val updateone = (id: String, body: String) => dynclient.createReturnId(uc.updateEntity, body)
 
     // wraps actual file json object in another json object with the index, etc., data key is "value"
@@ -149,10 +150,10 @@ class UpdateProcessor(val context: DynamicsContext) {
 
   /**
     * Run an update based on an input js.Object record and print a result. This
-   * function looks or the PK in the record, extracts it, removes it from the
-   * record, stringifies the resulting object as the body then calls the update
-   * function provided by the caller.
-   * 
+    * function looks or the PK in the record, extracts it, removes it from the
+    * record, stringifies the resulting object as the body then calls the update
+    * function provided by the caller.
+    *
     * @param source Record source identifier, typically a string like "Record 3".
     * @param pkcol PK attribute name in input record. Must be a single valued PK.
     * @param record js.Object record. The PK will be removed for the update.

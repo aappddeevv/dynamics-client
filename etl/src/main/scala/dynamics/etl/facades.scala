@@ -16,9 +16,8 @@ import scala.concurrent.Future
 import io.scalajs.RawOptions
 import io.scalajs.nodejs.events.IEventEmitter
 
-
 class MSSQLOptions(
-  val encrypet: js.UndefOr[Boolean] = js.undefined
+    val encrypet: js.UndefOr[Boolean] = js.undefined
 ) extends js.Object
 
 class MSSQLConfig(
@@ -33,7 +32,7 @@ class MSSQLConfig(
     val parseJSON: js.UndefOr[Boolean] = js.undefined,
     val stream: js.UndefOr[Boolean] = js.undefined,
     val pool: js.UndefOr[PoolOptions] = js.undefined,
-    val options: js.UndefOr[MSSQLOptions|RawOptions] = js.undefined
+    val options: js.UndefOr[MSSQLOptions | RawOptions] = js.undefined
 ) extends js.Object
 
 class PoolOptions(
@@ -50,9 +49,9 @@ class PoolOptions(
 @js.native
 @JSImport("mssql", JSImport.Namespace)
 object MSSQL extends js.Object with IEventEmitter {
-  def connect(config: RawOptions | String | MSSQLConfig): js.Promise[ConnectionPool]              = js.native
-  def Request(): Request                                                            = js.native
-  def ConnectionPool(options: js.UndefOr[PoolOptions | RawOptions]): ConnectionPool = js.native
+  def connect(config: RawOptions | String | MSSQLConfig): js.Promise[ConnectionPool] = js.native
+  def Request(): Request                                                             = js.native
+  def ConnectionPool(options: js.UndefOr[PoolOptions | RawOptions]): ConnectionPool  = js.native
 }
 
 @js.native
@@ -82,11 +81,11 @@ trait SQLResult[A] extends js.Object {
 @js.native
 trait Request extends js.Object with IEventEmitter {
   def input(p: String, t: Int, value: js.Any): Request = js.native
-  def input(p: String, value: js.Any): Request = js.native
-  var stream: js.UndefOr[Boolean]                             = js.native
-  var cancelled: js.UndefOr[Boolean]                          = js.native
-  var verbose: js.UndefOr[Boolean]                            = js.native
-  def query[A](q: String): js.Promise[SQLResult[A]]              = js.native
-  def cancel(): Unit                                          = js.native
+  def input(p: String, value: js.Any): Request         = js.native
+  var stream: js.UndefOr[Boolean]                      = js.native
+  var cancelled: js.UndefOr[Boolean]                   = js.native
+  var verbose: js.UndefOr[Boolean]                     = js.native
+  def query[A](q: String): js.Promise[SQLResult[A]]    = js.native
+  def cancel(): Unit                                   = js.native
   // def execute(procedureName: String): ??? = js.native
 }

@@ -14,13 +14,13 @@ class Logger() {
   protected def front() = getDate() + ": "
 
   def debug(msg: String): Unit = if (atLeast(loglevel, "debug")) println(front() + "DEBUG: " + msg)
-  def isDebugEnabled() = atLeast(loglevel, "debug")
+  def isDebugEnabled()         = atLeast(loglevel, "debug")
   def warn(msg: String): Unit  = if (atLeast(loglevel, "warn")) println(front() + "WARN: " + msg)
-  def isWarnEnabled() = atLeast(loglevel, "warn")
+  def isWarnEnabled()          = atLeast(loglevel, "warn")
   def info(msg: String): Unit  = if (atLeast(loglevel, "info")) println(front() + "INFO: " + msg)
-  def isInfoEnabled() = atLeast(loglevel, "info")
+  def isInfoEnabled()          = atLeast(loglevel, "info")
   def trace(msg: String): Unit = if (atLeast(loglevel, "trace")) println(front() + "TRACE: " + msg)
-  def isTraceEnabled() = atLeast(loglevel, "trace")
+  def isTraceEnabled()         = atLeast(loglevel, "trace")
   def error(msg: String): Unit = if (atLeast(loglevel, "info")) println(front() + "ERROR: " + msg)
 }
 

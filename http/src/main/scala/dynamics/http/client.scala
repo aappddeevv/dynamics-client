@@ -51,11 +51,11 @@ final case class Client(open: Service[HttpRequest, DisposableResponse], dispose:
   }
 
   /**
-   * Fetch response, process response with `d` regardless of status. Hence your
-   * `d` needs to be very general. Throws any exception found in `d`'s returned
-   * value, DecodeResult.
-   * 
-   */
+    * Fetch response, process response with `d` regardless of status. Hence your
+    * `d` needs to be very general. Throws any exception found in `d`'s returned
+    * value, DecodeResult.
+    *
+    */
   def fetchAs[A](req: HttpRequest)(implicit d: EntityDecoder[A]): IO[A] = {
     fetch(req) { resp =>
       d.decode(resp).fold(throw _, identity)

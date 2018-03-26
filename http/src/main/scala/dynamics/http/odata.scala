@@ -21,10 +21,10 @@ object OData {
   def attr(p: String, mod: String) = p + "@" + mod
 
   def getBasicHeaders(): HttpHeaders =
-    HttpHeaders("OData-Version" -> "4.0",
-      "OData-MaxVersion" -> "4.0",
-      "Cache-Control" -> "no-cache",
-      "If-None-Match" -> "null") ++
+    HttpHeaders("OData-Version"    -> "4.0",
+                "OData-MaxVersion" -> "4.0",
+                "Cache-Control"    -> "no-cache",
+                "If-None-Match"    -> "null") ++
       AcceptHeader ++
       ContentTypeJson
 
@@ -115,13 +115,13 @@ sealed trait Part {
 }
 
 object Part {
+
   /** Make changeset from SingleParts. */
   //def mkChangeset(parts: Seq[SinglePart], b: Boundary = Boundary.mkBoundary("changeset_")) = ChangeSet(parts, b)
 
   /** An empty part. */
   val empty = EmptyPart
 }
-
 
 /** Single request. Either standalone or in a changeset. Content-Type and
   * Content-Transfer-Encoding is added to each part prior to the request being
@@ -140,10 +140,10 @@ final case class SinglePart(request: HttpRequest, xtra: HttpHeaders = HttpHeader
   * @param bounday The changeset boundary.
   * @param xtra Extra headers after the changeset boundary but not in the actual requests.
   */
-final case class ChangeSet(
-  parts: Seq[SinglePart],
-  boundary: Boundary = Boundary.mkBoundary("changeset_"),
-  xtra: HttpHeaders = HttpHeaders.empty) extends Part
+final case class ChangeSet(parts: Seq[SinglePart],
+                           boundary: Boundary = Boundary.mkBoundary("changeset_"),
+                           xtra: HttpHeaders = HttpHeaders.empty)
+    extends Part
 
 /** Renders to empty. */
 private[dynamics] final object EmptyPart extends Part { val xtra = HttpHeaders.empty }
@@ -153,7 +153,6 @@ object ChangeSet {
   /** ChangeSet from requests. */
   def fromRequests(requests: Seq[HttpRequest]): ChangeSet = ChangeSet(requests.map(SinglePart(_)))
 }
-
 
 /**
   * Multipart composed of a list of parts: individual requests and changesets.

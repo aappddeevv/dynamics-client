@@ -29,11 +29,13 @@ object Utils {
   def options() = js.Dynamic.literal()
 
   /** Pretty print a js.Object */
-  def pprint(o: js.Object, opts: nodejs.util.InspectOptions = new nodejs.util.InspectOptions(depth = null, maxArrayLength = 10)) =
+  def pprint(o: js.Object,
+             opts: nodejs.util.InspectOptions = new nodejs.util.InspectOptions(depth = null, maxArrayLength = 10)) =
     nodejs.util.Util.inspect(o, opts)
 
   /** Render a js.Any into a string using nodejs Inspect. */
-  def render(o: js.Any, opts: nodejs.util.InspectOptions = new nodejs.util.InspectOptions(depth = null, maxArrayLength = 10)) =
+  def render(o: js.Any,
+             opts: nodejs.util.InspectOptions = new nodejs.util.InspectOptions(depth = null, maxArrayLength = 10)) =
     nodejs.util.Util.inspect(o, opts)
 
   /** Pretty print a js.Dynamic object. */
@@ -157,20 +159,9 @@ object Utils {
   def filename(path: String): Option[String] =
     Option(Path.basename(path)).filterNot(_.isEmpty)
 
-  /*
-  /** Merge two js.Objects in scale. */
-  def mergeJSObjects[A <: js.Object](objs: A*): A = {
-    val result = js.Dictionary.empty[Any]
-    for (source <- objs) {
-      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])
-        result(key) = value
-    }
-    result.asInstanceOf[A]
-  }
-   */
-
-   /**
-    * https://stackoverflow.com/questions/36561209/is-it-possible-to-combine-two-js-dynamic-objects
+  /**
+    * This is really just a Semigroup "combine" operation but it does
+    * *not* use "combine" at lower levels of the structure. https://stackoverflow.com/questions/36561209/is-it-possible-to-combine-two-js-dynamic-objects
     */
   @inline def mergeJSObjects(objs: js.Dynamic*): js.Dynamic = {
     // not js.Any? maybe keep js or scala values in here....
@@ -182,8 +173,11 @@ object Utils {
     result.asInstanceOf[js.Dynamic]
   }
 
-  /** Merge objects and Ts together. Good for merging props with data- attributes. */
-  @inline def merge[T <: js.Object](objs: T | js.Dynamic *): T = {
+  /**
+    * Merge objects and Ts together. Good for merging props with data- attributes.
+    * See the note from [[mergeJSObjects]].
+    */
+  @inline def merge[T <: js.Object](objs: T | js.Dynamic*): T = {
     val result = js.Dictionary.empty[Any]
     for (source <- objs) {
       for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])

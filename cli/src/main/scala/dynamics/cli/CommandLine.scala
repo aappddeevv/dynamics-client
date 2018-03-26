@@ -965,24 +965,48 @@ object CommandLine {
     import op._
     val h = CliHelpers(op)
     import h.sub
+
+    def addUserEmail() =
+      arg[String]("user-email")
+      .text("User email (internalemailaddress) to  modify")
+      .action((x,c) => c.lens(_.user.userid).set(Some(x)))
+
+    def addRoles() =
+      arg[Seq[String]]("roles")
+        .unbounded()
+        .text("Role list using names (not ids). Separate by comma and shell quote the values if needed or repeat the option.")
+        .action((x, c) => c.lens(_.user.roleNames).modify(rlist => rlist ++ x))
+
     cmd("users")
       .text("Manage users.")
       .action((x, c) => withCmd(c, "users"))
       .children(
         sub("list")
           .text("List users")
-          .action((x,c) => withSub(c, "list")),
+          .action((x,c) => withSub(c, "listUsers")),
+        sub("list-roles")
+          .text("List roles")
+          .action((x,c) => withSub(c, "listRoles")),
+        sub("user-roles")
+          .text("List roles for a user")
+          .action((x,c) => withSub(c, "listUserRoles"))
+          .children(
+            addUserEmail(),
+          ),
         sub("add-roles")
           .text("Add one or more roles to a user.")
-          .action((x, c) => withSub(c, "add-roles"))
+          .action((x, c) => withSub(c, "addRoles"))
           .children(
-            arg[String]("user-email")
-              .text("User email (internalemailaddress) to  modify")
-              .action((x,c) => c.lens(_.user.userid).set(Some(x))),
-            arg[Seq[String]]("roles")
-              .text("Role list using names (not ids). Separate by comma and shell quote the values if needed.")
-              .action((x, c) => c.lens(_.user.roleNames).modify(rlist => rlist ++ x))
-          )
+            addUserEmail(),
+            addRoles()
+          ),
+        sub("remove-roles")
+          .text("Remove one or more roles to a user.")
+          .action((x, c) => withSub(c, "removeRoles"))
+          .children(
+            addUserEmail(),
+            addRoles()
+          )        
       )
   }
 

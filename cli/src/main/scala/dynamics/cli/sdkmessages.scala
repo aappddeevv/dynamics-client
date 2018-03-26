@@ -79,10 +79,10 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
       dynclient.getOneWithKey[SDKMessageProcessingStep](ENTITYSET, id).map { step =>
         println(s"$msg SDK message [${step.name}] with id ${id}")
       }
-    }
+  }
 
-  def mkBody(activate: Boolean) = 
-    if(activate)"""{"statecode": 0, "statuscode": 1 }"""
+  def mkBody(activate: Boolean) =
+    if (activate) """{"statecode": 0, "statuscode": 1 }"""
     else """{"statecode": 1, "statuscode": 2 }"""
 
   def changeActivation(activate: Boolean, message: String) = Action { config =>
@@ -100,7 +100,7 @@ class SDKMessageProcessingStepsActions(context: DynamicsContext) extends LazyLog
     doit.map(_ => ())
   }
 
-  def activate() =  changeActivation(true, "Activated")
+  def activate() = changeActivation(true, "Activated")
 
   def deactivate() = changeActivation(false, "Deactivated")
 }

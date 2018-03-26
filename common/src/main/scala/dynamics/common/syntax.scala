@@ -54,10 +54,10 @@ trait JsAnySyntax {
 }
 
 final case class JsObjectOps(o: js.Object) {
-  @inline def asDict[A] = o.asInstanceOf[js.Dictionary[A]]
-  @inline def asAnyDict = o.asInstanceOf[js.Dictionary[js.Any]]
-  @inline def asDyn     = o.asInstanceOf[js.Dynamic]
-  @inline def add(that: js.Object) = merge(o, that)
+  @inline def asDict[A]                   = o.asInstanceOf[js.Dictionary[A]]
+  @inline def asAnyDict                   = o.asInstanceOf[js.Dictionary[js.Any]]
+  @inline def asDyn                       = o.asInstanceOf[js.Dynamic]
+  @inline def add(that: js.Object)        = merge(o, that)
   @inline def add(that: js.Dictionary[_]) = merge(o, that.asInstanceOf[js.Object])
 }
 
@@ -79,8 +79,8 @@ final case class JsUndefOrStringOps(a: UndefOr[String]) {
 
 /** Not sure this is really going to do much for me. */
 final case class JsUndefOrOps[A](a: UndefOr[A]) {
-  @inline def isNull  = a == null
-  @inline def isEmpty = isNull || !a.isDefined
+  @inline def isNull          = a == null
+  @inline def isEmpty         = isNull || !a.isDefined
   @inline def toNonNullOption = if (a.isEmpty) None else a.toOption
   @inline def toStringJs      = a.asInstanceOf[js.Any].toString()
 }
@@ -92,18 +92,18 @@ trait JsUndefOrSyntax {
 
 final case class JsDynamicOps(val jsdyn: js.Dynamic) {
   @inline def asString: String        = jsdyn.asInstanceOf[String]
-  @inline  def asInt: Int              = jsdyn.asInstanceOf[Int]
-  @inline  def asArray[A]: js.Array[A] = jsdyn.asInstanceOf[js.Array[A]]
-  @inline  def asBoolean: Boolean      = jsdyn.asInstanceOf[Boolean]
+  @inline def asInt: Int              = jsdyn.asInstanceOf[Int]
+  @inline def asArray[A]: js.Array[A] = jsdyn.asInstanceOf[js.Array[A]]
+  @inline def asBoolean: Boolean      = jsdyn.asInstanceOf[Boolean]
 
   /** @deprecated use asJsObj */
-  @inline  def asJSObj: js.Object          = jsdyn.asInstanceOf[js.Object]
-  @inline  def asJsObj: js.Object          = jsdyn.asInstanceOf[js.Object]
-  @inline  def asDict[A]: js.Dictionary[A] = jsdyn.asInstanceOf[js.Dictionary[A]]
-  @inline  def asUndefOr[A]: js.UndefOr[A] = jsdyn.asInstanceOf[js.UndefOr[A]]
-  @inline  def asJsObjSub[A <: js.Object]  = jsdyn.asInstanceOf[A] // assumes its there!
-  @inline  def asJsArray[A <: js.Object]   = jsdyn.asInstanceOf[js.Array[A]]
-  @inline  def asOption[T <: js.Object]: Option[T] =
+  @inline def asJSObj: js.Object          = jsdyn.asInstanceOf[js.Object]
+  @inline def asJsObj: js.Object          = jsdyn.asInstanceOf[js.Object]
+  @inline def asDict[A]: js.Dictionary[A] = jsdyn.asInstanceOf[js.Dictionary[A]]
+  @inline def asUndefOr[A]: js.UndefOr[A] = jsdyn.asInstanceOf[js.UndefOr[A]]
+  @inline def asJsObjSub[A <: js.Object]  = jsdyn.asInstanceOf[A] // assumes its there!
+  @inline def asJsArray[A <: js.Object]   = jsdyn.asInstanceOf[js.Array[A]]
+  @inline def asOption[T <: js.Object]: Option[T] =
     if (js.DynamicImplicits.truthValue(jsdyn)) Some(jsdyn.asInstanceOf[T])
     else None
   @inline def add(that: js.Dynamic) = mergeJSObjects(jsdyn, that)
@@ -149,6 +149,16 @@ trait JsObjectInstances {
     sb.append(Utils.pprint(obj))
     sb.toString
   }
+
+  /** Monoid for js.Object, which is really just a dick. Use |+| to combine. */
+  implicit val jsObjectMonoid: Monoid[js.Object] =
+    new Monoid[js.Object] {
+      def combine(lhs: js.Object, rhs: js.Object): js.Object = {
+        Utils.merge[js.Object](lhs, rhs)
+      }
+
+      def empty: js.Object = new js.Object()
+    }
 }
 
 /** These are not all implicits. FIXME */

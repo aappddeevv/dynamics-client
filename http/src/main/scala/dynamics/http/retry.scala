@@ -18,7 +18,6 @@ import org.slf4j._
 
 import dynamics.common._
 
-
 trait Retry extends LazyLogger {
   import Status._
 
@@ -26,11 +25,11 @@ trait Retry extends LazyLogger {
 
   protected[this] val RetriableStatuses = Set(
     RequestTimeout,
-    /** 
-     * This is problematic, could be badly composed content! but then would we retry?
-     * May have to read error to know which toasts everyone downstream of the retry.
-     */
-    InternalServerError, 
+    /**
+      * This is problematic, could be badly composed content! but then would we retry?
+      * May have to read error to know which toasts everyone downstream of the retry.
+      */
+    InternalServerError,
     ServiceUnavailable,
     BadGateway,
     GatewayTimeout,
@@ -41,94 +40,91 @@ trait Retry extends LazyLogger {
   def isRetryable(s: Status): Boolean = RetriableStatuses.contains(s)
 
   /**
-   * Create a retry policy that retries on `CommunicationFailure`,
-   * `DecodeFailure` or UnexectedStatus (if isRetryable(status) is
-   * true)failures.
-   */
-  def retryIfRetryableThrowables[F[_], A](retry: F[A] => F[A])
-    (implicit eh: ApplicativeError[F, Throwable]): F[A] => F[A] =
-    fa => fa.recoverWith {
-      case c: CommunicationsFailure => retry(fa)
-      case d: MessageBodyFailure => retry(fa)
-      case u@UnexpectedStatus(status,_,_) if(isRetryable(status)) => retry(fa)
+    * Create a retry policy that retries on `CommunicationFailure`,
+    * `DecodeFailure` or UnexectedStatus (if isRetryable(status) is
+    * true)failures.
+    */
+  def retryIfRetryableThrowables[F[_], A](retry: F[A] => F[A])(
+      implicit eh: ApplicativeError[F, Throwable]): F[A] => F[A] =
+    fa =>
+      fa.recoverWith {
+        case c: CommunicationsFailure                                    => retry(fa)
+        case d: MessageBodyFailure                                       => retry(fa)
+        case u @ UnexpectedStatus(status, _, _) if (isRetryable(status)) => retry(fa)
     }
 
-  /** 
-   * Convert an effect containing a `DisposableResponse`, if it fails
-   * predictate, to an F UnexpectedStatus error. Otherwise leave it
-   * untouched. Success is defined by the predicate. If you have a
-   * `Kleisli[F,?,DisposableResponse]` you can obtain a
-   * `Kleisli[F,?,DisposableResponse]` using `k1 andThen k2` and ensure your
-   * effect carries a failure if the status does not satisfy
-   * `predicate`. Callers can use this function if they are not sure that an
-   * effect carrying a `DisposableResponse` has converted the effect to contain
-   * an error for specific status codes.
-   */
-  def makeSomeStatusesErrors[F[_]](isError: Status => Boolean = isRetryable)
-    (implicit eh: ApplicativeError[F, Throwable]):
-      Kleisli[F, DisposableResponse, DisposableResponse] = Kleisli { dr =>
-    if(!isError(dr.response.status)) eh.pure(dr)
+  /**
+    * Convert an effect containing a `DisposableResponse`, if it fails
+    * predictate, to an F UnexpectedStatus error. Otherwise leave it
+    * untouched. Success is defined by the predicate. If you have a
+    * `Kleisli[F,?,DisposableResponse]` you can obtain a
+    * `Kleisli[F,?,DisposableResponse]` using `k1 andThen k2` and ensure your
+    * effect carries a failure if the status does not satisfy
+    * `predicate`. Callers can use this function if they are not sure that an
+    * effect carrying a `DisposableResponse` has converted the effect to contain
+    * an error for specific status codes.
+    */
+  def makeSomeStatusesErrors[F[_]](isError: Status => Boolean = isRetryable)(
+      implicit eh: ApplicativeError[F, Throwable]): Kleisli[F, DisposableResponse, DisposableResponse] = Kleisli { dr =>
+    if (!isError(dr.response.status)) eh.pure(dr)
     else eh.raiseError(UnexpectedStatus(dr.response.status, None, Some(dr.response)))
   }
 
   def getMessage(t: Throwable, fallback: String = "no message"): String = {
-    (Option(t.getMessage()) orElse Option(t.getCause()).map(_.getMessage()) orElse Option(t.toString())).getOrElse(fallback)
+    (Option(t.getMessage()) orElse Option(t.getCause()).map(_.getMessage()) orElse Option(t.toString()))
+      .getOrElse(fallback)
   }
 
   /**
-   * If your IO carries an error, retry. If you want to have retry based a bad
-   * status, ensure your IO has converted the desired statuses to an effect
-   * failure first (see `ensureSeccussfulStatus`).
-   */ 
-  def retryWithBackoff[A](initialDelay: FiniteDuration=5.seconds, maxRetries: Int=5)(ioa: IO[A])
-    (implicit timer: Timer[IO]): IO[A] =
+    * If your IO carries an error, retry. If you want to have retry based a bad
+    * status, ensure your IO has converted the desired statuses to an effect
+    * failure first (see `ensureSeccussfulStatus`).
+    */
+  def retryWithBackoff[A](initialDelay: FiniteDuration = 5.seconds, maxRetries: Int = 5)(ioa: IO[A])(
+      implicit timer: Timer[IO]): IO[A] =
     ioa.handleErrorWith { error =>
-      if(maxRetries > 0) {
+      if (maxRetries > 0) {
         val msg = getMessage(error)
-        if(logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying with backoff. ${maxRetries}")
-          IO.sleep(initialDelay) *> retryWithBackoff(initialDelay * 2, maxRetries - 1)(ioa)
-        }
-        else IO.raiseError(error)
+        if (logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying with backoff. ${maxRetries}")
+        IO.sleep(initialDelay) *> retryWithBackoff(initialDelay * 2, maxRetries - 1)(ioa)
+      } else IO.raiseError(error)
     }
 
   /**
-   * If your IO carries an error, retry. If you want to have retry based a bad
-   * status, ensure your IO has converted the desired statuses to an effect
-   * failure first (see `ensureSeccussfulStatus`).
-   */ 
-  def retryWithPause[A](delayBetween: FiniteDuration=5.seconds, maxRetries: Int=5)(ioa: IO[A])
-    (implicit timer: Timer[IO]): IO[A] =
+    * If your IO carries an error, retry. If you want to have retry based a bad
+    * status, ensure your IO has converted the desired statuses to an effect
+    * failure first (see `ensureSeccussfulStatus`).
+    */
+  def retryWithPause[A](delayBetween: FiniteDuration = 5.seconds, maxRetries: Int = 5)(ioa: IO[A])(
+      implicit timer: Timer[IO]): IO[A] =
     ioa.handleErrorWith { error =>
-      if(maxRetries > 0) {
+      if (maxRetries > 0) {
         val msg = getMessage(error)
-        if(logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying with pause. ${maxRetries}")
+        if (logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying with pause. ${maxRetries}")
         IO.sleep(delayBetween) *> retryWithPause(delayBetween, maxRetries - 1)(ioa)
-      }
-      else IO.raiseError(error)
+      } else IO.raiseError(error)
     }
 
   /**
-   * If your IO carries an error, retry. If you want to have retry based a bad
-   * status, ensure your IO has converted the desired statuses to an effect
-   * failure first (see `ensureSeccussfulStatus`).
-   */ 
-  def retryDirectly[A](maxRetries: Int=5)(ioa: IO[A]): IO[A] =
+    * If your IO carries an error, retry. If you want to have retry based a bad
+    * status, ensure your IO has converted the desired statuses to an effect
+    * failure first (see `ensureSeccussfulStatus`).
+    */
+  def retryDirectly[A](maxRetries: Int = 5)(ioa: IO[A]): IO[A] =
     ioa.handleErrorWith { error =>
-      if(maxRetries > 0) {
+      if (maxRetries > 0) {
         val msg = getMessage(error)
-        if(logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying directly. ${maxRetries}")
-        retryDirectly(maxRetries-1)(ioa)
-      }
-      else IO.raiseError(error)
+        if (logger.isWarnEnabled()) logger.warn(s"Request failed: $msg. Retrying directly. ${maxRetries}")
+        retryDirectly(maxRetries - 1)(ioa)
+      } else IO.raiseError(error)
     }
 
 }
 
 object retry extends Retry
 
-
-/** 
- * Implement retry transparently for a Client as Middleware.  For dynamics, this
+/**
+  * Implement retry transparently for a Client as Middleware.  For dynamics, this
   * is a bit hard as the server could be busy but it returns 500. Otherwise,
   * other 500 errors due to other request issues may retry a bunch of times
   * until they fail but this should only affect developers. The retry policies
@@ -159,32 +155,30 @@ trait RetryClient extends LazyLogger with Retry {
   // }
 
   /**
-   * Construct middleware with retry strategies which ensure that responses with
-   * statuses known to be retryable are retried. The retry policy is embedded in
-   * the "retry" parameter. Therefore, your effect must be able to express
-   * "retry" semantics. "retry" is composed with the output from the Middlware's
-   * input Client. Your retry strategy may wish to filter on different types of
-   * errors so that not every `Throwable` causes a retry.
-   */
-  def makeMiddleware(retry: IO[DisposableResponse] => IO[DisposableResponse])
-      (implicit eh: ApplicativeError[IO, Throwable]): Middleware =
+    * Construct middleware with retry strategies which ensure that responses with
+    * statuses known to be retryable are retried. The retry policy is embedded in
+    * the "retry" parameter. Therefore, your effect must be able to express
+    * "retry" semantics. "retry" is composed with the output from the Middlware's
+    * input Client. Your retry strategy may wish to filter on different types of
+    * errors so that not every `Throwable` causes a retry.
+    */
+  def makeMiddleware(retry: IO[DisposableResponse] => IO[DisposableResponse])(
+      implicit eh: ApplicativeError[IO, Throwable]): Middleware =
     client => {
       client.copy(Kleisli { req: HttpRequest =>
         (client.open andThen makeSomeStatusesErrors[IO](isRetryable) mapF retry)(req)
-      },
-        client.dispose)
+      }, client.dispose)
     }
 
-  def unstable_pause(maxRetries: Int = 5, delayBetween: FiniteDuration = 5.seconds)
-    (implicit eh: ApplicativeError[IO, Throwable]): Middleware =
+  def unstable_pause(maxRetries: Int = 5, delayBetween: FiniteDuration = 5.seconds)(
+      implicit eh: ApplicativeError[IO, Throwable]): Middleware =
     makeMiddleware(retryIfRetryableThrowables(retryWithPause(delayBetween, maxRetries)))
 
-  def unstable_directly(maxRetries: Int = 5)
-    (implicit eh: ApplicativeError[IO, Throwable]): Middleware =
+  def unstable_directly(maxRetries: Int = 5)(implicit eh: ApplicativeError[IO, Throwable]): Middleware =
     makeMiddleware(retryIfRetryableThrowables(retryDirectly(maxRetries)))
 
-  def unstable_backoff(maxRetries: Int = 5, initialDelay: FiniteDuration = 5.seconds)
-    (implicit eh: ApplicativeError[IO, Throwable]): Middleware =
+  def unstable_backoff(maxRetries: Int = 5, initialDelay: FiniteDuration = 5.seconds)(
+      implicit eh: ApplicativeError[IO, Throwable]): Middleware =
     makeMiddleware(retryIfRetryableThrowables(retryWithBackoff(initialDelay, maxRetries)))
 
   // /** Middlaware based on a retry.Pause policy. */
@@ -219,6 +213,5 @@ trait RetryClient extends LazyLogger with Retry {
   //   }
 
 }
-
 
 object RetryClient extends RetryClient

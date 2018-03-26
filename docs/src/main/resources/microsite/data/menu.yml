@@ -35,6 +35,9 @@ options:
   - title: webresources
     url: docs/webresources.html
 
+  - title: workflows
+    url: docs/workflows.html
+
   - title: Create your own CLI
     url: docs/creatingacustomcli.html
 

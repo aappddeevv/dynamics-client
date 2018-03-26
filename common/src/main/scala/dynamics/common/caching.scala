@@ -12,12 +12,12 @@ import io.scalajs.nodejs.events.IEventEmitter
 import cats.effect._
 
 class NodeCacheOptions(
-  /** In seconds. Default is 0. */
-  val stdTTL: UndefOr[Int] = js.undefined,
-  /** Delete interval. */
-  val checkperiod: UndefOr[Int] = js.undefined,
-  val errorOnMissing: UndefOr[Boolean] = js.undefined,
-  /** Clone the returned value, vs just give it back directly. */
+    /** In seconds. Default is 0. */
+    val stdTTL: UndefOr[Int] = js.undefined,
+    /** Delete interval. */
+    val checkperiod: UndefOr[Int] = js.undefined,
+    val errorOnMissing: UndefOr[Boolean] = js.undefined,
+    /** Clone the returned value, vs just give it back directly. */
     val useClones: UndefOr[Boolean] = js.undefined
 ) extends js.Object
 
@@ -160,8 +160,8 @@ case class LineCache(filename: String) extends OfflineCache {
     }
 }
 
-/** 
- * Manage a backing cache file.
+/**
+  * Manage a backing cache file.
   *
   * @param fname Generate a filename for the  file cache.
   * @param ignore Whether the file cache should be ignored and reacquired.

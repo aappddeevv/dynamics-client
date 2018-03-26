@@ -166,11 +166,11 @@ object NodeFetchClient extends LazyLogger {
     * @param defaultHeaders Headers applied to every request.
     */
   def create(info: ConnectionInfo,
-                debug: Boolean = false,
-                defaultHeaders: HttpHeaders = HttpHeaders.empty,
-                opts: NodeFetchClientOptions = DefaultNodeFetchClientOptions)(implicit ec: ExecutionContext,
-                                                                              ehandler: ApplicativeError[IO, Throwable],
-                                                                              scheduler: Scheduler): Client = {
+             debug: Boolean = false,
+             defaultHeaders: HttpHeaders = HttpHeaders.empty,
+             opts: NodeFetchClientOptions = DefaultNodeFetchClientOptions)(implicit ec: ExecutionContext,
+                                                                           ehandler: ApplicativeError[IO, Throwable],
+                                                                           scheduler: Scheduler): Client = {
 
     require(info.dataUrl.isDefined)
     val donothing = IO.pure(())

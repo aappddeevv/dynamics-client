@@ -30,10 +30,10 @@ import MonadlessIO._
 
 @js.native
 trait SystemuserJS extends js.Object {
-  val firstname: String = js.native
-  val lastname: String = js.native
-  val fullname: String = js.native
-  val systemuserid: String = js.native
+  val firstname: String            = js.native
+  val lastname: String             = js.native
+  val fullname: String             = js.native
+  val systemuserid: String         = js.native
   val internalemailaddress: String = js.native
 
   //@JSName("systemuserroles_association@odata.nextLink")
@@ -41,44 +41,71 @@ trait SystemuserJS extends js.Object {
 }
 
 @js.native
-trait RoleJS extends js.Object {
+trait RoleNameJS extends js.Object {
   val roleid: String = js.native
-  val name: String = js.native
+  val name: String   = js.native
 }
 
-trait UsersDAO { 
+@js.native
+trait RoleJS extends RoleNameJS {
+  // pure GUID
+  val organizationid: String          = js.native
+  val _businesunitid_value: String    = js.native
+  val solutionid: String              = js.native
+  val _parentrootroleid_value: String = js.native
+
+  @JSName("_businessunitid_value@OData.Community.Display.V1.FormattedValue")
+  val _businesunitid_value_fv: String = js.native
+  @JSName("_parentrootroleid_value@OData.Community.Display.V1.FormattedValue")
+  val _parentrootroleid_value_fv: String = js.native
+  @JSName("componentstate@OData.Community.Display.V1.FormattedValue")
+  val componentstate_fv: String = js.native
+}
+
+trait UsersDAO {
   val dynclient: DynamicsClient
 
-  def getList() = {
+  def getUsers() = {
     val query =
       "/systemusers?$select=firstname,lastname,fullname,internalemailaddress"
     dynclient.getList[SystemuserJS](query)
   }
 
+  def getRoles(organizationId: Option[String] = None, businessUnitId: Option[String] = None) = {
+    val ofilter = organizationId.map(o => s"organizationid eq $o")
+    val bfilter = businessUnitId.map(b => s"_businessunitid_value eq $b")
+    val q = QuerySpec(
+      filter = Option(Seq(ofilter, bfilter).collect { case Some(s) => s }.mkString(" and ")).filterNot(_.isEmpty)
+    )
+    dynclient.getList[RoleJS](q.url("roles"))
+  }
+
   def getUserByEmail(email: String): IO[Option[SystemuserJS]] = {
     val q = QuerySpec(
-      filter=Some(s"internalemailaddress eq '${email}'"),
-      expand=Seq(Expand("systemuserroles_association"))
+      filter = Some(s"internalemailaddress eq '${email}'"),
+      expand = Seq(Expand("systemuserroles_association"))
     )
-    dynclient.getList[SystemuserJS](q.url("systemusers"))
-      .map{ u =>
-        if(u.size == 1) Some(u(0))
+    dynclient
+      .getList[SystemuserJS](q.url("systemusers"))
+      .map { u =>
+        if (u.size == 1) Some(u(0))
         else None
       }
   }
 
   def getRoleByName(name: String): IO[Option[RoleJS]] = {
     val q = QuerySpec(filter = Some(s"name eq '${name}'"))
-    dynclient.getList[RoleJS](q.url("roles"))
-      .map{ roles =>
-        if(roles.size == 1) Some(roles(0))
+    dynclient
+      .getList[RoleJS](q.url("roles"))
+      .map { roles =>
+        if (roles.size == 1) Some(roles(0))
         else None
       }
   }
 
   def getRolesForUser(id: String) = {
     val q = QuerySpec(
-      properties=Seq(NavProperty("systemuserroles_association"))
+      properties = Seq(NavProperty("systemuserroles_association"))
     )
     dynclient.getList[RoleJS](q.url(s"systemusers($id)"))
   }
@@ -87,81 +114,190 @@ trait UsersDAO {
   def getUserAndCurrentRolesByEmail(email: String) = {
     getUserByEmail(email)
       .flatMap { userOpt =>
-        userOpt.fold(IO.pure(Option.empty[(SystemuserJS, Seq[RoleJS])]))(
-          u => getRolesForUser(u.systemuserid)
-          .map { roles =>
-            Some((u, roles))
-          })
+        userOpt.fold(IO.pure(Option.empty[(SystemuserJS, Seq[RoleJS])]))(u =>
+          getRolesForUser(u.systemuserid).map(roles => Some((u, roles))))
       }
   }
 
   def addRole(systemuserId: String, roleId: String) =
-    dynclient.associate(
-      "systemusers",
-      systemuserId,
-      "systemuserroles_association",
-      "roles",
-      roleId)
+    dynclient.associate("systemusers", systemuserId, "systemuserroles_association", "roles", roleId, false)
+
+  def removeRole(systemuserId: String, roleId: String) =
+    dynclient.disassociate("systemusers", systemuserId, "systemuserroles_association", Some(roleId))
+
+  /**
+    * Given a list of string role names, return (valid, invalid, all) role names. "all"
+    * is all role (id, name) tuples in the org.
+    */
+  def validateRoleNames(names: Seq[String]): IO[(Seq[String], Seq[String], Seq[RoleNameJS])] = {
+    val q = QuerySpec(select = Seq("roleid", "name"))
+    dynclient
+      .getList[RoleJS](q.url("roles"))
+      .map { list =>
+        val inputs   = names.distinct
+        val allNames = list.map(_.name)
+        val valid    = allNames.intersect(inputs)
+        (valid, names diff valid, list)
+      }
+  }
+
 }
 
 class UsersActions(context: DynamicsContext) extends UsersDAO {
   import context._
   implicit val dec = JsObjectDecoder[SystemuserJS]
-  val dynclient = context.dynclient
+  val dynclient    = context.dynclient
 
-  val list = Action { config =>
-    getList().map { list =>
-      IO {
-        println("Users")
-        val cols  = jsobj("100" -> jsobj(width = 40))
-        val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat), columns = cols)
-        val data: Seq[Seq[String]] =
-          Seq(Seq("#", "systemuserid", "lastname", "firstname", "fullname", "internalemailaddress")) ++
-        list.zipWithIndex.map {
+  def renderRoleList(config: CommonConfig, roles: Seq[RoleJS]): String = {
+    val cols = jsobj("100" -> jsobj(width = 40))
+    val topts = new TableOptions(
+      border = Table.getBorderCharacters(config.tableFormat),
+      columns = cols
+    )
+    val data: Seq[Seq[String]] =
+      Seq(Seq("#", "roleid", "name", "parentrootrole", "componentstate", "solutionid", "businessunit")) ++
+        roles.sortBy(_.name).zipWithIndex.map {
           case (i, idx) =>
             Seq((idx + 1).toString,
-              i.systemuserid,
-              i.lastname,
-              i.firstname,
-              i.fullname,
-              i.internalemailaddress)
+                i.roleid,
+                i.name,
+                i._parentrootroleid_value_fv,
+                i.componentstate_fv,
+                i.solutionid,
+                i._businesunitid_value_fv)
         }
-        val out = Table.table(data.map(_.toJSArray).toJSArray, topts)
-        println(out)
-      }}
+    Table.table(data.map(_.toJSArray).toJSArray, topts)
   }
 
-  val addRoles = Action { config =>
-    getUserAndCurrentRolesByEmail(config.user.userid.get)
-      .flatMap { _ match {
-        case None => IO(s"Unknown user.")
-        case Some((user, roles)) =>
-          val currentRoleNames = roles.map(_.name)
-          // filter out existing
-          val rolesToAdd = config.user.roleNames.filter(n => !currentRoleNames.contains(n))
-          println(s"Roles to be added: ${rolesToAdd}")
-          val roleEntitiesToAdd = unlift(rolesToAdd.map(n => getRoleByName(n)).toList.sequence)
-            .collect{ case Some(r) => r }
-          roleEntitiesToAdd
-            .map(r =>
-              addRole(user.systemuserid, r.roleid)
-                .map(result => (result, r)))
-            .toList.sequence
-            .map{ _.collect { case (added, role) if(added) => role }}
-            .map{ _.map(_.name).mkString(",")}
-      }}
+  val listRoles = Action { config =>
+    getRoles()
+      .flatMap { list =>
+        IO {
+          println("Roles")
+          println(renderRoleList(config.common, list))
+        }
+      }
   }
+
+  val listUserRoles = Action { config =>
+    getUserAndCurrentRolesByEmail(config.user.userid.get)
+      .flatMap {
+        _ match {
+          case Some((user, roles)) =>
+            IO {
+              println(s"Roles for ${user.internalemailaddress}")
+              println(renderRoleList(config.common, roles))
+            }
+          case None =>
+            IO(println(s"User not found."))
+        }
+      }
+  }
+
+  val list = Action { config =>
+    getUsers()
+      .flatMap { list =>
+        IO {
+          //list.foreach(u => println(PrettyJson.render(u)))
+          println("Users")
+          val cols  = jsobj("100" -> jsobj(width = 40))
+          val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat), columns = cols)
+          val data: Seq[Seq[String]] =
+            Seq(Seq("#", "systemuserid", "lastname", "firstname", "fullname", "internalemailaddress")) ++
+              list.sortBy(_.internalemailaddress).zipWithIndex.map {
+                case (i, idx) =>
+                  Seq((idx + 1).toString, i.systemuserid, i.lastname, i.firstname, i.fullname, i.internalemailaddress)
+              }
+          val out = Table.table(data.map(_.toJSArray).toJSArray, topts)
+          println(out)
+        }
+      }
+  }
+
+  private def add(user: SystemuserJS,
+                  currentRoles: Seq[RoleJS],
+                  valid: Seq[String],
+                  invalid: Seq[String],
+                  allRoles: Seq[RoleNameJS]): IO[String] = {
+    val roleNamesToAdd = valid intersect currentRoles.map(_.name)
+    val rolesToAdd     = allRoles.filter(r => roleNamesToAdd.contains(r.name))
+    //rolesToAdd.foreach{ e => js.Dynamic.global.console.log(e)}
+    rolesToAdd
+      .map(role => addRole(user.systemuserid, role.roleid).map(wasAdded => (role.name, wasAdded)))
+      .toList
+      .sequence
+      .flatMap { listOfResults =>
+        val nonAdds = listOfResults.filterNot(p => p._2).map(_._1)
+        val adds    = listOfResults.filter(p => p._2).map(_._1)
+        val rolesAddedMsg =
+          if (adds.length == 0) s"""No roles added."""
+          else s"""Roles added (${listOfResults.length}): ${adds.mkString(", ")}"""
+        val rolesNotAdded = s"""Roles not added: ${nonAdds.mkString(", ")}"""
+        if (nonAdds.length > 0) IO(s"${rolesAddedMsg}\n${rolesNotAdded}")
+        else IO(rolesAddedMsg)
+      }
+  }
+
+  private def remove(user: SystemuserJS,
+                     currentRoles: Seq[RoleJS],
+                     valid: Seq[String],
+                     invalid: Seq[String],
+                     allRoles: Seq[RoleNameJS]): IO[String] = {
+    val currentRoleNames  = currentRoles.map(_.name)
+    val roleNamesToRemove = valid intersect currentRoleNames
+    val rolesToRemove     = allRoles.filter(r => roleNamesToRemove.contains(r.name))
+    rolesToRemove
+      .map(role => removeRole(user.systemuserid, role.roleid).map(didHappen => (role.name, didHappen)))
+      .toList
+      .sequence
+      .flatMap { listOfResults =>
+        val nonRemoves = listOfResults.filterNot(p => p._2).map(_._1)
+        val removes    = listOfResults.filter(p => p._2).map(_._1)
+        val rolesRemovedMsg =
+          if (removes.length == 0) s"""No roles removed."""
+          else s"""Roles removed (${listOfResults.length}): ${removes.mkString(", ")}"""
+        val rolesNotRemoved = s"""Roles not added: ${nonRemoves.mkString(", ")}"""
+        if (nonRemoves.length > 0) IO(s"${rolesRemovedMsg}\n${rolesNotRemoved}")
+        else IO(rolesRemovedMsg)
+      }
+  }
+
+  private def doit(action: (SystemuserJS, Seq[RoleJS], Seq[String], Seq[String], Seq[RoleNameJS]) => IO[String]) =
+    Action { config =>
+      getUserAndCurrentRolesByEmail(config.user.userid.get)
+        .flatMap(userStuff =>
+          validateRoleNames(config.user.roleNames)
+            .map(roleCheck => (userStuff, roleCheck)))
+        .flatMap {
+          _ match {
+            case (_, (_, invalid, _)) if (invalid.length > 0) =>
+              IO.pure(s"""Invalid names: ${invalid.mkString(", ")}""")
+            case (None, _) =>
+              IO.pure(s"""Invalid user: ${config.user.userid.get}""")
+            case (Some((user, currentRoles)), (valid, Nil, allRoles)) =>
+              action(user, currentRoles, valid, Nil, allRoles)
+            case _ =>
+              IO.pure(s"""Internal error. Report this as a bug.""")
+          }
+        }
+        .map(println)
+    }
+
+  val addRoles    = doit(add _)
+  val removeRoles = doit(remove _)
 
   def get(command: String): Action = {
     command match {
-      case "list" => list
-      case "add-roles" => addRoles
+      case "listUsers"     => list
+      case "listUserRoles" => listUserRoles
+      case "listRoles"     => listRoles
+      case "addRoles"      => addRoles
+      case "removeRoles"   => removeRoles
       case _ =>
         Action { _ =>
           IO(println(s"users command '${command}' not recognized."))
         }
     }
   }
-
 
 }
