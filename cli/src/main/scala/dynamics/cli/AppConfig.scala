@@ -21,7 +21,8 @@ import dynamics.common._
     quiet: Boolean = false,
     verbose: Boolean = false,
     verbosity: Int = 0,
-    crmConfigFile: Option[String] = None,
+  crmConfigFile: Option[String] = None,
+  officeConfigFile: Option[String] = None,
     outputDir: String = "./",
     outputFile: Option[String] = None,
     logFile: String = "dynamicscli.log",
@@ -150,12 +151,10 @@ import dynamics.common._
     paramsFile: Option[String] = None,
     dataInputFile: String = "",
     verbosity: Int = 0,
-    batchSize: Int = 10,
     take: Option[Long] = None,
     drop: Option[Long] = None,
     maxPageSize: Option[Int] = None,
     cliParameters: Map[String, String] = Map(),
-    batch: Boolean = false,
     dryRun: Boolean = false,
     /** Query to run, if relevant. */
     query: Option[String] = None,
@@ -210,6 +209,65 @@ import dynamics.common._
     entityList: Seq[String] = Nil,
     name: Option[String] = None,
 )
+
+/**
+ * A simple cake to bundle together a data structure for capturing
+ * CLI parameters and a CLI parser that can parse parameters.
+ * 
+ * @todo: Should probably bundle together a `run` method to run the program.
+ */
+trait CLIApplication {
+
+  type AppConfig <: AppConfigLike
+
+  trait AppConfigLike {
+    def common: CommonConfig
+  }
+
+  /** Adds are a thunk to keep this pure. */
+  def addParserOpts: Seq[scopt.OptionParser[AppConfig] => Unit]
+
+  /** Add version and help options. */
+  protected def addBasicParserOpts(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    head("dynamics", BuildInfo.version)
+    version("version")
+      .abbr("v")
+      .text("Print version")
+    help("help")
+      .abbr("h")
+      .text("dynamics command line tool")
+  }
+}
+
+/** 
+ * Standard operations for a basic CLI.
+ */
+trait StandardCLIApplication extends CLIApplication {
+
+  type AppConfig <: AppConfigLike
+
+  trait AppConfigLike extends super.AppConfigLike {
+    def solution: SolutionConfig
+    def export: ExportConfig
+    def update: UpdateConfig
+    def etl: ETLConfig
+    def workflow: WorkflowConfig
+    def plugin: PluginConfig
+    def importdata: ImportConfig
+    def webResource: WebResourceConfig
+    def metadata: MetadataConfig
+    def sdkMessage: SDKMessageConfig
+    def test: TestConfig
+    def systemjob: SystemJobConfig
+    def action: ActionConfig
+    def settings: SettingsConfig
+    def appModule: AppModuleConfig
+    def token: TokenConfig
+    def user: UserConfig
+  }
+
+}
 
 @Lenses case class AppConfig(
     common: CommonConfig = CommonConfig(),

@@ -12,6 +12,8 @@ import scala.scalajs.js
 import js.annotation._
 import fs2._
 
+import cats.effect._
+
 import dynamics.common._
 import dynamics.client._
 import dynamics.http._
@@ -55,14 +57,14 @@ trait BatchOptions {
 object Processors {
 
   /** A list of (HttpRequest, optional correlation id) tuples. */
-  type RequestSet = Vector[(HttpRequest, Option[String])]
+  type RequestSet = Vector[(HttpRequest[IO], Option[String])]
 
   /**
     * Create a batch request from a (use changset, RequestSet) tuple.
     * TODO: Incorporate correlation ids into a structure that
     * can pull out the responses properly.
     */
-  val batch: (Boolean, RequestSet) => HttpRequest =
+  val batch: (Boolean, RequestSet) => HttpRequest[IO] =
     (useChangeSet, rset) => {
       val reqs  = rset.map(ro => SinglePart(ro._1))
       val label = "batch_" + java.util.UUID.randomUUID.toString()

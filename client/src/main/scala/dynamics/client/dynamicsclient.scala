@@ -48,7 +48,7 @@ case class DynamicsOptions(
     /**
       * Controls the use of `version` in some request scenarios.
       * DELETE + version => If-Match: version, delete succeeds if etag matches (204), fails otherwise (412).
-      * PATCH (update) + version => If-Match: version, update succeeds if etage matches (204), fails otherwise (412)
+      * PATCH (update) + version => If-Match: version, update succeeds if etag matches (204), fails otherwise (412)
       */
     applyOptimisticConcurrency: Option[Boolean] = None
 )
@@ -70,7 +70,7 @@ case class DynamicsOptions(
   * captured in this layer.
   *
   */
-case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo, debug: Boolean = false)(
+case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionInfo, debug: Boolean = false)(
     implicit ehandler: ApplicativeError[IO, Throwable],
     e: ExecutionContext)
     extends LazyLogger
@@ -79,7 +79,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
   /**
     * Create a failed effect and pull out a dynamics server error message from the body, if present.
     */
-  def responseToFailedTask[A](resp: HttpResponse, msg: String, req: Option[HttpRequest]): IO[A] = {
+  def responseToFailedTask[A](resp: HttpResponse[IO], msg: String, req: Option[HttpRequest[IO]]): IO[A] = {
     resp.body.flatMap { body =>
       logger.debug(s"ERROR: ${resp.status}: RESPONSE BODY: $body")
       val statuserror                       = Option(UnexpectedStatus(resp.status, request = req, response = Option(resp)))
@@ -127,25 +127,33 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
                         opts: DynamicsOptions = DefaultDynamicsOptions): IO[String] = {
     val b = ""
     val request =
-      HttpRequest(Method.PUT, s"/$entitySet($id)/$property", body = Entity.fromString(b), headers = toHeaders(opts))
+      HttpRequest[IO](Method.PUT, s"/$entitySet($id)/$property", body = Entity.fromString(b), headers = toHeaders(opts))
     http.fetch[String](request) {
       case Status.Successful(resp) if (resp.status == Status.NoContent) => IO.pure(id)
       case failedResponse                                               => responseToFailedTask(failedResponse, s"Update $entitySet($id)", Option(request))
     }
   }
 
-  /** Run a batch request. */
-  def batch[A](r: HttpRequest, m: Multipart)(implicit d: EntityDecoder[A]): IO[A] = {
+  /**
+   * @deprecated
+   */
+  def batch[R](r: HttpRequest[IO], m: Multipart)(implicit e: EntityEncoder[ Multipart], d: EntityDecoder[IO, R]): IO[R] =
+    batch(m,r.headers)(e, d)
+
+  /** 
+   * Run a batch request. Dynamics batch requests are POSTs. 
+   * @param headers Headers for the post. *not* for each request.
+   * @param opts dynamics options such as "prefer"
+   */
+  def batch[R](m: Multipart, headers: HttpHeaders = HttpHeaders.empty,
+    opts: DynamicsOptions = QuietDynamicsOptions)(implicit e: EntityEncoder[ Multipart], d: EntityDecoder[IO,R]): IO[R] = {
     import OData._
-    r match {
-      case HttpRequest(_, _, headers, body) => // this seems useless, never really use r...
-        val (mrendered, xtra) = EntityEncoder[Multipart].encode(m)
-        val therequest        = HttpRequest(Method.POST, "/$batch", headers = headers ++ xtra, body = mrendered)
-        http.fetch[A](therequest) {
-          case Status.Successful(resp) => resp.as[A]
-          case failedResponse =>
-            responseToFailedTask(failedResponse, s"Batch", Option(therequest))
-        }
+    val (mrendered, xtra) = e.encode(m)
+    val therequest        = HttpRequest[IO](Method.POST, "/$batch", headers = headers ++ toHeaders(opts) ++ xtra, body = mrendered)
+    http.fetch[R](therequest) {
+      case Status.Successful(resp) => resp.as[R]
+      case failedResponse =>
+        responseToFailedTask(failedResponse, s"Batch", Option(therequest))
     }
   }
 
@@ -154,13 +162,13 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     * For now, do not use return=representation.
     *
     */
-  def update(entitySet: String,
+  def update[B](entitySet: String,
              id: String,
-             body: String,
-             upsertPreventCreate: Boolean = false,
+             body: B,
+             upsertPreventCreate: Boolean = true,
              upsertPreventUpdate: Boolean = false,
-             opts: DynamicsOptions = DefaultDynamicsOptions): IO[String] = {
-    val request = mkUpdateRequest(entitySet, id, body, upsertPreventCreate, upsertPreventUpdate, opts, Some(base))
+             opts: DynamicsOptions = DefaultDynamicsOptions)(implicit e: EntityEncoder[B]): IO[String] = {
+    val request = mkUpdateRequest[IO,B](entitySet, id, body, upsertPreventCreate, upsertPreventUpdate, opts, Some(base))
     //HttpRequest(Method.PATCH, s"/$entitySet($id)", body = Entity.fromString(body), headers = toHeaders(opts) ++ h )
     http.fetch[String](request) {
       case Status.Successful(resp) => IO.pure(id)
@@ -172,29 +180,31 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
   /** Create an entity and expect only its id returned. includeRepresentation is set to an explicit
     * false in the headers to ensure the id is returend in the header.
     */
-  def createReturnId(entityCollection: String,
-                     body: String,
-                     opts: DynamicsOptions = DefaultDynamicsOptions): IO[String] = {
+  def createReturnId[B](entityCollection: String,
+                     body: B,
+    opts: DynamicsOptions = DefaultDynamicsOptions)
+    (implicit e: EntityEncoder[B]): IO[String] = {
     val newOpts = opts.copy(prefers = opts.prefers.copy(includeRepresentation = Some(false)))
-    create[String](entityCollection, body, newOpts)(ReturnedIdDecoder)
+    create(entityCollection, body, newOpts)(e, ReturnedIdDecoder)
   }
 
   /** Create an entity. If return=representation then the decoder can decode the body with entity content.
     * You can return an id or body from this function.
     */
-  def create[A](entitySet: String, body: String, opts: DynamicsOptions = DefaultDynamicsOptions)(
-      implicit d: EntityDecoder[A]): IO[A] = {
+  def create[B,R](entitySet: String, body: B, opts: DynamicsOptions = DefaultDynamicsOptions)(
+      implicit e: EntityEncoder[B], d: EntityDecoder[IO, R]): IO[R] = {
     //val request = HttpRequest(Method.POST, s"/$entitySet", body=Entity.fromString(body), headers=toHeaders(opts))
-    val request = mkCreateRequest(entitySet, body, opts)
+    val request = mkCreateRequest[IO, B](entitySet, body, opts)
     http.fetch(request) {
-      case Status.Successful(resp) => resp.as[A]
+      case Status.Successful(resp) => resp.as[R]
       case failedResponse =>
         responseToFailedTask(failedResponse, s"Create for $entitySet", Option(request))
     }
   }
 
-  /** Create an entity. Return the id passed in for convenience. Return true if
-    * the entity does not exist even though this call did not technically delete it.
+  /** Delete an entity. Return the id passed in for convenience. Return true if
+    * the entity does not exist even though this call did not technically delete
+    * it if it did not exist already.
     * @param entityCollection Entity
     * @param keyInfo Primary key (GUID) or alternate key.
     * @return Pair of the id passed in and true if deleted (204), false if not (404).
@@ -203,7 +213,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
              keyInfo: DynamicsId,
              opts: DynamicsOptions = DefaultDynamicsOptions): IO[(DynamicsId, Boolean)] = {
     // Status 204 indicates success, status 404 indicates the entity did not exist.
-    val request = mkDeleteRequest(entitySet, keyInfo, opts)
+    val request = mkDeleteRequest[IO](entitySet, keyInfo, opts)
     http.fetch(request) {
       case Status.Successful(resp)                               => IO.pure((keyInfo, true))
       case Status.ClientError(resp) if (resp.status.code == 404) => IO.pure((keyInfo, true))
@@ -220,8 +230,8 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
   def executeAction[A](action: String,
                        body: Entity,
                        entitySetAndId: Option[(String, String)] = None,
-                       opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[A]): IO[A] = {
-    val request = mkExecuteActionRequest(action, body, entitySetAndId, opts)
+                       opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[IO, A]): IO[A] = {
+    val request = mkExecuteActionRequest[IO](action, body, entitySetAndId, opts)
     http.fetch(request) {
       case Status.Successful(resp) => resp.as[A]
       case failedResponse =>
@@ -239,8 +249,8 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     */
   def executeFunction[A](function: String,
                          parameters: Map[String, scala.Any] = Map.empty,
-                         entity: Option[(String, String)] = None)(implicit d: EntityDecoder[A]): IO[A] = {
-    val req = mkExecuteFunctionRequest(function, parameters, entity)
+                         entity: Option[(String, String)] = None)(implicit d: EntityDecoder[IO,A]): IO[A] = {
+    val req = mkExecuteFunctionRequest[IO](function, parameters, entity)
     http.expect(req)(d)
   }
 
@@ -255,7 +265,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
                 toEntityId: String,
                 singleNavProperty: Boolean): IO[Boolean] = {
     val request =
-      mkAssociateRequest(fromEntitySet, fromEntityId, navProperty, toEntitySet, toEntityId, base, singleNavProperty)
+      mkAssociateRequest[IO](fromEntitySet, fromEntityId, navProperty, toEntitySet, toEntityId, base, singleNavProperty)
     http.fetch(request) {
       case Status.Successful(resp) => IO.pure(true)
       case failedResponse =>
@@ -270,7 +280,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
                    fromEntityId: String,
                    navProperty: String,
                    to: Option[String] = None): IO[Boolean] = {
-    val request = mkDisassocatiateRequest(fromEntitySet, fromEntityId, navProperty, to)
+    val request = mkDisassocatiateRequest[IO](fromEntitySet, fromEntityId, navProperty, to)
     http.fetch(request) {
       case Status.Successful(resp) => IO.pure(true)
       case failedResponse =>
@@ -288,7 +298,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     * Allow you to specify a queryspec somehow as well.
     */
   def getOneWithKey[A](entitySet: String, keyInfo: DynamicsId, opts: DynamicsOptions = DefaultDynamicsOptions)(
-      implicit d: EntityDecoder[A]): IO[A] =
+      implicit d: EntityDecoder[IO, A]): IO[A] =
     getOne(s"/$entitySet(${keyInfo.render()})", opts)(d)
 
   /**
@@ -302,8 +312,8 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
     * property e.g. a single entity's set of connections or some child
     * entity. In this case, your URL will typically have an "expand" segment.
     */
-  def getOne[A](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[A]): IO[A] = {
-    val request = HttpRequest(Method.GET, url, headers = toHeaders(opts))
+  def getOne[A](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[IO,A]): IO[A] = {
+    val request = HttpRequest[IO](Method.GET, url, headers = toHeaders(opts))
     http.fetch(request) {
       case Status.Successful(resp) => resp.as[A]
       case failedResponse =>
@@ -330,7 +340,7 @@ case class DynamicsClient(http: Client, private val connectInfo: ConnectionInfo,
         // Return a IO[Option[(Seq[A],Option[String])]]
         case None => IO.pure(None)
         case Some(nextLink) =>
-          val request = HttpRequest(Method.GET, nextLink, headers = toHeaders(opts))
+          val request = HttpRequest[IO](Method.GET, nextLink, headers = toHeaders(opts))
           http.fetch(request) {
             case Status.Successful(resp) =>
               resp.body.map { str =>

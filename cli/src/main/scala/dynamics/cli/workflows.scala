@@ -221,13 +221,13 @@ class WorkflowActions(val context: DynamicsContext) {
             .map(_ => s"Executed workflow against $entityId")
         }
       } else {
-        val pt1: Pipe[IO, (String, Int), (HttpRequest, String)] =
+        val pt1: Pipe[IO, (String, Int), (HttpRequest[IO], String)] =
           _ map { p: (String, Int) =>
             val source  = s"${p._1}" // identifier is the id
             val request = mkExecuteWorkflowRequest(workflowId, p._1)
             (request.copy(path = dynclient.base + request.path), source) // make full URL for odata patch
           }
-        val pt2: Pipe[IO, (HttpRequest, String), IO[String]] =
+        val pt2: Pipe[IO, (HttpRequest[IO], String), IO[String]] =
           _.vectorChunkN(config.common.batchSize).map { v =>
             val ids = v.map(_._2).mkString(", ")
             updater
@@ -326,7 +326,7 @@ object WorkflowActions {
       "SOAPAction"   -> "http://schemas.microsoft.com/xrm/2011/Contracts/Services/IOrganizationService/Execute",
       "Accept"       -> "application/xml"
     )
-    HttpRequest(Method.POST, s"$baseUrl/$SOAPEP", headers = headers, body = Entity.fromString(body))
+    HttpRequest[IO](Method.POST, s"$baseUrl/$SOAPEP", headers = headers, body = Entity.fromString(body))
   }
 
   val SOAPEP = "XRMServices/2011/Organization.svc/web"

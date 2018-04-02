@@ -13,13 +13,19 @@ import cats.effect._
 
 package object http {
 
-  @deprecated("Use Kleisli directly e.g. Kleisli[F, A, B]")
-  type Service[A, B]      = Kleisli[IO, A, B]
-  type Middleware         = Client => Client
-  type HttpService        = Service[HttpRequest, HttpResponse]
-  type StreamingClient[A] = fs2.Pipe[IO, HttpRequest, IO[A]]
+  @deprecated("Use Kleisli directly e.g. Kleisli[F, A, B]", "0.1.0")
+  type Service[F, A, B]      = Kleisli[IO, A, B]
+  type Middleware[F[_]]         = Client[F] => Client[F]
+  type HttpService[F[_]]        = Kleisli[F, HttpRequest[F], HttpResponse[F]]
+  type StreamingClient[F[_], A] = fs2.Pipe[F, HttpRequest[F], F[A]]
 
-  /** Non-streaming but good enough for our needs. */
+  /** 
+   * Non-streaming but good enough for our needs.  IO is used explicitly but
+   * since we have strict bodies for dynamics, why not use "Id" in the short
+   * term? Entity is the body part of a Message.
+   * 
+   * @todo Make F so we can use Id or something simpler.
+   */
   type Entity = IO[String]
 
   /** Basic headers are a dict of strings. */
@@ -27,9 +33,9 @@ package object http {
 
   /**
     * When decoding a response body, either you get an A
-    * or a DecodeFailure. The Task may also carry an exception.
+    * or a DecodeFailure. The effect may also carry an exception.
     */
-  type DecodeResult[A] = EitherT[IO, DecodeFailure, A]
+  type DecodeResult[F[_], A] = EitherT[F, DecodeFailure, A]
 
   /**
     * Retry policies are added to an effect so that when run, a retry

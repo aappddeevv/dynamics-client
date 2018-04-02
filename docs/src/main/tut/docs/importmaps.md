@@ -9,6 +9,29 @@ Import maps can be downloaded from dynamics or created manually locally. General
 
 Once you are ready to lead data, load the import maps first. The use the CLI to load the data.
 
+## Subcommands
+
+* *download*: Download importmaps.
+* *list*: List importmaps.
+* *upload*: Upload import maps.
+
+## download
+
+Download all importmaps
+
+Examples:
+* `dynamicscli importmaps download`: Download all import maps.
+* `dynamicscli importmaps download --noclobber`: Download all import maps but do not overwrite any. This allows you to download new importmaps that have not been downloaded.
+
+## list
+
+Listings can be customized by a filter:
+
+Examples:
+* `dynamicscli importmaps list`: List all importmaps.
+* `dynamicscli importmaps list --filter blah`: List importmaps with the name blah in it.
+
+## upload 
 Example:
 
 ```sh

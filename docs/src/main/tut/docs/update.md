@@ -3,7 +3,8 @@ layout: docs
 title: update
 ---
 
-The `update` command allows you to update entities based on an input json file.
+The `update` command allows you to update entities based on an input json
+file. You can also perform inserts via the "upsert" concept.
 
 ## Subcommands
 * entity: Update records as specified on the command line.
@@ -17,7 +18,8 @@ Let's say you downloaded reference and key information to your local
 database. You might then run a sql command that mergesq the source data with the
 key/reference data.
 
-For example, I might need to update the name attribute of my entity and I use the csv toolkit alot under linux, so:
+For example, I might need to update the name attribute of my entity and I use
+the csv toolkit alot under linux, so:
 
 ```sh
 sql2csv--db $DB update-new_myentity.sql  | csvjson --stream > new_myentity_name_update.json
@@ -36,5 +38,13 @@ Then you can run:
 $CLI update entity new_myentitys new_myentitys.json --pk new_myentityid
 ```
 
-And the update is performed. If you have extra fields in the json that should not be part of the update for any reason, you can use the `--drops col1,col2` option to remove them.
+And the update is performed. If you have extra fields in the json that should
+not be part of the update for any reason, you can use the `--drops col1,col2`
+option to remove them.
+
+If you add `--upsertpreventcreate false` (the default is true, to prevent
+creating a new record) and the record does not exist, it will be inserted. While
+this means you need to generate your own guids, this is not hard in practice and
+allows you to load data with the same "primary key" as a source system, assuming
+they use guids as well.
 

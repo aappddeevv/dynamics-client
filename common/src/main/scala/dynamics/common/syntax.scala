@@ -16,6 +16,7 @@ import fs2._
 import cats._
 import cats.data._
 import cats.implicits._
+import cats.arrow.FunctionK
 import cats.effect._
 import io.scalajs.npm.chalk._
 import js.Dynamic.{literal => jsobj}
@@ -150,7 +151,10 @@ trait JsObjectInstances {
     sb.toString
   }
 
-  /** Monoid for js.Object, which is really just a dick. Use |+| to combine. */
+  /** 
+   * Monoid for js.Object, which is really just a dick. Use |+| or "combine" to
+   * combine.
+   */
   implicit val jsObjectMonoid: Monoid[js.Object] =
     new Monoid[js.Object] {
       def combine(lhs: js.Object, rhs: js.Object): js.Object = {
@@ -161,31 +165,29 @@ trait JsObjectInstances {
     }
 }
 
-/** These are not all implicits. FIXME */
-trait JsPromiseSyntax {
-  import scala.scalajs.runtime.wrapJavaScriptException
+trait IOInstances {
+  val ioToIOFunctionK = FunctionK.id[IO]
 
+  implicit val ioToIO: IO ~> IO = new (IO ~> IO) {
+    override def apply[A](ioa: IO[A]): IO[A] = ioa
+  }
+}
+
+trait JsPromiseInstances {
+  /**
+    * Natural transformation from js.Promise to IO.
+    */
+  implicit def jsPromiseToIO(implicit e: ExecutionContext): js.Promise ~> IO =
+    new (js.Promise ~> IO) {
+      override def apply[A](p: js.Promise[A]): IO[A] =
+        common.syntax.jsPromise.RichPromise(p).toIO
+    }
+}
+
+trait JsPromiseSyntax {
   /** Convert a js.Promise to a IO. */
   implicit class RichPromise[A](p: js.Promise[A]) {
-    def toIO(implicit ec: ExecutionContext): IO[A] = {
-      val t: IO[A] = IO.async { cb =>
-        p.`then`[Unit](
-          { (v: A) =>
-            cb(Right(v))
-          },
-          js.defined { (e: scala.Any) =>
-            // create a Throwable from e
-            val t = e match {
-              case th: Throwable => th
-              case _             => js.JavaScriptException(e)
-            }
-            cb(Left(t))
-          }
-        )
-        () // return unit
-      }
-      t
-    }
+    def toIO(implicit ec: ExecutionContext): IO[A] = _jsPromiseToIO(p)
   }
 }
 
@@ -237,6 +239,8 @@ trait AllInstances extends JsObjectInstances
 object instances {
   object all      extends AllInstances
   object jsObject extends JsObjectInstances
+  object jsPromise extends JsPromiseInstances
+  object io extends IOInstances
 }
 
 object implicits extends AllSyntax with AllInstances

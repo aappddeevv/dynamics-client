@@ -22,6 +22,7 @@ import io.scalajs.npm.winston
 import io.scalajs.npm.winston._
 import io.scalajs.npm.winston.transports._
 import cats.implicits._
+import cats.MonadError
 import cats.effect._
 import monocle.macros.syntax.lens._
 
@@ -36,11 +37,15 @@ import Utils._
 
 object MainHelpers extends LazyLogger {
 
-  /** Run the program with a way to provide some more options. */
+  /** 
+   * Run the program with a way to provide some more options if desired. All standard options
+   * are added by default.
+   */
   //def run[T <: AppConfig](zero: T, options: Seq[CommandLine.OptionProvider[T]] = Nil): Unit = {
   def run(zero: AppConfig,
           moreOpts: Option[scopt.OptionParser[AppConfig] => Unit] = None,
-          moreCommands: Option[ActionSelector] = None): Unit = {
+    moreCommands: Option[ActionSelector] = None)
+      (implicit ec: ExecutionContext, F: MonadError[IO, Throwable]): Unit = {
     // remove nodejs bin and nodejs script name, make it look java like
     val args = process.argv.drop(2)
 
@@ -54,7 +59,7 @@ object MainHelpers extends LazyLogger {
         process.exit(1)
         zero
       } { c =>
-        c.lens(_.common.connectInfo).set(readConnectionInfoOrExit(c.common.crmConfigFile))
+        c.lens(_.common.connectInfo).set(readDynamicsConnectionInfoOrExit(c.common.crmConfigFile))
       }
 
     val start = process.hrtime()
@@ -86,7 +91,7 @@ object MainHelpers extends LazyLogger {
         .lens(_.common.impersonate)
         .set(impersonateOpt)
 
-    val context = DynamicsContext.default(config2)(scala.concurrent.ExecutionContext.Implicits.global)
+    val context = DynamicsContext.default(config2)
 
     // io.scalajs.nodejs.process.onUnhandledRejection{(reason: String, p: js.Any) =>
     //   println(s"Unhandled promise error: $reason, $p")
@@ -107,7 +112,9 @@ object MainHelpers extends LazyLogger {
   }
 
   /**
-    * Process an Attempt (Either) from an Action run.
+    * Process an Attempt (Either) from an Action run. Left exceptions are matched
+   * and printed out otherwise the run time is printed.
+   * 
     * @param start Start time information array from `process.hrtime`.
     */
   def actionPostProcessor[A](noisy: Boolean, start: Array[Int]): Either[Throwable, A] => Unit =
@@ -115,8 +122,7 @@ object MainHelpers extends LazyLogger {
       case Right(_) =>
         val delta = processhack.hrtime(start)
         if (noisy) {
-          println()
-          println("Run time: " + delta(0) + " seconds")
+          println("\nRun time: " + delta(0) + " seconds.")
         }
       case Left(t) =>
         t match {
@@ -147,7 +153,7 @@ object MainHelpers extends LazyLogger {
         val delta = processhack.hrtime(start)
         if (noisy) {
           println()
-          println("Run time: " + delta(0) + " seconds")
+          println("Run time: " + delta(0) + " seconds.")
         }
     }
 

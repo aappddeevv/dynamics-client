@@ -129,7 +129,7 @@ object Part {
   * @paarm request HttpRequest
   * @param xtra Extra headers after the boundary but not in the actual request.
   */
-final case class SinglePart(request: HttpRequest, xtra: HttpHeaders = HttpHeaders.empty) extends Part
+final case class SinglePart[F[_]](request: HttpRequest[F], xtra: HttpHeaders = HttpHeaders.empty) extends Part
 
 /**
   * Changeset "part". Headers are written for Content-Type and
@@ -140,7 +140,7 @@ final case class SinglePart(request: HttpRequest, xtra: HttpHeaders = HttpHeader
   * @param bounday The changeset boundary.
   * @param xtra Extra headers after the changeset boundary but not in the actual requests.
   */
-final case class ChangeSet(parts: Seq[SinglePart],
+final case class ChangeSet[F[_]](parts: Seq[SinglePart[F]],
                            boundary: Boundary = Boundary.mkBoundary("changeset_"),
                            xtra: HttpHeaders = HttpHeaders.empty)
     extends Part
@@ -151,7 +151,7 @@ private[dynamics] final object EmptyPart extends Part { val xtra = HttpHeaders.e
 object ChangeSet {
 
   /** ChangeSet from requests. */
-  def fromRequests(requests: Seq[HttpRequest]): ChangeSet = ChangeSet(requests.map(SinglePart(_)))
+  def fromRequests[F[_]](requests: Seq[HttpRequest[F]]): ChangeSet[F] = ChangeSet(requests.map(SinglePart(_)))
 }
 
 /**
@@ -171,7 +171,7 @@ object Multipart extends RenderConstants {
   import Boundary.renderBoundary
 
   /** Requests are bundled into a changeset. */
-  def fromRequests(requests: Seq[HttpRequest]): Multipart = Multipart(Seq(ChangeSet.fromRequests(requests)))
+  def fromRequests[F[_]](requests: Seq[HttpRequest[F]]): Multipart = Multipart(Seq(ChangeSet.fromRequests(requests)))
 
   /**
     * Render a batch boundary for each part, render each part, render the closing batch boundary.

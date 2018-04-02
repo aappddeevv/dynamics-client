@@ -18,10 +18,20 @@ import dynamics.common._
   * Helper objects to make creating DecodeResults easier.
   */
 object DecodeResult {
-  def apply[A](fa: IO[Either[DecodeFailure, A]]): DecodeResult[A] = EitherT(fa)
-  def success[A](a: IO[A]): DecodeResult[A]                       = DecodeResult(a.map(Either.right(_)))
-  def success[A](a: A): DecodeResult[A]                           = success(IO.pure(a))
-  def failure[A](e: IO[DecodeFailure]): DecodeResult[A]           = DecodeResult(e.map(Either.left(_)))
-  def failure[A](e: DecodeFailure): DecodeResult[A]               = failure(IO.pure(e))
-  def fail[A]: DecodeResult[A]                                    = failure(IO.pure(MessageBodyFailure("Intentionally failed.")))
+  def apply[F[_], A](fa: F[Either[DecodeFailure, A]]): DecodeResult[F, A] = EitherT(fa)
+
+  /** Lift an effectful A to a DecodeResult. */
+  def success[F[_],A](a: F[A])(implicit F: Functor[F]): DecodeResult[F,A]                       = DecodeResult(a.map(Either.right(_)))
+
+  /** Lift a pure A to a DecodeResult. */
+  def success[F[_],A](a: A)(implicit F: Applicative[F]): DecodeResult[F,A]                           = success(F.pure(a))
+
+  /** Lift an effectful DecodeFailure to a DecodeResult. */
+  def failure[F[_],A](e: F[DecodeFailure])(implicit F: Functor[F]): DecodeResult[F,A]           = DecodeResult(e.map(Either.left(_)))
+
+  /** Lift an plain DecodeFailure to a DecodeResult. */
+  def failure[F[_],A](e: DecodeFailure)(implicit F: Applicative[F]): DecodeResult[F,A]               = failure(F.pure(e))
+
+  /** Return a failure. */
+  def fail[F[_],A](implicit F: Applicative[F]): DecodeResult[F,A]                                    = failure(MessageBodyFailure("Intentionally failed."))
 }

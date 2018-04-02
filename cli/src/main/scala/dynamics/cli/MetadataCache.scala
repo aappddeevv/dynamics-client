@@ -82,6 +82,10 @@ class MetadataCache(val context: DynamicsContext) {
   import dynamics.common.syntax.all._
   import LocalizedHelpers._
 
+  // keep these here until the class get fleshed out a bit
+  implicit val F =  MonadError[IO, Throwable]
+  //implicit val A = Alternative[IO]
+
   //import scalacache._
   //implicit val cache = ScalaCache(new ScalaCacheNodeCache(new NodeCache()))
   val ucache = new NodeCache()
@@ -220,16 +224,16 @@ class MetadataCache(val context: DynamicsContext) {
   }
 
   /** Given an entity set name, return the entity definition. */
-  def getEntityDefinition2(ename: String): DecodeResult[EntityDefinition] = {
+  def getEntityDefinition2(ename: String): IO[EntityDefinition] = {
     val q = QuerySpec(filter = Option(s"EntitySetName eq '$ename'"))
-    val result = lift {
-      val values = unlift(dynclient.getList[EntityDefinition](q.url("EntityDefinitions")))
+    dynclient.getList[EntityDefinition](q.url("EntityDefinitions")).flatMap{ values =>
       if (values.size != 1)
-        Left(OnlyOneExpected(s"EntityDefinition for entity set name $ename"))
+        F.raiseError[EntityDefinition](OnlyOneExpected(s"EntityDefinition for entity set name $ename"))
       else
-        Right(values(0))
+        F.pure(values(0))
     }
-    DecodeResult(result)
+    // rather wasteful
+    //DecodeResult[IO, EntityDefinition](result).value.map(_.raiseOrPure)
   }
 
   /** Get entity definition using logical name as the key. Use the entity logical name not the entity set name. */
@@ -246,14 +250,14 @@ EntityDefinitions(LogicalName='account')/Attributes(LogicalName='accountcategory
   /** Given an entity set name and an attribute name, return the attribute type.
     */
   def getAttributeTypeCode(ename: String, aname: String): IO[AttributeTypeCode] = {
-    getEntityDefinition2(ename).toIO.flatMap { ed =>
+    getEntityDefinition2(ename).flatMap { ed =>
       val q =
         QuerySpec(select = Seq("LogicalName", "EntitySetName"),
                   expand =
                     Seq(Expand("Attributes", select = Seq("AttributeType"), filter = Some(s"LogicalName eq '$aname'"))))
       val opts = DynamicsOptions(prefers = OData.PreferOptions(includeFormattedValues = Some(true)))
       dynclient.getOne[String](q.url("EntityDefinitions", Some(ed.MetadataId.get)), opts).map { ad =>
-        println(s"metadata get: $ad")
+        //println(s"metadata get: $ad")
         metadata.AttributeTypeCode.Integer
       }
     }
@@ -267,7 +271,7 @@ EntityDefinitions(LogicalName='account')/Attributes(LogicalName='accountcategory
     * Customer entities: $filter=ObjectTypeCode gt 9999
     */
   def getObjectTypeCode(ename: String): IO[Option[Int]] = {
-    getEntityDefinition2(ename).toIO.map { ed =>
+    getEntityDefinition2(ename).map { ed =>
       ed.ObjectTypeCode.toOption
     }
   }

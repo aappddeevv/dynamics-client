@@ -1,13 +1,16 @@
+// Copyright (c) 2017 The Trapelo Group LLC
+// This software is licensed under the MIT License (MIT).
+// For more information see LICENSE or https://opensource.org/licenses/MIT
+
 package dynamics
 package client
 
+import syntax.queryspec._
 import org.scalatest._
 
 class QuerySpecSpec extends FlatSpec with Matchers with OptionValues {
 
-  import dynamics.syntax.queryspec._
-
-  "QuerySpec" should "handle selects" in {
+  "QuerySpec" should "handle selects and filters together" in {
     val q = QuerySpec(filter = Some("hah ne fah"), select = Seq("attr1", "attr2"))
     q.url("blah") shouldBe ("/blah?$select=attr1,attr2&$filter=hah ne fah")
   }

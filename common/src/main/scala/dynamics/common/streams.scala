@@ -30,41 +30,30 @@ object fs2helpers {
   }
 
   /** A pipe that given a stream, delays it by delta. */
-  //def sleepFirst[F[_], O](delta: FiniteDuration)(implicit F: Effect[F]): Pipe[F, O, O] =
-  //   delayed => time.sleep(delta).flatMap(_ => delayed)
   def sleepFirst[F[_], O](
       delta: FiniteDuration)(implicit F: Async[F], s: Scheduler, ec: ExecutionContext): Pipe[F, O, O] =
     delayed => s.delay(delayed, delta)
 
   /**
-    * Unfold, periodically checking an effect for new values.
-    * Time between checks is obtained using getDelay potentially
-    * using the returned effect value. f is run immediately when
-    * the stream starts.
+    * Unfold, periodically checking an effect for new values.  Time between
+    * checks is obtained using getDelay potentially using the returned effect
+    * value. f is run immediately when the stream starts. The delay originates
+    * from `Timer[F]` (on the F async functor) and not from a fs2 scheduler.
+   * 
     * @param A Output element type.
     * @param f Call an effect to get a value.
     * @param getDelay Extract amount to delay from that value.
     */
-  def unfoldEvalWithDelay[F[_], A](f: => F[Option[A]], getDelay: A => FiniteDuration)(
-      implicit M: Functor[F],
-      F: Async[F],
-      s: Scheduler,
-      ec: ExecutionContext): Stream[F, A] =
+  def unfoldEvalWithDelay[F[_], A](f: => F[Option[A]], getDelay: A => FiniteDuration)
+    (implicit M: Functor[F], F: Async[F], t: Timer[F]): Stream[F, A] =
     Stream.unfoldEval(0.seconds) { delay =>
-      M.map(s.effect.delay(f, delay)) { opt =>
+      M.map(t.sleep(delay) *> f) { opt =>
+      //M.map(s.effect.delay(f, delay)) { opt =>
         opt.map { a =>
           (a, getDelay(a))
         }
       }
     }
-  // Stream.unfoldEval(0.seconds) { delay =>
-  //   f.schedule(delay)
-  //     .map { opt =>
-  //       opt.map { a =>
-  //         (a, getDelay(a))
-  //       }
-  //     }
-  // }
 
   /**
     * Calculate a delay but use fraction to shorten the delay.
@@ -85,7 +74,8 @@ object fs2helpers {
   }
 
   /** Throttle a stream. Default value is for dynamics throttling. */
-  def throttle[A](delay: FiniteDuration = 5.millis)(implicit sch: Scheduler, ec: ExecutionContext): Pipe[IO, A, A] =
-    _.zip(sch.awakeEvery[IO](delay)).map(_._1)
+  def throttle[F[_], A](delay: FiniteDuration = 5.millis)
+    (implicit sch: Scheduler, ec: ExecutionContext, F: Effect[F]): Pipe[F, A, A] =
+    _.zip(sch.awakeEvery[F](delay)).map(_._1)
 
 }

@@ -35,63 +35,6 @@ import dynamics.http._
 import dynamics.client.syntax.queryspec._
 import dynamics.http.implicits._
 
-object CSVStringifyX {
-
-  @js.native
-  trait CSVStringify extends IEventEmitter {
-
-    /** Streaming version. */
-    def apply(): Stringifier = js.native
-
-    /** Streaming version. */
-    def apply(options: StringifyOptions | RawOptions): Stringifier = js.native
-
-    /** Callback version. */
-    def apply(data: js.Array[js.Array[String]], callback: js.Function2[nodejs.Error, String, js.Any]): Unit = js.native
-
-    /** Callback version.*/
-    def apply(data: js.Array[js.Array[String]],
-              options: StringifyOptions | RawOptions,
-              callback: js.Function2[nodejs.Error, String, js.Any]): Unit = js.native
-  }
-
-  /** Allows you to register for events. */
-  @js.native
-  class Stringifier() extends Readable with Writable {
-    def write(data: js.Array[_]): Boolean = js.native
-    def write(data: js.Object): Boolean   = js.native
-  }
-
-  implicit class StringifierEvents(val s: Stringifier) extends AnyVal {
-    @inline
-    def onError(listener: Error => Any): s.type = s.on("error", listener)
-    @inline
-    def onFinish(listener: () => Any): s.type = s.on("finish", listener)
-    @inline
-    def onReadable(listener: () => Any): s.type = s.on("readable", listener)
-    @inline
-    def onRecord(listener: (js.Array[js.Any], Int) => Any): s.type = s.on("record", listener)
-  }
-
-  @js.native
-  @JSImport("csv-stringify", JSImport.Namespace)
-  object CSVStringify extends CSVStringify
-
-  class StringifyOptions(
-      val columns: js.UndefOr[js.Dictionary[String] | js.Array[String]] = js.undefined,
-      val delimiter: js.UndefOr[String] = js.undefined,
-      val escape: js.UndefOr[String] = js.undefined,
-      val eof: js.UndefOr[Boolean] = js.undefined,
-      val header: js.UndefOr[Boolean] = js.undefined,
-      val quote: js.UndefOr[String] = js.undefined,
-      val quoted: js.UndefOr[Boolean] = js.undefined,
-      val quotedEmpty: js.UndefOr[Boolean] = js.undefined,
-      val quotedString: js.UndefOr[Boolean] = js.undefined,
-      val rowDelimiter: js.UndefOr[Boolean] = js.undefined,
-      val formatters: js.UndefOr[js.Dictionary[js.Function1[js.Any, String]]] = js.undefined
-  ) extends js.Object
-}
-
 class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   import CSVStringifyX._
@@ -168,13 +111,15 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       dynclient
         .getListStream[js.Object](config.export.query, opts)
         .drop(config.export.skip.map(_.toLong).getOrElse(0))
+        .take(config.export.top.map(_.toLong).getOrElse(Long.MaxValue))
 
     Stream
       .bracket(IO(Fs.createWriteStream(outputpath, null)))(
         f => {
           if (config.export.wrap) f.write("[")
           values
-            .map(Utils.render(_))
+            .map(JSON.stringify(_))
+            //.map(Utils.render(_))
             .to(_ map { jstr =>
               f.write(jstr + (if (config.export.wrap) ",\n" else "\n"))
             })
@@ -308,7 +253,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   def getCountFromFunctionForEntity(entitySet: Seq[String] = Nil) = {
     val collection = s"""EntityNames=[${entitySet.map("'" + _ + "'").mkString(",")}]"""
-    val request    = HttpRequest(Method.GET, s"/RetrieveTotalRecordCount($collection)")
+    val request    = HttpRequest[IO](Method.GET, s"/RetrieveTotalRecordCount($collection)")
     dynclient.http.expect[RetrieveTotalRecordCountResponse](request)(
       http.instances.entityDecoder.JsObjectDecoder[RetrieveTotalRecordCountResponse])
   }

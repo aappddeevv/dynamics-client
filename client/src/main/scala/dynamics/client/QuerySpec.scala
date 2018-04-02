@@ -108,7 +108,7 @@ object QuerySpec {
     val properties   = spec.properties.map(NavProperty.render(_)).mkString("")
     val definedparts = parts.collect { case Some(x) => x }
     val sep          = if (definedparts.size > 0) "?" else ""
-    s"""/${properties}${cast}${sep}${definedparts.mkString("&")}"""
+    s"""${properties}${cast}${sep}${definedparts.mkString("&")}"""
   }
 }
 

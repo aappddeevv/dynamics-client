@@ -36,7 +36,7 @@ class MetadataActions(val context: DynamicsContext) {
 
   def getCSDL(): IO[String] = {
     val request =
-      HttpRequest(Method.GET, "/$metadata", headers = HttpHeaders("Accept" -> "application/xml;charset=utf8"))
+      HttpRequest[IO](Method.GET, "/$metadata", headers = HttpHeaders("Accept" -> "application/xml;charset=utf8"))
     dynclient.http.expect[String](request)
   }
 
@@ -90,5 +90,5 @@ object MetadataActions {
 
   /** An HttpRequest that can be used with Client to obtain the CSDL. */
   val DownloadCSDLRequest =
-    HttpRequest(Method.GET, "/$metadata", headers = HttpHeaders("Accept" -> "application/xml;charset=utf8"))
+    HttpRequest[IO](Method.GET, "/$metadata", headers = HttpHeaders("Accept" -> "application/xml;charset=utf8"))
 }

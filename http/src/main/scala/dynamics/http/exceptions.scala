@@ -11,10 +11,12 @@ import dynamics.common._
 
 /**
   * Unexpected status returned, the original request and response may be available.
+ * Potentiailly having the request/response available forces the F parameter
+ * to be available.
   */
-final case class UnexpectedStatus(status: Status,
-                                  request: Option[HttpRequest] = None,
-                                  response: Option[HttpResponse] = None)
+final case class UnexpectedStatus[F[_]](status: Status,
+                                  request: Option[HttpRequest[F]] = None,
+                                  response: Option[HttpResponse[F]] = None)
     extends RuntimeException {
   override def toString(): String = {
     s"""UnexpectedStatus: status=$status${Option(status.reason).map("(" + _ + ")").getOrElse("")}, request=${request
@@ -29,7 +31,8 @@ sealed abstract class MessageFailure extends RuntimeException {
 }
 
 /** Error for a Client to throw when something happens underneath it e.g. in the OS. */
-final case class CommunicationsFailure(details: String, val cause: Option[Throwable] = None) extends MessageFailure {
+final case class CommunicationsFailure(details: String, val cause: Option[Throwable] = None)
+    extends MessageFailure {
   cause.foreach(initCause) // java's associate a throwable with this exception
   def message: String = s"Communications failure: $details"
 }

@@ -10,6 +10,7 @@ import dynamics.common._
 import scala.scalajs.js
 import scala.scalajs.js._
 import fs2._
+import cats.effect._
 
 import Utils._
 import dynamics.client.implicits._
@@ -19,6 +20,7 @@ import scala.concurrent.duration._
 import java.util.concurrent.{TimeUnit => TU}
 
 import dynamics.client._
+import common.instances.jsPromise._
 
 class TokenActions(context: DynamicsContext) extends LazyLogger {
 
@@ -30,11 +32,11 @@ class TokenActions(context: DynamicsContext) extends LazyLogger {
   def doit(n: Long = 1) = Action { config =>
     val ofile = config.common.outputFile.getOrElse(defaultOutputFile)
     println(s"Token output file: ${ofile}")
-    val auth    = new AuthManager(config.common.connectInfo)
+    val auth    = new AuthManager[IO](config.common.connectInfo)
     val ctx     = auth.getAuthContext();
     val refresh = config.token.refreshIntervalInMinutes
     val str =
-      AuthManager.tokenStream(auth.getTokenWithRetry(ctx, dynamics.http.retry.retryWithPause(5.seconds, 10)))
+      AuthManager.tokenStream(auth.getTokenWithRetry(ctx, dynamics.http.retry.withPause(5.seconds, 10)))
     //,_ => FiniteDuration(1, TU.MINUTES))
     str
       .take(n)

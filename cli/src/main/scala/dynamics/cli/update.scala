@@ -67,6 +67,7 @@ class UpdateActions(val context: DynamicsContext) {
       }
   }
 
+  // TODO: Convert to batch
   val update = Action { config =>
     println("Update records from a set of JSON objects.")
     val uc    = config.update
@@ -187,8 +188,8 @@ class UpdateProcessor(val context: DynamicsContext) {
   /** Run the updates but in batch mode. (id,body) => HttpRequest. */
   def mkBatch(inputs: Vector[InputContext[js.Object]],
               pkcol: String,
-              mkRequest: (String, String) => HttpRequest): IO[String] = {
-    val requests: Vector[(HttpRequest, String)] = inputs
+              mkRequest: (String, String) => HttpRequest[IO]): IO[String] = {
+    val requests: Vector[(HttpRequest[IO], String)] = inputs
       .map { input =>
         val data   = input.input
         val source = input.source
@@ -203,8 +204,8 @@ class UpdateProcessor(val context: DynamicsContext) {
   }
 
   /** Run the updates but in batch mode. Inputs are: (request, source identifier) */
-  def mkBatchFromRequests(requests: Vector[(HttpRequest, String)], useChangeSet: Boolean = true): IO[String] = {
-    val reqs: Seq[SinglePart] = requests.map(_._1).map(SinglePart(_))
+  def mkBatchFromRequests(requests: Vector[(HttpRequest[IO], String)], useChangeSet: Boolean = true): IO[String] = {
+    val reqs: Seq[SinglePart[IO]] = requests.map(_._1).map(SinglePart(_))
 
     val label: String = requests.map(_._2).toList match { // expensive just for a label
       case list @ (head :: tail) =>
@@ -219,7 +220,7 @@ class UpdateProcessor(val context: DynamicsContext) {
         Multipart(reqs, Boundary(label))
 
     // Create the "task"
-    dynclient.batch[String](HttpRequest(Method.PUT, "/$batch"), m).attempt.map {
+    dynclient.batch[String](HttpRequest[IO](Method.PUT, "/$batch"), m).attempt.map {
       _ match {
         case Right(v) =>
           s"Batch $label (${requests.size} records) processed. [${js.Date()}]"

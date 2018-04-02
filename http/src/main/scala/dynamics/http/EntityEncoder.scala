@@ -64,12 +64,12 @@ trait EntityEncoderInstances {
   /** Explicit lower order priority implicit. */
   implicit def defaultEncoder[A <: js.Object] = JsObjectEncoder[A]
 
-  import play.api.libs.json._
+  //import play.api.libs.json._
 
-  /** play json */
-  implicit val JsValueEncoder: EntityEncoder[JsValue] = new EntityEncoder[JsValue] {
-    def encode(a: JsValue) = (IO.pure(Json.stringify(a)), HttpHeaders.empty)
-  }
+  // /** play json */
+  // implicit val JsValueEncoder: EntityEncoder[JsValue] = new EntityEncoder[JsValue] {
+  //   def encode(a: JsValue) = (IO.pure(Json.stringify(a)), HttpHeaders.empty)
+  // }
 
 }
 

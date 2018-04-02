@@ -37,7 +37,7 @@ final case class Status(val code: Int)(val reason: String) extends Ordered[Statu
 
   def withReason(reason: String): Status = new Status(code)(reason)
 
-  def unapply(msg: HttpResponse): Option[HttpResponse] = {
+  def unapply[F[_]](msg: HttpResponse[F]): Option[HttpResponse[F]] = {
     if (msg.status == this) Some(msg) else None
   }
 }
@@ -52,7 +52,7 @@ object Status {
     def isSuccess: Boolean
 
     /** Match a [[Response]] based on [[Status]] category */
-    final def unapply(resp: HttpResponse): Option[HttpResponse] =
+    final def unapply[F[_]](resp: HttpResponse[F]): Option[HttpResponse[F]] =
       if (resp.status.responseClass == this) Some(resp) else None
   }
 

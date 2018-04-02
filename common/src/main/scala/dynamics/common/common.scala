@@ -11,17 +11,29 @@ import fs2._
 import cats.~>
 import cats.effect._
 
+import scala.scalajs.runtime.wrapJavaScriptException
+
 package object common {
 
   type JsAnyDict = js.Dictionary[js.Any]
 
-  /**
-    * Natural transformation from js.Promise to IO.
-    */
-  def jsPromiseToIO(implicit e: ExecutionContext): js.Promise ~> IO =
-    new (js.Promise ~> IO) {
-      override def apply[A](p: js.Promise[A]): IO[A] =
-        syntax.jsPromise.RichPromise(p).toIO
+  private[dynamics]
+  def _jsPromiseToIO[A](p: js.Promise[A])(implicit ec: ExecutionContext): IO[A] =
+    IO.async { cb =>
+      p.`then`[Unit](
+        { (v: A) =>
+          cb(Right(v))
+        },
+        js.defined { (e: scala.Any) =>
+          // create a Throwable from e
+          val t = e match {
+            case th: Throwable => th
+            case _             => js.JavaScriptException(e)
+          }
+          cb(Left(t))
+        }
+      )
+      () // return unit
     }
 
 }

@@ -385,7 +385,8 @@ object CommandLine {
               .action((x, c) => c.lens(_.export.wrap).set(true)),
             formattedValues,
             maxPageSize,
-            skip
+            skip,
+            top,
           ),
         sub("count")
           .text("Count entities. Concurrency affects how many counters run simultaneously.")
@@ -636,9 +637,9 @@ object CommandLine {
         opt[Int]("maxpagesize")
           .text("Set the maximum number of entities returned per 'fetch'. If node crashes when exporting large entities, set this smaller than 5000.")
           .action((x, c) => c.lens(_.etl.maxPageSize).set(Option(x))),
-        opt[Unit]("batch")
-          .text("Use batch interface. See batchsize.")
-          .action((x, c) => c.lens(_.etl.batch).set(true)),
+        // opt[Unit]("batch")
+        //   .text("Use batch interface. See batchsize.")
+        //   .action((x, c) => c.lens(_.etl.batch).set(true)),
         opt[Unit]("dryrun")
           .text("Do not perform final remote operation. Allows user to check processing flow.")
           .action((x, c) => c.lens(_.etl.dryRun).set(true)),
@@ -1145,17 +1146,21 @@ object CommandLine {
   /**
     * Read connection info from file in json format.  If there is an error,
     * cannot read the file or if there is no password in the config file or the
-    * enviroment variable DYNAMICS_PASSWORD, return an error string.
+    * enviroment variable `passwordEnvVar`, return an error string in Left
+    * otherwise return ConnectionInfo in Right.
     */
-  def readConnectionInfo(file: String): Either[String, ConnectionInfo] = {
+  def readConnectionInfo(file: String, passwordEnvVar: Option[String]): Either[String, ConnectionInfo] = {
     import scala.util.{Try, Success, Failure}
     Try { slurpAsJson[ConnectionInfo](file) } match {
       case Success(ci) =>
         // look for password in env variable
-        val envpassword = nodejs.process.env.get("DYNAMICS_PASSWORD")
+        val envpassword = passwordEnvVar.flatMap(ev => nodejs.process.env.get(ev))
         // use env password if it is not in the config file
-        (envpassword orElse ci.password.toOption).fold[Either[String, ConnectionInfo]](
-          Left(s"No password found in environment variable DYNAMICS_PASSWORD or config file ${file}.")) { password =>
+          (envpassword orElse ci.password.toOption).fold[Either[String, ConnectionInfo]]{
+            envpassword.fold(Left(s"No password found in config file ${file}."))
+            { ev => Left(s"No password found in environment variable `$ev or config file ${file}.")}
+        }
+        { password =>
           ci.password = js.defined(password)
           Right(ci)
         }
@@ -1165,19 +1170,38 @@ object CommandLine {
   }
 
   /**
+   * Read the connection information or exit the application.
+   */
+  def readConnectionInfo(filesInPrecedenceOrder: Seq[String], passwordEnvVar: Option[String]):
+      Either[String, ConnectionInfo] = {
+    // find first file in seq that exists
+    val configFileOpt = filesInPrecedenceOrder.map(f => (f, Utils.fexists(f)))
+      .collect{ case (f, exists) if(exists) => f }
+      .headOption
+
+    configFileOpt match {
+      case Some(configFile) =>
+        readConnectionInfo(configFile, passwordEnvVar)
+      case _ =>
+        Left("No config file found.")
+    }
+  }
+
+  /**
    * Read the connection information or exit the application. Uses file, then
    * DYNAMICS_CRMCONFIG then the default config file in sequence to find the
    * file.
    */
-  def readConnectionInfoOrExit(file: Option[String] = None): ConnectionInfo = {
-    val configFile = (file orElse nodejs.process.env.get("DYNAMICS_CRMCONFIG")).getOrElse(defaultConfigFile)
-    readConnectionInfo(configFile) match {
-      case Right(c) => c
-      case Left(e) =>
-        println(e)
-        process.exit(1)
-        null
-    }
+  def readDynamicsConnectionInfoOrExit(file: Option[String] = None): ConnectionInfo = {
+    val configFiles = Seq(
+      file,
+      nodejs.process.env.get("DYNAMICS_CRMCONFIG"),
+      Some(defaultCrmConfigFile))
+      .collect{ case Some(f) => f }
+
+    readConnectionInfo(configFiles, Some("DYNAMICS_PASSWORD")).fold(
+      msg => { println(msg); process.exit(1); null },
+      c => c)
   }
 
 }

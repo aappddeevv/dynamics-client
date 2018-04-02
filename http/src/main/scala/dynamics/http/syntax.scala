@@ -11,12 +11,14 @@ import cats.data._
 import cats.implicits._
 import cats.effect._
 
-final case class DecodeResultOps[T](val dr: DecodeResult[T]) extends AnyVal {
-  def toIO: IO[T] = dr.fold(IO.raiseError, IO.pure).flatten
+final case class DecodeResultOps[F[_], T](val dr: DecodeResult[F, T])
+  (implicit F: MonadError[F, Throwable]) {
+  def toF: F[T] = F.flatten(dr.fold(F.raiseError, F.pure))
 }
 
 trait DecodeResultSyntax {
-  implicit def decodeResultOpsSyntax[T](dr: DecodeResult[T]) = DecodeResultOps(dr)
+  implicit def decodeResultOpsSyntax[F[_], T](dr: DecodeResult[F, T])
+    (implicit F: MonadError[F,Throwable]) = DecodeResultOps(dr)
 }
 
 final case class EntityEncoderOps[A](a: A) extends AnyVal {
@@ -27,20 +29,21 @@ trait EntityEncoderSyntax {
   implicit def entityEncoderOpsSyntax[A](a: A): EntityEncoderOps[A] = EntityEncoderOps[A](a)
 }
 
-case class MultipartOps(r: HttpRequest) {
+final case class MultipartOps[F[_]](r: HttpRequest[F]) {
   def toPart = SinglePart(r)
 }
 
 trait MultipartSyntax {
-  implicit def httpRequestToOps(r: HttpRequest): MultipartOps = MultipartOps(r)
+  implicit def httpRequestToOps[F[_]](r: HttpRequest[F]): MultipartOps[F] = MultipartOps(r)
 }
 
 trait MultipartInstances {
-  implicit val multipartEntityEncoder: EntityEncoder[Multipart] = new EntityEncoder[Multipart] {
-    def encode(m: Multipart) =
-      (Multipart.render(m),
-       HttpHeaders.empty ++ Map("Content-Type" -> Seq(Multipart.MediaType, "boundary=" + m.boundary.value)))
-  }
+  implicit def multipartEntityEncoder: EntityEncoder[Multipart] =
+    new EntityEncoder[Multipart] {
+      def encode(m: Multipart) =
+        (Multipart.render(m),
+          HttpHeaders.empty ++ Map("Content-Type" -> Seq(Multipart.MediaType, "boundary=" + m.boundary.value)))
+    }
 }
 
 trait AllSyntax extends MultipartSyntax with EntityEncoderSyntax with DecodeResultSyntax
@@ -52,12 +55,17 @@ object syntax {
   object decoderesult  extends DecodeResultSyntax
 }
 
-trait AllInstances extends MultipartInstances with EntityEncoderInstances with EntityDecoderInstances
+trait AllInstances
+    extends MultipartInstances
+    with EntityEncoderInstances
+    with EntityDecoderInstances
+    with MethodInstances
 
 object instances {
   object all           extends AllInstances
   object entityEncoder extends EntityEncoderInstances with MultipartInstances
   object entityDecoder extends EntityDecoderInstances
+  object method extends MethodInstances
 }
 
 object implicits extends AllSyntax with AllInstances

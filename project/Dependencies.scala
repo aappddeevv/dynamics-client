@@ -14,7 +14,7 @@ object Dependencies {
     "org.typelevel" %%% "cats-core" % "1.1.0",
     "org.typelevel" %%% "cats-effect" % "0.10",
     //"com.github.mpilquist" %%% "simulacrum" % "0.10.0",
-    "com.typesafe.play" %%% "play-json" % "2.6.0",
+    //"com.typesafe.play" %%% "play-json" % "2.6.0",
     "com.softwaremill.retry" %%% "retry" % "0.3.0",
     "com.github.cb372" %%% "scalacache-core" % "0.10.0",
     "org.scala-js" %%% "scalajs-java-time" % "latest.version",

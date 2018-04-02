@@ -38,5 +38,5 @@ package object cli {
   def isDefined(a: js.Any): Boolean = a != null && !js.isUndefined(a)
 
   /** Default connection config resource. */
-  val defaultConfigFile = "dynamics.json"
+  val defaultCrmConfigFile = "dynamics.json"
 }

@@ -143,7 +143,7 @@ object Utils {
   def pathjoin(lhs: String, rhs: String) =
     Path.join(lhs, rhs)
 
-  /** Returns true if the file exists, false otherwise. */
+  /** Returns true if the file exists, false otherwise. Synchronous. */
   def fexists(path: String) =
     try { Fs.accessSync(path, Fs.R_OK); true } catch { case scala.util.control.NonFatal(_) => false }
 

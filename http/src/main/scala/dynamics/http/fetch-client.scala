@@ -154,38 +154,38 @@ case class NodeFetchClientOptions(
 )
 
 object NodeFetchClient extends LazyLogger {
-  //import dynamics.implicits._
   import NodeFetch._
 
   val DefaultNodeFetchClientOptions = NodeFetchClientOptions()
 
   /**
     * Create Client from connection information.
+   * 
     * @param info Connection information
     * @param debug Temporary parameter to turn debugging on or off in this client.
     * @param defaultHeaders Headers applied to every request.
     */
-  def create(info: ConnectionInfo,
-             debug: Boolean = false,
-             defaultHeaders: HttpHeaders = HttpHeaders.empty,
-             opts: NodeFetchClientOptions = DefaultNodeFetchClientOptions)(implicit ec: ExecutionContext,
-                                                                           ehandler: ApplicativeError[IO, Throwable],
-                                                                           scheduler: Scheduler): Client = {
+  def create[F[_]](info: ConnectionInfo,
+    debug: Boolean = false,
+    defaultHeaders: HttpHeaders = HttpHeaders.empty,
+    options: NodeFetchClientOptions = DefaultNodeFetchClientOptions)
+    (implicit ec: ExecutionContext, F: MonadError[F, Throwable], scheduler: Scheduler,
+      PtoF: js.Promise ~> F, IOtoF: IO ~> F, PtoIO: js.Promise ~> IO): Client[F] = {
 
     require(info.dataUrl.isDefined)
-    val donothing = IO.pure(())
+    val donothing = F.pure(())
 
     val base =
       if (info.dataUrl.get.endsWith("/")) info.dataUrl.get.dropRight(1)
       else info.dataUrl.get
 
-    val svc = Kleisli((request: HttpRequest) => {
+    val svc: Kleisli[F, HttpRequest[F], DisposableResponse[F]] = Kleisli { request =>
       val hashttp = request.path.startsWith("http")
       assert(request.path(0) == '/' || hashttp, s"Request path must start with a slash (/) or http: ${request.path}}")
       val mergedHeaders: HttpHeaders = OData.getBasicHeaders() ++ defaultHeaders ++ request.headers
       val url                        = (if (!hashttp) base else "") + request.path
       // using body string, call the fetch
-      request.body.flatMap {
+      IOtoF(request.body).flatMap {
         bodyString =>
           if (debug) {
             logger.debug(s"FETCH URL: $url")
@@ -196,28 +196,27 @@ object NodeFetchClient extends LazyLogger {
           val fetchopts = new RequestOptions(
             body = bodyString,
             headers = mergedHeaders.mapValues(_.mkString(";")).toJSDictionary,
-            compress = opts.compress,
-            timeout = opts.timeoutInMillis,
+            compress = options.compress,
+            timeout = options.timeoutInMillis,
             method = request.method.name
           )
-          fetch(url, fetchopts).toIO.attempt.flatMap {
+            PtoF(fetch(url, fetchopts)).attempt.flatMap {
             case Right(r) =>
               // convert headers as String -> Seq[String] to just String -> String, is this wrong?
               val headers: HttpHeaders = r.headers.raw().mapValues(_.toSeq).toMap
               //.asInstanceOf[js.Dictionary[Seq[String]]]
-              val hresp = HttpResponse(Status.lookup(r.status), headers, r.text().toIO)
+              val hresp = HttpResponse[F](Status.lookup(r.status), headers, PtoIO(r.text()))
               val dr    = DisposableResponse(hresp, donothing)
               if (debug) {
                 logger.debug(s"FETCH RESPONSE: $dr")
                 //println(s"Raw headers: ${Utils.pprint(r.headers.raw2().asInstanceOf[js.Dynamic])}")
               }
-              IO.pure(dr)
+              F.pure(dr)
             case Left(e) =>
               logger.error(s"node-fetch failure: $e")
-              ehandler.raiseError(CommunicationsFailure("node fetch client", Some(e)))
+              F.raiseError(CommunicationsFailure("node fetch client", Some(e)))
           }
-      }
-    })
+      }}
     Client(svc, donothing)
   }
 }

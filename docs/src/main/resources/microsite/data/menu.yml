@@ -38,11 +38,14 @@ options:
   - title: workflows
     url: docs/workflows.html
 
+  - title: Deployment Scripts
+    url: docs/solutiondeployment.html
+
+  - title: Example Usage Scenarios
+    url: docs/examples.html
+
   - title: Create your own CLI
     url: docs/creatingacustomcli.html
 
-  - title: ETL
+  - title: Simple ETL Programs
     url: docs/etl.html
-
-  - title: Create Your Own Solution Deployer Script
-    url: docs/solutiondeployment.html

@@ -7,6 +7,7 @@ package cli
 
 import scala.scalajs.js
 import annotation._
+import concurrent.ExecutionContext.Implicits.global
 
 object Main {
 

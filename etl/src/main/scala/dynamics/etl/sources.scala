@@ -196,7 +196,7 @@ object sources {
     } yield a
   }
 
-  def MSSQLSourceRequest[A](qstr: String, config: js.Object | RawOptions | String)(
+  def MSSQLSourceRequest[A](qstr: String, config: js.Dynamic | RawOptions | String)(
       implicit ec: ExecutionContext): IO[etl.Request] = {
     MSSQL.connect(config).toIO.map { pool =>
       val request = pool.request()
@@ -210,8 +210,9 @@ object sources {
     * A MSSQL source that executes a query. If you create your own coonnection
     * pool then use `queryToStream` once you create your query request.
     * @see https://www.npmjs.com/package/mssql#tedious connection string info.
+   * @todo Make non-native trait for the connection config options
     */
-  def MSSQLSource[A](qstr: String, config: js.Object | RawOptions | String, qsize: Int = 10000)(
+  def MSSQLSource[A](qstr: String, config: js.Dynamic | RawOptions | String, qsize: Int = 10000)(
       implicit ec: ExecutionContext): Stream[IO, A] = {
     def create() = MSSQL.connect(config).toIO.map { pool =>
       val request = pool.request()

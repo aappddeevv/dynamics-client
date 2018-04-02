@@ -23,29 +23,30 @@ import dynamics.common._
 import fs2helpers._
 
 /**
-  * General client interface, a thin layer over a service that adds some implcit
-  * convenience for finding response decoders and handling unsuccessful (non 200
-  * range) responses. Based on http4s design. The methods in this class do not
-  * deal with exceptions/errors but does, when expecting a successful result,
-  * translate a non-200 saus to an `UnexpectedStatus` exception.
+  * A thin layer over a HTTP service that adds implcit convenience for finding
+  * response decoders and handling unsuccessful (non 200 range) responses. Based
+  * on http4s design. The methods in this class do not deal with
+  * exceptions/errors but does, when expecting a successful result, translate a
+  * non-200 saus to an `UnexpectedStatus` exception and hence uses
+  * `MonadError.raiseError` to signal the error.
   */
-final case class Client(open: Service[HttpRequest, DisposableResponse], dispose: IO[Unit])(
-    implicit ehandler: ApplicativeError[IO, Throwable]) {
+final case class Client[F[_]](open: Kleisli[F, HttpRequest[F], DisposableResponse[F]], dispose: F[Unit])(
+    implicit F: MonadError[F, Throwable]) {
 
   /** Fetch response, process regardless of status. Very low-level. */
-  def fetch[A](request: HttpRequest)(f: HttpResponse => IO[A]): IO[A] =
+  def fetch[A](request: HttpRequest[F])(f: HttpResponse[F] => F[A]): F[A] =
     open.run(request).flatMap(_.apply(f))
 
   /** Fetch response, process response with `d` but only if successful status.
     * Throw [[UnexpectedStatus]] otherwise since you cannot use the decoder,
     * which assumes a successful response, if the response is not valid.
     */
-  def expect[A](req: HttpRequest)(implicit d: EntityDecoder[A]): IO[A] = {
+  def expect[A](req: HttpRequest[F])(implicit d: EntityDecoder[F, A]): F[A] = {
     fetch(req) {
       case Status.Successful(resp) =>
         d.decode(resp).fold(throw _, identity)
       case failedResponse =>
-        ehandler.raiseError(
+        F.raiseError(
           UnexpectedStatus(failedResponse.status, request = Option(req), response = Option(failedResponse)))
     }
   }
@@ -56,25 +57,26 @@ final case class Client(open: Service[HttpRequest, DisposableResponse], dispose:
     * value, DecodeResult.
     *
     */
-  def fetchAs[A](req: HttpRequest)(implicit d: EntityDecoder[A]): IO[A] = {
+  def fetchAs[A](req: HttpRequest[F])(implicit d: EntityDecoder[F, A]): F[A] = {
     fetch(req) { resp =>
       d.decode(resp).fold(throw _, identity)
     }
   }
 
   /** Same as `fetch` but request is in an effect. */
-  def fetch[A](request: IO[HttpRequest])(f: HttpResponse => IO[A]): IO[A] =
+  def fetch[A](request: F[HttpRequest[F]])(f: HttpResponse[F] => F[A]): F[A] =
     request.flatMap(fetch(_)(f))
 
   /** Same as `expect` but request is in an effect. */
-  def expect[A](req: IO[HttpRequest])(implicit d: EntityDecoder[A]): IO[A] =
+  def expect[A](req: F[HttpRequest[F]])(implicit d: EntityDecoder[F, A]): F[A] =
     req.flatMap(expect(_)(d))
 
   /** Creates a funcion that acts like "client.fetch" but without need to call `.fetch`. */
-  def toService[A](f: HttpResponse => IO[A]): Service[HttpRequest, A] =
+  def toService[A](f: HttpResponse[F] => F[A]): Kleisli[F, HttpRequest[F], A] =
     open.flatMapF(_.apply(f))
 
-  def streaming[A](req: HttpRequest)(f: HttpResponse => Stream[IO, A]): Stream[IO, A] = {
+  /** Stream the response contents. */
+  def streaming[A](req: HttpRequest[F])(f: HttpResponse[F] => Stream[F, A]): Stream[F, A] = {
     Stream
       .eval(open(req))
       .flatMap {
