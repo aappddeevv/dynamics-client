@@ -52,7 +52,7 @@ trait DynamicsClientRequests {
    * This does not handle the version tag + applyOptimisticConcurrency flag yet.
    */
   def toHeaders(o: DynamicsOptions): HttpHeaders = {
-    val prefer = OData.render(o.prefers)
+    val prefer = client.common.headers.render(o.prefers)
     prefer.map(str => HttpHeaders("Prefer"        -> str)).getOrElse(HttpHeaders.empty) ++
     o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty)
     //++ o.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
@@ -156,7 +156,7 @@ trait DynamicsClientRequests {
     * Since the parts will have requests, you need to ensure that the
     * base URL used in those requests have a consistent base URL.
     */
-  def mkBatch[F[_], A](m: Multipart, headers: HttpHeaders = HttpHeaders.empty): HttpRequest[F] = {
+  def mkBatch[F[_]](m: Multipart, headers: HttpHeaders = HttpHeaders.empty): HttpRequest[F] = {
     import dynamics.http.instances.entityEncoder._
     val (mrendered, xtra) = EntityEncoder[Multipart].encode(m)
     HttpRequest(Method.POST, "/$batch", headers = headers ++ xtra, body = mrendered)

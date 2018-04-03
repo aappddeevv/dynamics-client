@@ -34,6 +34,7 @@ import dynamics.client._
 import dynamics.http._
 import dynamics.client.syntax.queryspec._
 import dynamics.http.implicits._
+import dynamics.client.common._
 
 class EntityActions(context: DynamicsContext) extends LazyLogger {
 
@@ -105,7 +106,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     println(s"Output file: $outputpath")
 
     val opts = DynamicsOptions(
-      prefers = OData.PreferOptions(maxPageSize = config.export.maxPageSize,
+      prefers = client.common.headers.PreferOptions(maxPageSize = config.export.maxPageSize,
                                     includeFormattedValues = Some(config.export.includeFormattedValues)))
     val values =
       dynclient
@@ -134,7 +135,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     println(s"Export entity: ${config.export.entity}")
     val url = q.url(config.export.entity)
     val opts = DynamicsOptions(
-      prefers = OData.PreferOptions(maxPageSize = config.export.maxPageSize,
+      prefers = client.common.headers.PreferOptions(maxPageSize = config.export.maxPageSize,
                                     includeFormattedValues = Some(config.export.includeFormattedValues)))
 
     val values = dynclient.getListStream[js.Object](url, opts).drop(config.export.skip.map(_.toLong).getOrElse(0))

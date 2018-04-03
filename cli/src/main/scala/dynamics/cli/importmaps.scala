@@ -28,6 +28,7 @@ import http._
 import client.implicits._
 import http.implicits._
 import NPMTypes._
+import client.common._
 
 object ImportMapUtils {
 

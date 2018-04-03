@@ -23,8 +23,8 @@ import Utils._
 import dynamics.common.implicits._
 import dynamics.http._
 import dynamics.http.implicits._
-import dynamics.client.QuerySpec
 import dynamics.client.implicits._
+import client.common._
 
 @js.native
 trait SDKMessageProcessingStep extends js.Object {

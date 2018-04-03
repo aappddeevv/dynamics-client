@@ -27,6 +27,7 @@ import dynamics.http._
 import dynamics.common.syntax.jsdynamic._
 import dynamics.client.implicits._
 import dynamics.http.implicits._
+import client.common._
 
 case class EnityReference(entity: String, id: String)
 

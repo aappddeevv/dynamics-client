@@ -26,6 +26,7 @@ import dynamics.http._
 import dynamics.http.implicits._
 import dynamics.client.implicits._
 import dynamics.client._
+import client.common._
 
 @js.native
 trait GlobalOptionSetDefinition extends js.Object {

@@ -25,6 +25,7 @@ import dynamics.http._
 import dynamics.http.implicits._
 import client._
 import client.implicits._
+import client.common._
 
 @js.native
 trait OrganizationJS extends js.Object {

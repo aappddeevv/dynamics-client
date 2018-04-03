@@ -685,3 +685,38 @@ trait EntityRecordCountCollection extends js.Object {
 trait RetrieveTotalRecordCountResponse extends js.Object {
   val EntityRecordCountCollection: EntityRecordCountCollection
 }
+
+
+@js.native
+trait SystemuserJS extends js.Object {
+  val firstname: String            = js.native
+  val lastname: String             = js.native
+  val fullname: String             = js.native
+  val systemuserid: String         = js.native
+  val internalemailaddress: String = js.native
+
+  //@JSName("systemuserroles_association@odata.nextLink")
+  //val systemuserroles_association_nl: js.UndefOr[String] = js.native
+}
+
+@js.native
+trait RoleNameJS extends js.Object {
+  val roleid: String = js.native
+  val name: String   = js.native
+}
+
+@js.native
+trait RoleJS extends RoleNameJS {
+  // pure GUID
+  val organizationid: String          = js.native
+  val _businesunitid_value: String    = js.native
+  val solutionid: String              = js.native
+  val _parentrootroleid_value: String = js.native
+
+  @JSName("_businessunitid_value@OData.Community.Display.V1.FormattedValue")
+  val _businesunitid_value_fv: String = js.native
+  @JSName("_parentrootroleid_value@OData.Community.Display.V1.FormattedValue")
+  val _parentrootroleid_value_fv: String = js.native
+  @JSName("componentstate@OData.Community.Display.V1.FormattedValue")
+  val componentstate_fv: String = js.native
+}

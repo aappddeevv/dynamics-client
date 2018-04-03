@@ -35,6 +35,7 @@ import dynamics.http._
 import dynamics.http.implicits._
 import dynamics.client._
 import dynamics.client.implicits._
+import client.common._
 
 trait AddSolutionComponentResponse extends js.Object {
 

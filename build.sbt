@@ -58,7 +58,7 @@ lazy val root = project.in(file("."))
   .settings(dynamicsSettings)
   .settings(noPublishSettings)
   .settings(name := "dynamics-client")
-  .aggregate(http, client, common, etl, cli, `cli-main`, docs, adal)
+  .aggregate(http, client, clientcommon, common, etl, cli, `cli-main`, docs, adal)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val common = project
@@ -67,6 +67,14 @@ lazy val common = project
   .settings(libraryDependencies ++= Dependencies.monadlessDependencies.value)
   .settings(name := "dynamics-client-common")
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
+
+lazy val clientcommon = project
+  .settings(dynamicsSettings)
+  .settings(description := "Common client components")
+  .settings(libraryDependencies ++= Dependencies.monadlessDependencies.value)
+  .settings(name := "dynamics-client-client-common")
+  .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
+  .dependsOn(common, http)
 
 lazy val etl = project
   .settings(dynamicsSettings)
@@ -93,7 +101,7 @@ lazy val client = project
   .settings(dynamicsSettings)
   .settings(name := "dynamics-client-dynamicsclient")
   .settings(description := "dynamics client")
-  .dependsOn(http, common)
+  .dependsOn(http, clientcommon, common)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val cli = project
@@ -102,7 +110,7 @@ lazy val cli = project
   .settings(description := "common CLI client infrastructure")
   .settings(libraryDependencies ++=
     Dependencies.cliDependencies.value ++ Dependencies.monadlessDependencies.value)
-  .dependsOn(client, common, etl, adal)
+  .dependsOn(client, etl, adal)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin, BuildInfoPlugin)
   .settings(
     unmanagedResourceDirectories in Compile += baseDirectory.value / "cli/src/main/js",
@@ -120,7 +128,7 @@ lazy val `cli-main` = project
     scalaJSUseMainModuleInitializer := true,
     mainClass in Compile := Some("dynamics.cli.Main"),
   )
-  .dependsOn(client, common, etl, cli) 
+  .dependsOn(cli) 
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val docs = project
@@ -128,7 +136,7 @@ lazy val docs = project
   .settings(noPublishSettings)
   .enablePlugins(MicrositesPlugin)
   .enablePlugins(ScalaUnidocPlugin)
-  .dependsOn(client, http, cli, `cli-main`, etl, common).
+  .dependsOn(clientcommon, client, http, cli, `cli-main`, etl, common).
   settings(
     micrositeName := "dynamics-client",
     micrositeDescription := "A Microsoft Dynamics CLI swiss-army knife and browser/server library.",

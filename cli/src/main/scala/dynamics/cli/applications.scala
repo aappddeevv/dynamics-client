@@ -21,6 +21,7 @@ import MonadlessIO._
 import dynamics.client._
 import dynamics.client.implicits._
 import dynamics.http.implicits._
+import client.common._
 
 class ApplicationActions(val context: DynamicsContext) extends {
   import context._

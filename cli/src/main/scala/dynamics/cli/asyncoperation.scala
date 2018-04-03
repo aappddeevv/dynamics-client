@@ -27,6 +27,7 @@ import dynamics.client._
 import dynamics.http._
 import dynamics.client.implicits._
 import dynamics.http.implicits._
+import client.common._
 
 class AsyncOperationsCommand(val context: DynamicsContext) {
 

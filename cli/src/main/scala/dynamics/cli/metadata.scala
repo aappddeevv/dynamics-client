@@ -26,6 +26,7 @@ import dynamics.client._
 import dynamics.client.implicits._
 import dynamics.common.implicits._
 import dynamics.http.implicits._
+import client.common._
 
 class MetadataActions(val context: DynamicsContext) {
 

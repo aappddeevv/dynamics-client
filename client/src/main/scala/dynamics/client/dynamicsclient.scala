@@ -20,6 +20,7 @@ import fs2helpers._
 import dynamics.http._
 import dynamics.http.instances.entityEncoder._
 import dynamics.http.instances.entityDecoder._
+import dynamics.client.common._
 
 sealed trait DynamicsId {
   def render(): String
@@ -40,18 +41,18 @@ object AltId {
 
 case class DynamicsOptions(
     /** Prefer OData options. */
-    prefers: OData.PreferOptions = OData.DefaultPreferOptions,
-    /** Some operations take a version tag ("etag"). */
-    version: Option[String] = None,
+  override val prefers: client.common.headers.PreferOptions = client.common.headers.DefaultPreferOptions,
+  /** Some operations take a version tag ("etag"). */
+  override  val version: Option[String] = None,
     /** User GUID for MSCRMCallerId */
-    user: Option[String] = None,
+  override val user: Option[String] = None,
     /**
       * Controls the use of `version` in some request scenarios.
       * DELETE + version => If-Match: version, delete succeeds if etag matches (204), fails otherwise (412).
       * PATCH (update) + version => If-Match: version, update succeeds if etag matches (204), fails otherwise (412)
       */
-    applyOptimisticConcurrency: Option[Boolean] = None
-)
+    override val applyOptimisticConcurrency: Option[Boolean] = None
+) extends client.common.ClientOptions
 
 /**
   * Dynamics specific client. Its a thin layer over a basic HTTP client that
@@ -71,10 +72,11 @@ case class DynamicsOptions(
   *
   */
 case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionInfo, debug: Boolean = false)(
-    implicit ehandler: ApplicativeError[IO, Throwable],
+    implicit F: ApplicativeError[IO, Throwable],
     e: ExecutionContext)
     extends LazyLogger
-    with DynamicsClientRequests {
+    with DynamicsClientRequests
+    with ClientMethods {
 
   /**
     * Create a failed effect and pull out a dynamics server error message from the body, if present.
@@ -84,12 +86,12 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
       logger.debug(s"ERROR: ${resp.status}: RESPONSE BODY: $body")
       val statuserror                       = Option(UnexpectedStatus(resp.status, request = req, response = Option(resp)))
       val json                              = js.JSON.parse(body)
-      val dynamicserror: Option[ErrorOData] = findDynamicsError(json)
+      val dynamicserror: Option[DynamicsErrorJS] = findDynamicsError(json)
       val derror =
         dynamicserror.map(e => DynamicsClientError(msg, Some(DynamicsServerError(e)), statuserror, resp.status))
       val simpleerror = findSimpleMessage(json).map(DynamicsClientError(_, None, statuserror, resp.status))
       val fallback    = Option(DynamicsClientError(msg, None, statuserror, resp.status))
-      ehandler.raiseError((derror orElse simpleerror orElse fallback).get)
+      F.raiseError((derror orElse simpleerror orElse fallback).get)
     }
   }
 
@@ -103,10 +105,10 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   }
 
   /** Find an optional dynamics error message in the body. */
-  protected def findDynamicsError(body: js.Dynamic): Option[ErrorOData] = {
+  protected def findDynamicsError(body: js.Dynamic): Option[DynamicsErrorJS] = {
     if (js.DynamicImplicits.truthValue(body.error)) {
       val error: js.UndefOr[js.Dynamic] = body.error
-      error.map(_.asInstanceOf[ErrorOData]).toOption
+      error.map(_.asInstanceOf[DynamicsErrorJS]).toOption
     } else None
   }
 
@@ -328,36 +330,38 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     * QuerySpec.
     */
   def getList[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(): IO[Seq[A]] =
-    getListStream[A](url).compile.toVector
+    _getListStream[A](url, toHeaders(opts)).compile.toVector
 
   /**
     * Get a list of values as a stream. Follows @odata.nextLink. For now, the
     * caller must decode external to this method.
     */
-  def getListStream[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions): Stream[IO, A] = {
-    val str: Stream[IO, Seq[A]] = Stream.unfoldEval(Option(url)) {
-      _ match {
-        // Return a IO[Option[(Seq[A],Option[String])]]
-        case None => IO.pure(None)
-        case Some(nextLink) =>
-          val request = HttpRequest[IO](Method.GET, nextLink, headers = toHeaders(opts))
-          http.fetch(request) {
-            case Status.Successful(resp) =>
-              resp.body.map { str =>
-                val odata = js.JSON.parse(str).asInstanceOf[ValueArrayResponse[A]]
-                if (logger.isDebugEnabled())
-                  logger.debug(s"getListStream: body=$str\nodata=${PrettyJson.render(odata)}")
-                val a = odata.value.map(_.toSeq) getOrElse Seq()
-                //println(s"getList: a=$a,\n${PrettyJson.render(a(0).asInstanceOf[js.Object])}")
-                Option((a, odata.nextLink.toOption))
-              }
-            case failedResponse =>
-              responseToFailedTask(failedResponse, s"getListStream $url", Option(request))
-          }
-      }
-    }
-    // Flatten the seq chunks from each unfold iteration
-    str.flatMap(Stream.emits[A])
-  }
+  def getListStream[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions): Stream[IO, A] =
+    _getListStream[A](url, toHeaders(opts))
+  // {
+  //   val str: Stream[IO, Seq[A]] = Stream.unfoldEval(Option(url)) {
+  //     _ match {
+  //       // Return a IO[Option[(Seq[A],Option[String])]]
+  //       case None => IO.pure(None)
+  //       case Some(nextLink) =>
+  //         val request = HttpRequest[IO](Method.GET, nextLink, headers = toHeaders(opts))
+  //         http.fetch(request) {
+  //           case Status.Successful(resp) =>
+  //             resp.body.map { str =>
+  //               val odata = js.JSON.parse(str).asInstanceOf[ValueArrayResponse[A]]
+  //               if (logger.isDebugEnabled())
+  //                 logger.debug(s"getListStream: body=$str\nodata=${PrettyJson.render(odata)}")
+  //               val a = odata.value.map(_.toSeq) getOrElse Seq()
+  //               //println(s"getList: a=$a,\n${PrettyJson.render(a(0).asInstanceOf[js.Object])}")
+  //               Option((a, odata.nextLink.toOption))
+  //             }
+  //           case failedResponse =>
+  //             responseToFailedTask(failedResponse, s"getListStream $url", Option(request))
+  //         }
+  //     }
+  //   }
+  //   // Flatten the seq chunks from each unfold iteration
+  //   str.flatMap(Stream.emits[A])
+  // }
 
 }

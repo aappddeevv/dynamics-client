@@ -20,7 +20,8 @@ import scala.concurrent.duration._
 import java.util.concurrent.{TimeUnit => TU}
 
 import dynamics.client._
-import common.instances.jsPromise._
+import dynamics.common.instances.jsPromise._
+import dynamics.client.common._
 
 class TokenActions(context: DynamicsContext) extends LazyLogger {
 

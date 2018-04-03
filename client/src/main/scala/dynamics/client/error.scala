@@ -17,38 +17,46 @@ import js.JSConverters._
 import dynamics.common._
 import dynamics.http._
 
-/**
-  * See https://msdn.microsoft.com/en-us/library/mt770385.aspx,
-  *  https://msdn.microsoft.com/en-us/library/gg334391.aspx#bkmk_parseErrors
-  */
 @js.native
-trait ErrorOData extends js.Object {
+trait ODataErrorJS extends js.Object {
   val code: js.UndefOr[String]                = js.undefined
   val message: js.UndefOr[String]             = js.undefined
-  val innererror: js.UndefOr[InnerErrorOData] = js.undefined
 }
 
 /**
+  * @see https://msdn.microsoft.com/en-us/library/mt770385.aspx,
+  *  https://msdn.microsoft.com/en-us/library/gg334391.aspx#bkmk_parseErrors
+  */
+@js.native
+trait DynamicsErrorJS extends ODataErrorJS {
+  val innererror: js.UndefOr[DynamicsInnerErrorJS] = js.undefined
+}
+
+/**
+ * Dynamics related inner error.
   * See https://msdn.microsoft.com/en-us/library/mt770385.aspx
   */
 @js.native
-trait InnerErrorOData extends js.Object {
+trait DynamicsInnerErrorJS extends js.Object {
   @JSName("type")
   val etype: js.UndefOr[String]      = js.undefined
   val message: js.UndefOr[String]    = js.undefined
   val stacktrace: js.UndefOr[String] = js.undefined
 }
 
-/** Inner error returned by the dynamics server. Scala side. */
-case class InnerError(etype: String, message: String, stacktrace: String)
+trait ServerError {
+  def code: String
+  def message: String
+}
 
-/** Error object created from response body. Scala side.*/
-case class DynamicsServerError(code: String, message: String, innererror: Option[InnerError] = None)
+
+case class InnerError(etype: String, message: String, stacktrace: String)
+case class DynamicsServerError(code: String, message: String, innererror: Option[InnerError] = None) extends ServerError
 
 object DynamicsServerError {
 
   /** Extract out a scala side error. Embedded newline chars are replaced with actual newlines. */
-  def apply(err: ErrorOData): DynamicsServerError = {
+  def apply(err: DynamicsErrorJS): DynamicsServerError = {
     val ierror = err.innererror.map { i =>
       InnerError(
         i.etype.getOrElse("<no error type provided>"),

@@ -43,11 +43,11 @@ trait ClientShows {
   }
 }
 
-trait AllSyntax extends QuerySpecSyntax with DynamicsIdSyntax
+trait AllSyntax extends client.common.QuerySpecSyntax with DynamicsIdSyntax
 
 object syntax {
   object all        extends AllSyntax
-  object queryspec  extends QuerySpecSyntax
+  object queryspec  extends client.common.QuerySpecSyntax
   object dynamicsid extends DynamicsIdSyntax
 }
 

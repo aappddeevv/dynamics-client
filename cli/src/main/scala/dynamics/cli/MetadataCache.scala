@@ -29,6 +29,7 @@ import dynamics.client._
 import dynamics.client.implicits._
 import dynamics.common.implicits._
 import dynamics.http.implicits._
+import client.common._
 
 class EntityDefinition(
     val PrimaryNameAttribute: js.UndefOr[String] = js.undefined,
@@ -255,7 +256,7 @@ EntityDefinitions(LogicalName='account')/Attributes(LogicalName='accountcategory
         QuerySpec(select = Seq("LogicalName", "EntitySetName"),
                   expand =
                     Seq(Expand("Attributes", select = Seq("AttributeType"), filter = Some(s"LogicalName eq '$aname'"))))
-      val opts = DynamicsOptions(prefers = OData.PreferOptions(includeFormattedValues = Some(true)))
+      val opts = DynamicsOptions(prefers = client.common.headers.PreferOptions(includeFormattedValues = Some(true)))
       dynclient.getOne[String](q.url("EntityDefinitions", Some(ed.MetadataId.get)), opts).map { ad =>
         //println(s"metadata get: $ad")
         metadata.AttributeTypeCode.Integer

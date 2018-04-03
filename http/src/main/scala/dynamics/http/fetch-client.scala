@@ -182,7 +182,7 @@ object NodeFetchClient extends LazyLogger {
     val svc: Kleisli[F, HttpRequest[F], DisposableResponse[F]] = Kleisli { request =>
       val hashttp = request.path.startsWith("http")
       assert(request.path(0) == '/' || hashttp, s"Request path must start with a slash (/) or http: ${request.path}}")
-      val mergedHeaders: HttpHeaders = OData.getBasicHeaders() ++ defaultHeaders ++ request.headers
+      val mergedHeaders: HttpHeaders = defaultHeaders ++ request.headers
       val url                        = (if (!hashttp) base else "") + request.path
       // using body string, call the fetch
       IOtoF(request.body).flatMap {

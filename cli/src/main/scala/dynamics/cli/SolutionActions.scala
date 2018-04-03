@@ -25,6 +25,7 @@ import dynamics.http._ // nodejs has an http pkg
 import dynamics.http.implicits._
 import client._
 import client.implicits._
+import client.common._
 
 class ExportSolution(
     /** Required */

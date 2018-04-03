@@ -24,6 +24,7 @@ import dynamics.http._
 import dynamics.client._
 import dynamics.client.implicits._
 import dynamics.http.implicits._
+import dynamics.client.common._
 
 trait WorkflowJson extends js.Object {
   val workflowid: UndefOr[String]  = js.undefined
@@ -215,7 +216,7 @@ class WorkflowActions(val context: DynamicsContext) {
         _ map { p =>
           val entityId = p._1
           val body     = s"""{ "EntityId": "$entityId" }"""
-          val opts     = DynamicsOptions(prefers = OData.QuietPreferOptions)
+          val opts     = DynamicsOptions(prefers = client.common.headers.QuietPreferOptions)
           dynclient
             .executeAction[String](ExecuteWorkflow, Entity.fromString(body), Some(("workflows", workflowId)), opts)
             .map(_ => s"Executed workflow against $entityId")
@@ -267,7 +268,7 @@ class WorkflowActions(val context: DynamicsContext) {
   /** Make a request to execute workflow on an entity instance. */
   def mkExecuteWorkflowRequest(workflowId: String, entityId: String) = {
     val body = s"""{ "EntityId": "$entityId" }"""
-    val opts = DynamicsOptions(prefers = OData.QuietPreferOptions)
+    val opts = DynamicsOptions(prefers = client.common.headers.QuietPreferOptions)
     dynclient.mkExecuteActionRequest(ExecuteWorkflow, Entity.fromString(body), Some(("workflows", workflowId)), opts)
   }
 

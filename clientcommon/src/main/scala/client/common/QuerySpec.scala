@@ -4,6 +4,7 @@
 
 package dynamics
 package client
+package common
 
 import scala.scalajs.js
 import js._
@@ -16,8 +17,6 @@ import cats._
 import cats.data._
 import cats.implicits._
 import js.Dynamic.{literal => jsobj}
-
-import dynamics.common.implicits._
 
 sealed trait OrderByDir
 case object Desc extends OrderByDir
@@ -160,5 +159,5 @@ final class QuerySpecOps(val spec: QuerySpec) extends AnyVal {
 }
 
 trait QuerySpecSyntax {
-  implicit def dynamicsSyntaxQuerySpec(spec: QuerySpec) = new QuerySpecOps(spec)
+  implicit def clientSyntaxQuerySpec(spec: QuerySpec) = new QuerySpecOps(spec)
 }

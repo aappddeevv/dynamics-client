@@ -9,7 +9,7 @@ package object client {
   val DefaultDynamicsOptions = DynamicsOptions()
 
   /** Options with as little as possble being returned. */
-  val QuietDynamicsOptions = DynamicsOptions(prefers=http.OData.QuietPreferOptions)
+  val QuietDynamicsOptions = DynamicsOptions(prefers=client.common.headers.QuietPreferOptions)
 
   /** Boolean header value to suppress duplicate detection. */
   val SuppressDuplicateDetection = "MSCRM.SuppressDuplicateDetection"
