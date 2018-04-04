@@ -52,7 +52,12 @@ object QueryParts {
     )
 }
 
-/** To address a property. */
+/** 
+ * To navigate to child lists. id accesses a specific child. Cast may be
+ * required e.g. with AttributeMetadata you need
+ * Microsoft.Dynamics.CRM.PicklistAttributeMetadata to return the proper set of
+ * attributes.
+ */
 case class NavProperty(name: String, id: Option[String] = None, cast: Option[String] = None)
 
 object NavProperty {

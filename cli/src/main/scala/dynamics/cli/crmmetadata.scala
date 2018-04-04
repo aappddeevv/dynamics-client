@@ -329,17 +329,13 @@ object metadata {
       Codes.get(code).getOrElse(AttributeTypeCode(code, "No description available."))
 
     private val Codes: Map[Int, AttributeTypeCode] = Map(
-      0x12 -> AttributeTypeCode(0x12, "BigInt"),
       0    -> AttributeTypeCode(0, "Boolean"),
-      0x10 -> AttributeTypeCode(0x10, "CalendarRules"),
       1    -> AttributeTypeCode(1, "Customer"),
       2    -> AttributeTypeCode(2, "DateTime"),
       3    -> AttributeTypeCode(3, "Decimal"),
       4    -> AttributeTypeCode(4, "Double"),
-      20   -> AttributeTypeCode(20, "EntityName"),
       5    -> AttributeTypeCode(5, "Integer"),
       6    -> AttributeTypeCode(6, "Lookup"),
-      0x13 -> AttributeTypeCode(0x13, "ManagedProperty"),
       7    -> AttributeTypeCode(7, "Memo"),
       8    -> AttributeTypeCode(8, "Money"),
       9    -> AttributeTypeCode(9, "Owner"),
@@ -349,7 +345,11 @@ object metadata {
       13   -> AttributeTypeCode(13, "Status"),
       14   -> AttributeTypeCode(14, "String"),
       15   -> AttributeTypeCode(15, "Uniqueidentifier"),
-      0x11 -> AttributeTypeCode(0x11, "Virtual")
+      16 -> AttributeTypeCode(0x10, "CalendarRules"),      
+      17 -> AttributeTypeCode(0x11, "Virtual"),
+      18 -> AttributeTypeCode(0x12, "BigInt"),
+      19 -> AttributeTypeCode(0x13, "ManagedProperty"),
+      20   -> AttributeTypeCode(20, "EntityName"),      
     )
 
     val BigInt = Codes(0x12)

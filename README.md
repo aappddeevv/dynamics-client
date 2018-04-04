@@ -48,7 +48,21 @@ The above shows the domain name to be `<yourorg>.onmicrosoft.com` but the domain
 
 Some information can be inferred if left out. For example, the tenant can be inferred from username and the dataUrl can be inferred from acquireTokenResource but its best to specify them directly.
 
-Once you have created your connection file, use it with the `-c <connectionfile>` option. If you connect to several organizations just name the connection file after the organization e.g. myorg1.json or myorg2.json then use it `-c myorg1.json`.
+Once you have created your connection file, use it with the `-c <connectionfile>` option. If you connect to several organizations just name the connection file after the organization e.g. myorg1.json or myorg2.json then use it `-c myorg1.json`. Or, specify the config file in `DYNAMICS_CRMCONFIG` and skip providing the option on the command line.
+
+If you are using Graph via the GraphClient, use the following parameters:
+
+```javascript
+{
+ ...
+ "authorityHostUrl" : "https://login.microsoftonline.com",
+ "dataUrl": "https://graph.microsoft.com/v1.0",
+ "acquireTokenResource": "https://graph.microsoft.com",
+  ...
+}
+```
+
+You could also use `https://outlook.office.com` to access the outlook API directly at `https://outlook.office.com/api/v2.0` for the data url.
 
 ## Commands
 The general CLI usage is `dynamics command [subcommand] [opts]`.
@@ -91,6 +105,10 @@ Some of the things you can do with the CLI include:
 See [dynamics-client](https://aappddeevv.github.io/dynamics-client) for details.
 
 Ingredients for packaging up parts of a solution deployment are here so you can create your own scripted solution deployer by just creating a directory and a standard script.
+
+You can use the general `GraphClient` to connect and run processing against much of the Microsoft app universe.
+
+## Credit
 
 All work sponsored by The Trapelo Group.
 

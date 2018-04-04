@@ -32,6 +32,7 @@ class MetadataActions(val context: DynamicsContext) {
 
   import dynamics.client.syntax.queryspec._
   import context._
+  val m = new MetadataCache(context)
 
   //val mc = new MetadataCache(context)
 
@@ -47,16 +48,16 @@ class MetadataActions(val context: DynamicsContext) {
     val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
     lift {
       val list =
-        unlift(dynclient.getList[EntityDefinition](q.url("EntityDefinitions"))).sortBy(_.LogicalName.getOrElse(""))
+        unlift(m.entityDefinitions()).sortBy(_.LogicalName)
       val data: Seq[Seq[String]] =
         Seq(Seq("#", "LogicalName", "EntitySetName", "PrimaryIdAttribute", "ObjectTypeCode")) ++
           list.zipWithIndex.map {
             case (i, idx) =>
               Seq((idx + 1).toString,
-                  i.LogicalName.getOrElse(""),
-                  i.EntitySetName.getOrElse(""),
-                  i.PrimaryIdAttribute.getOrElse(""),
-                  i.ObjectTypeCode.getOrElse(-1).toString)
+                  i.LogicalName,
+                  i.EntitySetName,
+                  i.PrimaryIdAttribute,
+                  i.ObjectTypeCode.toString)
           }
       val out = Table.table(data.map(_.toJSArray).toJSArray, topts)
       println(out)

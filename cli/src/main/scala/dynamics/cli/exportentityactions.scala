@@ -78,8 +78,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     val deleteFromCLI: Stream[IO, (String, Long)] =
       if (config.export.query.size > 0)
         Stream
-          .eval(m.getEntityDefinition3(config.export.entity))
-          .flatMap(ed => deleteFromQuery(config.export.query, ed.PrimaryId, ed.EntitySetName, concurrency))
+          .eval(m.entityByName(config.export.entity).value)
+          .collect { case Some(ed) => ed }
+          .flatMap(ed => deleteFromQuery(config.export.query, ed.PrimaryIdAttribute, ed.EntitySetName, concurrency))
       else
         Stream.empty
 
@@ -90,8 +91,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
             etl.sources
               .CSVFileSource(f)
               .map(obj => { val dict = obj.asDict[String]; (dict("entity"), dict("query")) })
-              .evalMap(p => m.getEntityDefinition3(p._1).map(ed => (p._1, p._2, ed)))
-              .flatMap(t => deleteFromQuery(t._2, t._3.PrimaryId, t._3.EntitySetName, concurrency)))
+              .evalMap(p => m.entityByName(p._1).map(ed => (p._1, p._2, ed)).value)
+              .collect{ case Some(e) => e}
+              .flatMap(t => deleteFromQuery(t._2, t._3.PrimaryIdAttribute, t._3.EntitySetName, concurrency)))
         .getOrElse(Stream.empty)
 
     (deleteFromCLI ++ deleteFromCSVFile)
@@ -244,10 +246,10 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     import metadata._
     val m = new MetadataCache(context)
     val entityList = Stream
-      .eval(m.getEntityList())
-      .flatMap(Stream.emits[EntityDescription])
+      .eval(m.entityDefinitions)
+      .flatMap(Stream.emits[EntityDefinition])
       .filter(entity => entityNames.contains(entity.LogicalName))
-      .map(entity => (entity.LogicalCollectionName, entity.PrimaryId))
+      .map(entity => (entity.LogicalCollectionName, entity.PrimaryIdAttribute))
 
     entityList.map(p => mkCountingStreamForEntity(p._1, p._2))
   }

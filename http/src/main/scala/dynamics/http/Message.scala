@@ -23,7 +23,7 @@ import dynamics.common._
   */
 trait MessageOps[F[_]] extends Any {
 
-  /** Attempt to decode the body. */
+  /** Attempt to decode the body given an implicit decoder. */
   def attemptAs[T](implicit F: FlatMap[F], decoder: EntityDecoder[F, T]): DecodeResult[F, T]
 
   /**

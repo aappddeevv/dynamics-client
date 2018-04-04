@@ -299,8 +299,8 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     *
     * Allow you to specify a queryspec somehow as well.
     */
-  def getOneWithKey[A](entitySet: String, keyInfo: DynamicsId, opts: DynamicsOptions = DefaultDynamicsOptions)(
-      implicit d: EntityDecoder[IO, A]): IO[A] =
+  def getOneWithKey[A](entitySet: String, keyInfo: DynamicsId, opts: DynamicsOptions = DefaultDynamicsOptions)
+    (implicit d: EntityDecoder[IO, A]): IO[A] =
     getOne(s"/$entitySet(${keyInfo.render()})", opts)(d)
 
   /**
@@ -314,7 +314,8 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     * property e.g. a single entity's set of connections or some child
     * entity. In this case, your URL will typically have an "expand" segment.
     */
-  def getOne[A](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[IO,A]): IO[A] = {
+  def getOne[A](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)
+    (implicit d: EntityDecoder[IO,A]): IO[A] = {
     val request = HttpRequest[IO](Method.GET, url, headers = toHeaders(opts))
     http.fetch(request) {
       case Status.Successful(resp) => resp.as[A]
@@ -326,15 +327,18 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   /**
     * Get a list of values. Follows @data.nextLink but accumulates all the
     * results into memory. Prefer [[getListStream]]. For now, the caller must
-    * decode external to this method. The url is usually generated from a
+    * decode external to this method. The url is typically created from a
     * QuerySpec.
+   * 
+   * @see getListStream
     */
   def getList[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(): IO[Seq[A]] =
     _getListStream[A](url, toHeaders(opts)).compile.toVector
 
   /**
     * Get a list of values as a stream. Follows @odata.nextLink. For now, the
-    * caller must decode external to this method.
+    * caller must decode external to this method. The url is usually created
+    * from a QuerySpec e.g. `val q = QuerySpec(); val url = q.url("entitysetname")`.
     */
   def getListStream[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions): Stream[IO, A] =
     _getListStream[A](url, toHeaders(opts))
