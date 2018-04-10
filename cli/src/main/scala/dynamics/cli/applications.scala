@@ -45,7 +45,7 @@ class ApplicationActions(val context: DynamicsContext) extends {
 
     lift {
       val list = unlift(getList())
-      list.map(a => js.Dynamic.global.console.log("app", a))
+      //list.map(a => js.Dynamic.global.console.log("app", a))
       val filtered = filter(list, config.common.filter)
       val data = Seq(
         Seq(

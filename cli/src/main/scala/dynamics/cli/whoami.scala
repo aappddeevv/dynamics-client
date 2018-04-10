@@ -22,12 +22,12 @@ import MonadlessIO._
 import cats.effect._
 
 import dynamics.http._
-import dynamics.http.instances.entityDecoder._
+import dynamics.http.instances.entitydecoder._
 
 class WhoAmIActions(context: DynamicsContext) {
 
   import context._
-  implicit val WhoAmIDecoder = JsObjectDecoder[WhoAmI]
+  implicit val WhoAmIDecoder = JsObjectDecoder[WhoAmI]()
 
   def whoami() = Action { config =>
     dynclient

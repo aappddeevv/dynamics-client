@@ -14,7 +14,7 @@ object headers {
   val NextLink                     = "@odata.nextLink"
 
   //
-  // these should definitely not be here
+  // these should definitely not be here in that they are CRM specific.
   //
   val AssociatedNavigationProperty = "Microsoft.Dynamics.CRM.associatednavigationproperty"
   val LookupLogicalName            = "Microsoft.Dynamics.CRM.lookuplogicalname"
@@ -24,21 +24,23 @@ object headers {
 
   def getBasicHeaders(): HttpHeaders =
     HttpHeaders("OData-Version"    -> "4.0",
-                "OData-MaxVersion" -> "4.0",
-                "Cache-Control"    -> "no-cache",
-                "If-None-Match"    -> "null") ++
-      AcceptHeader ++
-      ContentTypeJson
+      "OData-MaxVersion" -> "4.0",
+      "Cache-Control"    -> "no-cache",
+      "If-None-Match"    -> "null") ++
+  AcceptHeader ++
+  ContentTypeJson
 
   val ContentTypeJson = HttpHeaders("Content-Type" -> "application/json; charset=utf-8")
   val AcceptHeader    = HttpHeaders("Accept"       -> "application/json")
+  val SuppressDuplicateDetection = HttpHeaders("MSCRM.SuppressDuplicateDetection" -> "true")
+  val DoNotSuppressDuplicateDetection = HttpHeaders("MSCRM.SuppressDuplicateDetection" -> "false")
 
-    /** Default includes everything. */
+  /** Default includes everything. */
   case class PreferOptions(maxPageSize: Option[Int] = None,
-                           includeRepresentation: Option[Boolean] = None,
-                           includeFormattedValues: Option[Boolean] = None,
-                           includeLookupLogicalNames: Option[Boolean] = None,
-                           includeAssociatedNavigationProperties: Option[Boolean] = None)
+    includeRepresentation: Option[Boolean] = None,
+    includeFormattedValues: Option[Boolean] = None,
+    includeLookupLogicalNames: Option[Boolean] = None,
+    includeAssociatedNavigationProperties: Option[Boolean] = None)
 
   /** Quiet prefer options. */
   val QuietPreferOptions = PreferOptions(
@@ -86,6 +88,41 @@ object headers {
     val str = opts.collect { case Some(x) => x }.mkString(",")
     if (str == "") None
     else Some(str)
+  }
+
+  val defaultMappers = Map[String, String => String](
+    FormattedValue -> (_ + "_fv"),
+    AssociatedNavigationProperty -> (_ + "_anp"),
+    LookupLogicalName -> (_ + "_lln"),
+  )
+
+  import scala.scalajs.js
+  import js.|
+  import dynamics.common.Utils.{merge}
+
+  /**
+   * Remap some CRM and OData response artifacts if found. Note that if O is a
+   * non-native JS trait, you may want to ensure that you "add" attributes to
+   * your trait that match the conventions specified so you can access the
+   * attributes directly later. Mapping function is (attribute name) => (mapped
+   * attribute name). key for mappers are the odata extensions. Object is
+   * mutated directly. Clone prior if you want.  This is very expensive so its
+   * *not* done by default in many methods.
+   */
+  def remapODataFields[O <: js.Object](obj: O,
+    mappers: Map[String, String => String] = defaultMappers): O = {
+    val d = obj.asInstanceOf[js.Dictionary[js.Any]]
+    val mergemeafter = js.Dictionary.empty[js.Any]
+    for((key, value) <- d) {
+      // test each mapper! very expensive
+      for((mkey, f) <- mappers) {
+        val odataKey = s"$key@$mkey"        
+
+        if(d.contains(odataKey))
+          mergemeafter(f(key)) = d(odataKey)
+      }
+    }
+    merge[O](obj, mergemeafter.asInstanceOf[O])
   }
 
 }

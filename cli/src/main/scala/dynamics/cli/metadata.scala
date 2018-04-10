@@ -32,7 +32,7 @@ class MetadataActions(val context: DynamicsContext) {
 
   import dynamics.client.syntax.queryspec._
   import context._
-  val m = new MetadataCache(context)
+  val m = new MetadataCache(dynclient, LCID)
 
   //val mc = new MetadataCache(context)
 

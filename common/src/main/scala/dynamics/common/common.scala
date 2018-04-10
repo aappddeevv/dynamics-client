@@ -36,4 +36,5 @@ package object common {
       () // return unit
     }
 
+  type Reviver = js.Function2[js.Any, js.Any, js.Any]
 }

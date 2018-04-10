@@ -42,12 +42,16 @@ final case class JsAnyOps(a: js.Any) {
   @inline def asDouble: Double          = a.asInstanceOf[Double]
   @inline def asBoolean: Boolean        = a.asInstanceOf[Boolean]
   @inline def asJsArray[A]: js.Array[A] = a.asInstanceOf[js.Array[A]]
-  @inline def asJson: String            = js.JSON.stringify(a)
+  @inline def toJson: String            = js.JSON.stringify(a)
+  @inline def asUndefOr[A]: js.UndefOr[A] = a.asInstanceOf[js.UndefOr[A]]
   @inline def toNonNullOption[T <: js.Any]: Option[T] = {
     // also defined in react package, repeated here
-    if (js.isUndefined(a)) None
+    if (js.isUndefined(a) || a == null) None
     else Option(a.asInstanceOf[T])
   }
+  @inline def toTruthy: Boolean =
+    if (js.DynamicImplicits.truthValue(a.asInstanceOf[js.Dynamic])) true
+    else false  
 }
 
 trait JsAnySyntax {
@@ -58,14 +62,16 @@ final case class JsObjectOps(o: js.Object) {
   @inline def asDict[A]                   = o.asInstanceOf[js.Dictionary[A]]
   @inline def asAnyDict                   = o.asInstanceOf[js.Dictionary[js.Any]]
   @inline def asDyn                       = o.asInstanceOf[js.Dynamic]
-  @inline def add(that: js.Object)        = merge(o, that)
-  @inline def add(that: js.Dictionary[_]) = merge(o, that.asInstanceOf[js.Object])
+  @inline def asUndefOr[A]: js.UndefOr[A] = o.asInstanceOf[js.UndefOr[A]]  
+  @inline def combine(that: js.Object)        = merge(o, that)
+  @inline def combine(that: js.Dictionary[_]) = merge(o, that.asInstanceOf[js.Object])
 }
 
 final case class JsDictionaryOps(o: js.Dictionary[_]) {
   @inline def asJsObj = o.asInstanceOf[js.Object]
   @inline def asDyn   = o.asInstanceOf[js.Dynamic]
-  @inline def add(that: js.Dictionary[_]) =
+  @inline def asUndefOr[A]: js.UndefOr[A] = o.asInstanceOf[js.UndefOr[A]]  
+  @inline def combine(that: js.Dictionary[_]) =
     merge(o.asInstanceOf[js.Object], that.asInstanceOf[js.Object]).asInstanceOf[js.Dictionary[_]]
 }
 
@@ -82,8 +88,11 @@ final case class JsUndefOrStringOps(a: UndefOr[String]) {
 final case class JsUndefOrOps[A](a: UndefOr[A]) {
   @inline def isNull          = a == null
   @inline def isEmpty         = isNull || !a.isDefined
-  @inline def toNonNullOption = if (a.isEmpty) None else a.toOption
+  @inline def toNonNullOption = if (a == null || a.isEmpty) None else a.toOption
   @inline def toStringJs      = a.asInstanceOf[js.Any].toString()
+  @inline def toTruthy: Boolean =
+    if (js.DynamicImplicits.truthValue(a.asInstanceOf[js.Dynamic])) true
+    else false
 }
 
 trait JsUndefOrSyntax {
@@ -104,10 +113,14 @@ final case class JsDynamicOps(val jsdyn: js.Dynamic) {
   @inline def asUndefOr[A]: js.UndefOr[A] = jsdyn.asInstanceOf[js.UndefOr[A]]
   @inline def asJsObjSub[A <: js.Object]  = jsdyn.asInstanceOf[A] // assumes its there!
   @inline def asJsArray[A <: js.Object]   = jsdyn.asInstanceOf[js.Array[A]]
-  @inline def asOption[T <: js.Object]: Option[T] =
+  @inline def toOption[T <: js.Object]: Option[T] =
     if (js.DynamicImplicits.truthValue(jsdyn)) Some(jsdyn.asInstanceOf[T])
     else None
-  @inline def add(that: js.Dynamic) = mergeJSObjects(jsdyn, that)
+  @inline def toNonNullOption[T <: js.Object]: Option[T] = JsUndefOrOps(asUndefOr).toNonNullOption
+  @inline def combine(that: js.Dynamic) = mergeJSObjects(jsdyn, that)
+  @inline def toTruthy: Boolean =
+        if (js.DynamicImplicits.truthValue(jsdyn)) true
+        else false
 }
 
 trait JsDynamicSyntax {
@@ -152,7 +165,7 @@ trait JsObjectInstances {
   }
 
   /** 
-   * Monoid for js.Object, which is really just a dick. Use |+| or "combine" to
+   * Monoid for js.Object, which is really just a dictionary. Use |+| or "combine" to
    * combine.
    */
   implicit val jsObjectMonoid: Monoid[js.Object] =
@@ -230,7 +243,9 @@ object syntax {
   object jsany         extends JsAnySyntax
   object future        extends FutureSyntax
   object iterator      extends IteratorSyntax
+  /** @deprecated, use "jspromise" */
   object jsPromise     extends JsPromiseSyntax
+  object jspromise     extends JsPromiseSyntax
   object stream        extends StreamSyntax
 }
 
@@ -238,8 +253,12 @@ trait AllInstances extends JsObjectInstances
 
 object instances {
   object all      extends AllInstances
+  /** @deprecated Use "jsobject" */
   object jsObject extends JsObjectInstances
+  object jsobject extends JsObjectInstances
+  /** @deprecated. Use "jspromise" */
   object jsPromise extends JsPromiseInstances
+  object jspromise extends JsPromiseInstances  
   object io extends IOInstances
 }
 

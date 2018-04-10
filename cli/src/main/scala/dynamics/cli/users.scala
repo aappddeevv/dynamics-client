@@ -112,7 +112,7 @@ trait UsersDAO {
 
 class UsersActions(context: DynamicsContext) extends UsersDAO {
   import context._
-  implicit val dec = JsObjectDecoder[SystemuserJS]
+  implicit val dec = JsObjectDecoder[SystemuserJS]()
   val dynclient    = context.dynclient
 
   def renderRoleList(config: CommonConfig, roles: Seq[RoleJS]): String = {

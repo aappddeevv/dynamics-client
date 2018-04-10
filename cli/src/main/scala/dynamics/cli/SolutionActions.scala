@@ -68,7 +68,7 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
   import SolutionActions._
   import context._
   import dynclient._
-  implicit val solnDecoder = JsObjectDecoder[SolutionOData]
+  implicit val solnDecoder = JsObjectDecoder[SolutionOData]()
 
   protected def getList() = {
     val query =

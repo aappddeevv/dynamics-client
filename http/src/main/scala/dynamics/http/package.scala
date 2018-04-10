@@ -32,8 +32,10 @@ package object http {
   type HttpHeaders = collection.immutable.Map[String, Seq[String]]
 
   /**
-    * When decoding a response body, either you get an A
-    * or a DecodeFailure. The effect may also carry an exception.
+    * When decoding a response body, either you get an A or a DecodeFailure. The
+    * effect may also carry an exception.  EitherT has a bunch of combinators.
+   * 
+   * @see https://typelevel.org/cats/api/cats/data/EitherT.html
     */
   type DecodeResult[F[_], A] = EitherT[F, DecodeFailure, A]
 

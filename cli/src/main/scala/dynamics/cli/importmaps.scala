@@ -58,8 +58,8 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
   import ImportMapActions._
   import context._
 
-  implicit val dec1 = JsObjectDecoder[ExportMappingsImportMapResponse]
-  implicit val dec2 = JsObjectDecoder[ImportMapOData]
+  implicit val dec1 = JsObjectDecoder[ExportMappingsImportMapResponse]()
+  implicit val dec2 = JsObjectDecoder[ImportMapOData]()
   implicit val enc  = JsObjectEncoder[ImportMappingsImportMap]
 
   def getList() = {
@@ -91,7 +91,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
               dynclient
                 .executeAction[js.Dynamic]("Microsoft.Dynamics.CRM.ExportMappingsImportMap",
                                            Entity.fromString("{ ExportIds: false }"),
-                                           Some(("importmaps", id)))(JSONDecoder)
+                                           Some(("importmaps", id)))(JSONDecoder())
                 .flatMap { jsdyn =>
                   val resp = jsdyn.asInstanceOf[ExportMappingsImportMapResponse]
                   val path = Utils.pathjoin(config.common.outputDir, s"${name}.xml")

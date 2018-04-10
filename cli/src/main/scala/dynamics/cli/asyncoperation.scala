@@ -33,7 +33,7 @@ class AsyncOperationsCommand(val context: DynamicsContext) {
 
   import context._
 
-  implicit val dec = JsObjectDecoder[AsyncOperationOData]
+  implicit val dec = JsObjectDecoder[AsyncOperationOData]()
 
   protected def getList(attrs: Seq[String] = Nil) = {
     val q = QuerySpec(select = attrs)

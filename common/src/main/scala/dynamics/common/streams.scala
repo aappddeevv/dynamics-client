@@ -18,6 +18,17 @@ import cats.effect._
 
 object fs2helpers {
 
+  /**
+   * from cats-effect gitter channel
+   */
+  def parallelWithLimit[A](limit: Int, as: List[IO[A]]) =
+    as.grouped(limit).toList.flatTraverse(_.parSequence)
+
+  /** Given a list of Fs, eval them at most N at a time. Output order is not preserved. */
+  def evalN[F[_], A](fs: Seq[F[A]], n: Int = 10)
+    (implicit F: Effect[F], ec: ExecutionContext): F[Vector[A]] =
+    Stream.emits(fs.map(Stream.eval(_))).join(n).compile.toVector
+
   /** Use it with `Stream.through`. */
   def liftToPipe[A, B](f: A => IO[B]): Pipe[IO, A, B] = _ evalMap f
 

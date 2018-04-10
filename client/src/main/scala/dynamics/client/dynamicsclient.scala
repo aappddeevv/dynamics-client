@@ -18,9 +18,10 @@ import js.JSConverters._
 import dynamics.common._
 import fs2helpers._
 import dynamics.http._
-import dynamics.http.instances.entityEncoder._
-import dynamics.http.instances.entityDecoder._
+import dynamics.http.instances.entityencoder._
+import dynamics.http.instances.entitydecoder._
 import dynamics.client.common._
+import dynamics.client.syntax.queryspec._
 
 sealed trait DynamicsId {
   def render(): String
@@ -51,7 +52,9 @@ case class DynamicsOptions(
       * DELETE + version => If-Match: version, delete succeeds if etag matches (204), fails otherwise (412).
       * PATCH (update) + version => If-Match: version, update succeeds if etag matches (204), fails otherwise (412)
       */
-    override val applyOptimisticConcurrency: Option[Boolean] = None
+  override val applyOptimisticConcurrency: Option[Boolean] = None,
+  /** Supress duplicate detection. */
+  suppressDuplicateDetection: Boolean = false,
 ) extends client.common.ClientOptions
 
 /**
@@ -59,7 +62,12 @@ case class DynamicsOptions(
   * formulates the HTTP request and minimually interprets the response.
   *
   * All of the methods either return a IO or a Steam. The IO or Stream must be
-  * run in order to execute the operation.
+  * run in order to execute the operation. Note that the client only captures
+  * the most commonly used idioms of using the dynamic web service. It's
+  * possible to have cases here this client's API is insufficient for your OData
+  * url and you need to go one level deeper e.g. getOne is navigating to a
+  * collection valued property and the "array" is in the "value" fieldname.
+ * 
   *
   * You must make sure you have a `MonadError[IO, Throwable]` in implicit scope
   * when you create the client.  If you need to you can always `val ehandler =
@@ -121,13 +129,17 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
 
   //private val reg = """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""".r
 
-  /** Update a single property, return the id updated. */
+  /** 
+   * Update a single property, return the id updated.
+@see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/webapi/update-delete-entities-using-web-api?view=dynamics-ce-odata-9
+   */
   def updateOneProperty(entitySet: String,
                         id: String,
                         property: String,
                         value: js.Any,
-                        opts: DynamicsOptions = DefaultDynamicsOptions): IO[String] = {
-    val b = ""
+                        opts: DynamicsOptions = QuietDynamicsOptions): IO[String] = {
+    val b = js.JSON.stringify(js.Dynamic.literal("value" -> value))
+    // A PUT! not POST!
     val request =
       HttpRequest[IO](Method.PUT, s"/$entitySet($id)/$property", body = Entity.fromString(b), headers = toHeaders(opts))
     http.fetch[String](request) {
@@ -193,8 +205,8 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   /** Create an entity. If return=representation then the decoder can decode the body with entity content.
     * You can return an id or body from this function.
     */
-  def create[B,R](entitySet: String, body: B, opts: DynamicsOptions = DefaultDynamicsOptions)(
-      implicit e: EntityEncoder[B], d: EntityDecoder[IO, R]): IO[R] = {
+  def create[B,R](entitySet: String, body: B, opts: DynamicsOptions = DefaultDynamicsOptions)
+    (implicit e: EntityEncoder[B], d: EntityDecoder[IO, R]): IO[R] = {
     //val request = HttpRequest(Method.POST, s"/$entitySet", body=Entity.fromString(body), headers=toHeaders(opts))
     val request = mkCreateRequest[IO, B](entitySet, body, opts)
     http.fetch(request) {
@@ -232,7 +244,8 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   def executeAction[A](action: String,
                        body: Entity,
                        entitySetAndId: Option[(String, String)] = None,
-                       opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[IO, A]): IO[A] = {
+    opts: DynamicsOptions = DefaultDynamicsOptions)
+    (implicit d: EntityDecoder[IO, A]): IO[A] = {
     val request = mkExecuteActionRequest[IO](action, body, entitySetAndId, opts)
     http.fetch(request) {
       case Status.Successful(resp) => resp.as[A]
@@ -251,7 +264,8 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     */
   def executeFunction[A](function: String,
                          parameters: Map[String, scala.Any] = Map.empty,
-                         entity: Option[(String, String)] = None)(implicit d: EntityDecoder[IO,A]): IO[A] = {
+    entity: Option[(String, String)] = None)
+    (implicit d: EntityDecoder[IO,A]): IO[A] = {
     val req = mkExecuteFunctionRequest[IO](function, parameters, entity)
     http.expect(req)(d)
   }
@@ -294,25 +308,34 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
 
   /**
     * Get a single entity using key information. The keyInfo can be a guid or
-    * alternate key criteria e.g "altkeyattribute='Larry',...".  You get all the
-    * fields with this.
+    * alternate key criteria e.g "altkeyattribute='Larry',...". You get all the
+    * fields with this. This assumes that the entity exists since you providing
+    * it in id--you should know ahead of time.
     *
     * Allow you to specify a queryspec somehow as well.
     */
-  def getOneWithKey[A](entitySet: String, keyInfo: DynamicsId, opts: DynamicsOptions = DefaultDynamicsOptions)
-    (implicit d: EntityDecoder[IO, A]): IO[A] =
-    getOne(s"/$entitySet(${keyInfo.render()})", opts)(d)
+  def getOneWithKey[A](entitySet: String, keyInfo: DynamicsId,
+    attributes: Seq[String] = Nil, opts: DynamicsOptions = DefaultDynamicsOptions)
+    (implicit d: EntityDecoder[IO, A]): IO[A] = {
+    val q = QuerySpec(select = attributes)
+    getOne(q.url(s"/$entitySet(${keyInfo.render()})"), opts)(d)
+  }
 
   /**
-    * Get one entity using a full query url.
+    * Get one entity using a full query url. You can use a QuerySpec to form the
+    * url then call `qs.url(myentities,Some(theid))`.
     *
     * If you use a URL that returns a OData response with a `value` array that
-    * will be automatically extract, you need to use a EntityDecoder that first
-    * looks for that array then obtains your `A`. See
+    * needs be automatically extracted, you need to use an explict EntityDecoder
+    * that first looks for that array then obtains your `A`. See
     * `EntityDecoder.ValueWrapper` for an example.  You often use this pattern
     * when employing `getOne` to obtain related records in a 1:M navigation
     * property e.g. a single entity's set of connections or some child
     * entity. In this case, your URL will typically have an "expand" segment.
+    * Note that if you navigate to a simple attribute, then it is return as a
+    * simple object also attached to "value" so choose your decoder wisely.
+   * 
+   * @todo This should really return an optional value
     */
   def getOne[A](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)
     (implicit d: EntityDecoder[IO,A]): IO[A] = {

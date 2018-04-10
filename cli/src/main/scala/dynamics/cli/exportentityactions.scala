@@ -40,7 +40,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   import CSVStringifyX._
   import context._
-  implicit val decoder = JSONDecoder
+  implicit val decoder = JSONDecoder()
 
   def export() = Action { config =>
     val query = QuerySpec(
@@ -72,13 +72,13 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   // TODO: Convert to batch request, this is way stupid.
   def deleteByQuery() = Action { config =>
-    val m           = new MetadataCache(context)
+    val m           = new MetadataCache(dynclient, LCID)
     val concurrency = config.common.concurrency
 
     val deleteFromCLI: Stream[IO, (String, Long)] =
       if (config.export.query.size > 0)
         Stream
-          .eval(m.entityByName(config.export.entity).value)
+          .eval(m.entityByName(config.export.entity))
           .collect { case Some(ed) => ed }
           .flatMap(ed => deleteFromQuery(config.export.query, ed.PrimaryIdAttribute, ed.EntitySetName, concurrency))
       else
@@ -91,7 +91,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
             etl.sources
               .CSVFileSource(f)
               .map(obj => { val dict = obj.asDict[String]; (dict("entity"), dict("query")) })
-              .evalMap(p => m.entityByName(p._1).map(ed => (p._1, p._2, ed)).value)
+              .evalMap(p => m.entityByName(p._1).map(_.map((p._1, p._2, _))))
               .collect{ case Some(e) => e}
               .flatMap(t => deleteFromQuery(t._2, t._3.PrimaryIdAttribute, t._3.EntitySetName, concurrency)))
         .getOrElse(Stream.empty)
@@ -244,7 +244,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
 
   def fromEntityNames(entityNames: Seq[String]): Stream[IO, Stream[IO, (String, Long)]] = {
     import metadata._
-    val m = new MetadataCache(context)
+    val m = new MetadataCache(context.dynclient, context.LCID)
     val entityList = Stream
       .eval(m.entityDefinitions)
       .flatMap(Stream.emits[EntityDefinition])
@@ -258,7 +258,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     val collection = s"""EntityNames=[${entitySet.map("'" + _ + "'").mkString(",")}]"""
     val request    = HttpRequest[IO](Method.GET, s"/RetrieveTotalRecordCount($collection)")
     dynclient.http.expect[RetrieveTotalRecordCountResponse](request)(
-      http.instances.entityDecoder.JsObjectDecoder[RetrieveTotalRecordCountResponse])
+      http.instances.entitydecoder.JsObjectDecoder[RetrieveTotalRecordCountResponse]())
   }
 
   def fromFunction(entityNames: Seq[String]): Stream[IO, Stream[IO, (String, Long)]] = {

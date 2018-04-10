@@ -58,7 +58,7 @@ lazy val root = project.in(file("."))
   .settings(dynamicsSettings)
   .settings(noPublishSettings)
   .settings(name := "dynamics-client")
-  .aggregate(http, client, clientcommon, common, etl, cli, `cli-main`, docs, adal)
+  .aggregate(http, client, clientcommon, common, etl, cli, `cli-main`, docs, adal, apps)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val common = project
@@ -67,6 +67,15 @@ lazy val common = project
   .settings(libraryDependencies ++= Dependencies.monadlessDependencies.value)
   .settings(name := "dynamics-client-common")
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
+
+lazy val apps = project
+  .settings(dynamicsSettings)
+  .settings(description := "CLI application frameworks")
+  .settings(libraryDependencies ++= Dependencies.monadlessDependencies.value)
+  .settings(libraryDependencies ++= Dependencies.appDependencies.value)
+  .settings(name := "dynamics-client-apps")
+  .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
+  .dependsOn(cli,client,common,http)
 
 lazy val clientcommon = project
   .settings(dynamicsSettings)
@@ -99,7 +108,7 @@ lazy val adal = project
 
 lazy val client = project
   .settings(dynamicsSettings)
-  .settings(name := "dynamics-client-dynamicsclient")
+  .settings(name := "dynamics-client-clients")
   .settings(description := "dynamics client")
   .dependsOn(http, clientcommon, common)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
@@ -136,7 +145,7 @@ lazy val docs = project
   .settings(noPublishSettings)
   .enablePlugins(MicrositesPlugin)
   .enablePlugins(ScalaUnidocPlugin)
-  .dependsOn(clientcommon, client, http, cli, `cli-main`, etl, common).
+  .dependsOn(clientcommon, client, http, cli, `cli-main`, etl, common, apps).
   settings(
     micrositeName := "dynamics-client",
     micrositeDescription := "A Microsoft Dynamics CLI swiss-army knife and browser/server library.",

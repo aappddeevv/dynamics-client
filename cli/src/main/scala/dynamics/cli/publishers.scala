@@ -28,7 +28,7 @@ import dynamics.http.implicits._
 class PublisherActions(context: DynamicsContext) {
 
   import context._
-  implicit val dec = JsObjectDecoder[PublisherOData]
+  implicit val dec = JsObjectDecoder[PublisherOData]()
 
   protected def getList() = {
     val query =

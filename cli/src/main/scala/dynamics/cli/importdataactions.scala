@@ -37,11 +37,11 @@ class ImportDataActions(val context: DynamicsContext) {
   import dynamics.common.implicits._
   import ImportDataActions._
 
-  implicit val jobDecoder            = JsObjectDecoder[AsyncOperationOData]
-  implicit val importJsonDecoder     = JsObjectDecoder[ImportJson]
-  implicit val importFileJsonDecoder = JsObjectDecoder[ImportFileJson]
-  implicit val WhoAmIDecoder         = JsObjectDecoder[WhoAmI]
-  implicit val dec10                 = JsObjectDecoder[BulkDeleteResponse]
+  implicit val jobDecoder            = JsObjectDecoder[AsyncOperationOData]()
+  implicit val importJsonDecoder     = JsObjectDecoder[ImportJson]()
+  implicit val importFileJsonDecoder = JsObjectDecoder[ImportFileJson]()
+  implicit val WhoAmIDecoder         = JsObjectDecoder[WhoAmI]()
+  implicit val dec10                 = JsObjectDecoder[BulkDeleteResponse]()
 
   type WaitTuple   = (Int, String, AsyncOperationOData) // status, msg, data
   type WaitHandler = PartialFunction[Either[Throwable, AsyncOperationOData], Option[WaitTuple]]

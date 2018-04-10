@@ -10,11 +10,26 @@ import js.annotation._
 
 import dynamics.common._
 import dynamics.http._
-import dynamics.http.instances.entityEncoder._
+import dynamics.http.instances.entityencoder._
 
 trait DynamicsClientRequests {
 
   val DefaultBatchRequest = HttpRequest(Method.PUT, "/$batch")
+  import client.common.headers
+
+  /** 
+   * This does not handle the version tag + applyOptimisticConcurrency flag yet.
+   */
+  def toHeaders(o: DynamicsOptions): HttpHeaders = {
+    val prefer = headers.render(o.prefers)
+    prefer.map(str => HttpHeaders("Prefer"        -> str)).getOrElse(HttpHeaders.empty) ++
+    o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty) ++
+    (
+      if(o.suppressDuplicateDetection) headers.SuppressDuplicateDetection
+      else HttpHeaders.empty
+    )
+    //++ o.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
+  }
 
   def mkGetListRequest[F[_]](url: String, opts: DynamicsOptions = DefaultDynamicsOptions) =
     HttpRequest[F](Method.GET, url, headers = toHeaders(opts))
@@ -46,16 +61,6 @@ trait DynamicsClientRequests {
                              opts: DynamicsOptions = DefaultDynamicsOptions) = {
     val url = entitySetAndId.map { case (c, i) => s"/$c($i)/$action" }.getOrElse(s"/$action")
     HttpRequest[F](Method.POST, url, body = body, headers = toHeaders(opts))
-  }
-
-  /** 
-   * This does not handle the version tag + applyOptimisticConcurrency flag yet.
-   */
-  def toHeaders(o: DynamicsOptions): HttpHeaders = {
-    val prefer = client.common.headers.render(o.prefers)
-    prefer.map(str => HttpHeaders("Prefer"        -> str)).getOrElse(HttpHeaders.empty) ++
-    o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty)
-    //++ o.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
   }
 
   /**
@@ -157,7 +162,6 @@ trait DynamicsClientRequests {
     * base URL used in those requests have a consistent base URL.
     */
   def mkBatch[F[_]](m: Multipart, headers: HttpHeaders = HttpHeaders.empty): HttpRequest[F] = {
-    import dynamics.http.instances.entityEncoder._
     val (mrendered, xtra) = EntityEncoder[Multipart].encode(m)
     HttpRequest(Method.POST, "/$batch", headers = headers ++ xtra, body = mrendered)
   }

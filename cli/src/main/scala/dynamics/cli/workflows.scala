@@ -78,7 +78,7 @@ class WorkflowActions(val context: DynamicsContext) {
 
   val ehandler = implicitly[MonadError[IO, Throwable]]
 
-  implicit val dec = JsObjectDecoder[WorkflowJson]
+  implicit val dec = JsObjectDecoder[WorkflowJson]()
 
   protected def getList(attrs: Seq[String] = Nil) = {
     val q = QuerySpec(select = attrs)

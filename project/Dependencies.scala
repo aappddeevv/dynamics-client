@@ -36,6 +36,11 @@ object Dependencies {
     // no lucid xtract? may be hard to use then...
   ))
 
+  val appDependencies = Def.setting(Seq(
+    "io.estatico" %% "newtype" % "0.3.0",
+    "ru.pavkin" %%% "scala-js-momentjs" % "0.9.1",
+  ))
+
   /** js only libraries */
   val myJSDependencies = Def.setting(Seq(
     "io.scalajs.npm" %%% "chalk" % "latest.version",

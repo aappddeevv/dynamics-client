@@ -3,7 +3,7 @@
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
 package dynamics
-package cli
+package client
 
 import dynamics.common._
 
@@ -148,10 +148,9 @@ trait ConnectionRole extends js.Object {
 /**
  * Simple metadata cache for CRM metadata.
  */
-class MetadataCache(protected val context: DynamicsContext)
-  (implicit F: MonadError[IO, Throwable]) {
+class MetadataCache(protected val dynclient: DynamicsClient, LCID: Int = 1033)
+  (implicit F: MonadError[IO, Throwable], ec: ExecutionContext) {
 
-  import context._
   import dynamics.common.syntax.all._
   import LocalizedHelpers._
 
@@ -174,79 +173,96 @@ class MetadataCache(protected val context: DynamicsContext)
     }
   }
 
-  def entityByName(entityName: String): OptionT[IO, EntityDefinition] =
-    OptionT(entityDefinitions().map { _ =>
+  def entityByName(entityName: String): IO[Option[EntityDefinition]] =
+    entityDefinitions().map { _ =>
       cache.get[EntityDefinition](s"Entity:$entityName").toOption
-    })
+    }
 
-  def entityBySetName(entitySetName: String): OptionT[IO, EntityDefinition] =
-    OptionT(entityDefinitions().map { _ =>
+  def entityBySetName(entitySetName: String): IO[Option[EntityDefinition]] =
+    entityDefinitions().map { _ =>
       cache.get[EntityDefinition](s"EntitySet:$entitySetName").toOption
-    })
+    }
 
-  def entitySetName(entityName: String): OptionT[IO, String] =
-    entityByName(entityName).map(ed => ed.LogicalCollectionName)
+  def entitySetName(entityName: String): IO[Option[String]] =
+    entityByName(entityName).map(_.map(_.LogicalCollectionName))
 
-  def entityName(entitySetName: String): OptionT[IO, String] =
-    entityBySetName(entitySetName).map(ed => ed.LogicalName)
+  def entityName(entitySetName: String): IO[Option[String]] =
+    entityBySetName(entitySetName).map(_.map(_.LogicalName))
 
-  def objectTypeCode(entityName: String): OptionT[IO, Int] =
-    entityByName(entityName).map(ed => ed.ObjectTypeCode)
+  def objectTypeCode(entityName: String): IO[Option[Int]] =
+    entityByName(entityName).map(_.map(_.ObjectTypeCode))
 
   /** @deprecated Use [[entitySetName]] */
-  def entityDescription(entitySet: String): OptionT[IO, EntityDefinition] =
+  def entityDescription(entitySet: String): IO[Option[EntityDefinition]] =
     entityBySetName(entitySet)
 
-  def pk(entityName: String): OptionT[IO, String] =
-    entityByName(entityName).map(_.PrimaryIdAttribute)
+  def pk(entityName: String): IO[Option[String]] =
+    entityByName(entityName).map(_.map(_.PrimaryIdAttribute))
 
   def baseAttributes(entityName: String): IO[Seq[AttributeMetadata]] = {
     val alist = cache.get[Seq[AttributeMetadata]](s"Attributes:$entityName")
     alist.fold {
-      // not found, so get it, create a OptionT[IO, Seq[]]
-      entityByName(entityName).flatMapF { ed =>
-        val q = QuerySpec(
-          select=Seq("LogicalName"),
-          filter=Some(s"""MetadataId eq ${ed.MetadataId}"""),
-          expand=Seq(Expand("Attributes"))
-        )
-        // only get the attributes, flip to IO[Option[Seq]]
-        dynclient.getList[EntityDefinition](q.url("EntityDefinitions"))
-          .map{ eds =>
-            //js.Dynamic.global.console.log("returned attributes", eds(0).Attributes)
-            if(eds.length > 0) {
-              val attributes = eds(0).Attributes.map(_.toSeq)
-              attributes.foreach{ attrs =>
-                cache.set(s"Attributes:$entityName", attrs)
-                attrs.foreach(a => cache.set(s"Entity:$entityName:Attribute:${a.LogicalName}", a))
+      // not found, so get it, create a IO[Seq[]]
+      entityByName(entityName)
+        .flatMap{ _.fold(IO.pure(Seq.empty[AttributeMetadata]))
+          { ed =>
+            val q = QuerySpec(
+              select=Seq("LogicalName"),
+              filter=Some(s"""MetadataId eq ${ed.MetadataId}"""),
+              expand=Seq(Expand("Attributes"))
+            )
+            // only get the attributes, flip to IO[Option[Seq]]
+            dynclient.getList[EntityDefinition](q.url("EntityDefinitions"))
+              .map{ eds =>
+                // more than one means error on the dynamics server!
+                if(eds.length > 0) {
+                  val attributes = eds(0).Attributes.map(_.toSeq)
+                  attributes.foreach{ attrs =>
+                    addAttributesToCache(entityName, attrs)
+                    attrs.foreach(addAttributeToCache(_))
+                  }
+                  attributes.getOrElse(Seq.empty)
+                } else Seq.empty
               }
-              attributes.toOption
-            } else Option.empty
-          }
-        // handle error on getList a bit better than this?
-      }
-        .getOrElse(Seq.empty)
+            // handle error on getList a bit better than this?
+          }}
     }{
-      // found them
+      // in cache
       items => F.pure(items)
     }
   }
 
-  def attributeMetadataId(entitySetName: String, attribute: String): OptionT[IO, String] = {
+  /** Return true if all the attributes on entity exist. */
+  def hasAttributes(entityName: String, anames: Seq[String]): IO[Boolean] = {
+    baseAttributes(entityName).map { attrs =>
+      // does attrs have all of anames? todo: faster algorithm e.g. sets
+      val justNames = attrs.map(_.LogicalName)
+      anames.filter(justNames.contains(_)).length > 0
+    }
+  }
+
+  protected def addAttributesToCache(ename: String, as: Seq[AttributeMetadata]): Unit =
+    cache.set(s"Attributes:$ename", as)
+
+  protected def addAttributeToCache(a: AttributeMetadata): Unit =
+    cache.set(s"Entity:${a.EntityLogicalName}:Attribute:${a.LogicalName}", a)
+
+  def attributeMetadataId(entitySetName: String, attribute: String): IO[Option[String]] =
     entityName(entitySetName)
-      .flatMapF { ename =>
+      .flatMap { _.fold(IO.pure(Option.empty[String])) {
+        ename =>
+        // if no attributes, None, else look for it in the cache
         baseAttributes(ename).map { _ =>
           val attr = cache.get[AttributeMetadata](s"Entity:$ename:Attribute:$attribute")
           attr.map(_.MetadataId).toOption
         }
-      }
-  }
+      }}
 
   private def govKey(e: String, a: String) = s"OptionValues:$e:$a"
 
-  /** 
+  /**
    * Obtain option values give an entity and attribute combination.
-   * @todo Should we signal an erro if either entiytSet or attribute is not found?
+   * @todo Should we signal an error if either entiytSet or attribute is not found?
    */
   def optionValues(entitySet: String, attribute: String): IO[Seq[OptionValue]] = {
     val k = govKey(entitySet, attribute)
@@ -254,9 +270,9 @@ class MetadataCache(protected val context: DynamicsContext)
     ov.fold {
       // did not find it
       lift {
-        implicit val decoder = jsObjectDecoder[LocalOrGlobalOptionSetsResponse](context.e)
-        val eid = unlift(entityBySetName(entitySet).map(_.MetadataId).value)
-        val aid = unlift(attributeMetadataId(entitySet, attribute).value)
+        implicit val decoder = jsObjectDecoder[LocalOrGlobalOptionSetsResponse](ec)
+        val eid = unlift(entityBySetName(entitySet).map(_.map(_.MetadataId)))
+        val aid = unlift(attributeMetadataId(entitySet, attribute))
         //println(s"e-a key: $eid, $aid")
           (eid, aid) match {
           case (Some(e), Some(a)) =>
@@ -277,7 +293,7 @@ class MetadataCache(protected val context: DynamicsContext)
                   resp.OptionSet.toNonNullOption.map(_.Options)).getOrElse(js.Array())
 
               val result: Seq[OptionValue] = options.map { oitem =>
-                LocalizedHelpers.findByLCID(context.LCID, oitem.Label)
+                LocalizedHelpers.findByLCID(LCID, oitem.Label)
                   .map(locLabel => OptionValue(locLabel.Label, oitem.Value))
                   .getOrElse(throw new IllegalArgumentException(
                     s"Unable to find localized label for $entitySet.$attribute OptionSet."))
@@ -296,7 +312,7 @@ class MetadataCache(protected val context: DynamicsContext)
 
   protected def optionSetMetadataToOptionValues(items: js.Array[OptionSetItem]): Seq[OptionValue] =
     items.map { oitem =>
-      LocalizedHelpers.findByLCID(context.LCID, oitem.Label)
+      LocalizedHelpers.findByLCID(LCID, oitem.Label)
         .map(locLabel => OptionValue(locLabel.Label, oitem.Value))
         .getOrElse(throw new IllegalArgumentException(
           s"Unable to find localized label for OptionSet."))
@@ -305,12 +321,12 @@ class MetadataCache(protected val context: DynamicsContext)
   /**
    * Given an entity set name and an attribute name, return the attribute type.
    */
-  def attributeType(ename: String, aname: String): OptionT[IO, String] = {
-    OptionT(baseAttributes(ename).map { _ =>
+  def attributeType(ename: String, aname: String): IO[Option[String]] = {
+    baseAttributes(ename).map { _ =>
       val attr = cache.get[AttributeMetadata](s"Entity:$ename:Attribute:$aname")
       attr.fold{ Option.empty[String] }
       { attr => Some(attr.AttributeType) }
-    })
+    }
   }
 
   def globalOptionSets(): IO[Seq[OptionSetMetadata]] = {
@@ -357,25 +373,18 @@ class MetadataCache(protected val context: DynamicsContext)
     }
   }
 
+  def connectionRole(roleName: String): IO[Option[ConnectionRole]] = {
+    connectionRoles().map { _ =>
+      val cr = cache.get[ConnectionRole](s"ConnectionRole:$roleName")
+      cr.fold(Option.empty[ConnectionRole])
+      { Some(_) }
+    }
+  }
+
   def connectionRolesForCategory(cname: String, ignoreCase: Boolean = false): IO[Seq[ConnectionRole]] = {
     connectionRoles().map(_.filter{ cr =>
       if(ignoreCase) cr.category_fv.toLowerCase == cname.toLowerCase
       else cr.category_fv == cname
     })
   }
-
-}
-
-@js.native
-@JSImport("shorthash", JSImport.Namespace)
-object ShortHash extends js.Object {
-  def unique(in: String): String = js.native
-}
-
-/** Cache the metadata string returned from CRM. CSDL is cached across runs. */
-case class CSDLFileCache(name: String, context: DynamicsContext, ignore: Boolean = false, location: String = ".")
-    extends FileCache(Utils.pathjoin(location, ShortHash.unique(name) + ".csdl.cache"), ignore) {
-
-  protected def getContent() = (new MetadataActions(context)).getCSDL()
-
 }

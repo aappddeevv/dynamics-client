@@ -145,13 +145,14 @@ object Expand {
 
 final class QuerySpecOps(val spec: QuerySpec) extends AnyVal {
 
-  /** Convert Query spec to a URL. You must specify the
-    * entity and key that it applies to as the first navigation property.
-    */
-  def url(ename: String, keyInfo: Option[String] = None) = {
+  /** 
+   * Convert Query spec to a URL. You must specify the entity set name and key
+   * that it applies to as the first navigation property.
+   */
+  def url(name: String, keyInfo: Option[String] = None) = {
     val rest       = QuerySpec.render(spec)
     val keyInfoStr = keyInfo.map(ki => s"($ki)").getOrElse("")
-    s"""/${ename}${keyInfoStr}${rest}"""
+    s"""/${name}${keyInfoStr}${rest}"""
   }
 
   /** Render QuerySpec. Throws an exception of there are no navigation properties. */

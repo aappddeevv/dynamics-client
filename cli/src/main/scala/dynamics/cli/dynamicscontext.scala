@@ -37,7 +37,7 @@ object DynamicsContext {
       val LCID = config.common.lcid
       implicit val e   = ec
       implicit val sch = Scheduler.default
-      implicit val t = IO.timer(e)
+      implicit val t = IO.timerGlobal
 
       private val retryPolicyMiddleware = makePolicy(config.common)
       private val middleware = makeAuthMiddleware(config.common)(sch, e) andThen retryPolicyMiddleware

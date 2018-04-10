@@ -686,7 +686,29 @@ trait RetrieveTotalRecordCountResponse extends js.Object {
   val EntityRecordCountCollection: EntityRecordCountCollection
 }
 
+@js.native
+trait SystemuserJS extends js.Object {
+  val systemuserid: String = js.native
+  val internalemailaddress: String = js.native
+  val lastname: String = js.native
+  val firstname: String = js.native
+  val fullname: String             = js.native  
+  val isdisabled: Boolean = js.native
+  val isemailaddressapprovedbyo365admin: Boolean = js.native
+  val isintegrationuser: Boolean = js.native
+  val islicensed: Boolean = js.native
+  val nickname: String = js.native
+  val jobtitle: String = js.native
+  val personalemailaddress: String = js.native
+  val photourl: String = js.native
+  val setupuser: Boolean = js.native
+  val sharepointemailaddress: Boolean = js.native
+  val userlicensetype: Int = js.native
 
+  // ...
+}
+
+/*
 @js.native
 trait SystemuserJS extends js.Object {
   val firstname: String            = js.native
@@ -697,6 +719,24 @@ trait SystemuserJS extends js.Object {
 
   //@JSName("systemuserroles_association@odata.nextLink")
   //val systemuserroles_association_nl: js.UndefOr[String] = js.native
+}
+ */
+
+@js.native
+trait TeamJS  extends js.Object {
+  val teamid: String = js.native
+  val ownerid: String = js.native
+  val teamtype: Int = js.native
+  val name: String = js.native
+  val description: String = js.native
+  val organizationid: String = js.native
+
+  /** 
+   * Only present when using expand=teammembership_association on team fetch.
+   * Or use getList with a property path to a "collection value property"
+   * and the list will in "value".
+   */
+  val teammembership_association: js.UndefOr[js.Array[SystemuserJS]] = js.native
 }
 
 @js.native

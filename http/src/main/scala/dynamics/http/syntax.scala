@@ -63,8 +63,8 @@ trait AllInstances
 
 object instances {
   object all           extends AllInstances
-  object entityEncoder extends EntityEncoderInstances with MultipartInstances
-  object entityDecoder extends EntityDecoderInstances
+  object entityencoder extends EntityEncoderInstances with MultipartInstances
+  object entitydecoder extends EntityDecoderInstances
   object method extends MethodInstances
 }
 

@@ -18,10 +18,14 @@ import scala.annotation.implicitNotFound
 import scala.collection.mutable
 
 import dynamics.common._
+import dynamics.common.implicits._
 
 /**
-  *  Decode a Message to a DecodeResult.
-  */
+ * Decode a Message to a DecodeResult. After decoding you have a DecodeResult
+ * which is co-product (either) an error or a value. You can fold on the decode
+ * result to work with either side e.g. `mydecoderesult.fold(throw _,
+ * identity)`.
+ */
 @implicitNotFound("Cannot find instance of EntityDecoder[${T}].")
 trait EntityDecoder[F[_], T] { self =>
 
@@ -29,12 +33,14 @@ trait EntityDecoder[F[_], T] { self =>
 
   def decode(response: Message[F]): DecodeResult[F, T]
 
+  /** Map into the value part of a DecodeResult. */
   def map[T2](f: T => T2)(implicit F: Functor[F]): EntityDecoder[F, T2] =
     new EntityDecoder[F, T2] {
       override def decode(msg: Message[F]): DecodeResult[F, T2] =
         self.decode(msg).map(f)
     }
 
+  /** Flatmap into the right of the DecodeResult, i.e. the value part not the error. */
   def flatMapR[T2](f: T => DecodeResult[F, T2])(implicit F: Monad[F]): EntityDecoder[F, T2] =
     new EntityDecoder[F, T2] {
       override def decode(msg: Message[F]): DecodeResult[F, T2] =
@@ -42,9 +48,9 @@ trait EntityDecoder[F[_], T] { self =>
     }
 
   /**
-    * Due to the process-once nature of the body, the orElse must
-    * really check headers or other information to allow orElse
-    * to compose correctly.
+    * Try this decoder then other if this decoder returns a decode failure. Due
+    * to the process-once nature of the body, the orElse must really check
+    * headers or other information to allow orElse to compose correctly.
     */
   def orElse[T2 >: T](other: EntityDecoder[F, T2])(implicit F: Monad[F]): EntityDecoder[F, T2] = {
     new EntityDecoder[F, T2] {
@@ -54,8 +60,10 @@ trait EntityDecoder[F[_], T] { self =>
     }
   }
 
+  /** Covariant widenening via cast. */
   def widen[T2 >: T]: EntityDecoder[F, T2] = this.asInstanceOf[EntityDecoder[F, T2]]
 
+  /** Transform a decode result into another decode result. */
   def transform[T2](t: Either[DecodeFailure, T] => Either[DecodeFailure, T2])
     (implicit F: Functor[F]): EntityDecoder[F, T2] =
     new EntityDecoder[F, T2] {
@@ -86,13 +94,39 @@ object EntityDecoder {
   */
 trait EntityDecoderInstances {
 
-  private val reg = """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""".r
+  /** GUID regex. (scala) */
+  val reg = """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""".r
+
+  /** Dates from dynamics server. (js regexp) */
+  protected val dateRegex =
+    new js.RegExp("""^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$""")
+
+  val undefinedReviver = js.undefined.asInstanceOf[Reviver]
+
+  /** Date reviver. (js) */
+  val dateReviver: Reviver =
+    (key, value) => {
+      if(js.typeOf(value) == "string") {
+        val a = dateRegex.exec(value.asInstanceOf[String])
+        if(a != null) new js.Date(js.Date.UTC(
+          a(1).get.toInt,
+          a(2).get.toInt -1,
+          a(3).get.toInt,
+          a(4).get.toInt,
+          a(5).get.toInt,
+          a(6).get.toInt
+        ))
+        else value
+      }
+      else value
+    }
 
   /**
-    * A decoder that only looks at the header for an OData-EntityId (case-insensitive)
-    * value and returns that, otherwise fail. To ensure that the id is returned in the header,
-    * you must make sure that return=representation is *not* set in the Prefer headers when
-    * the HTTP call is issued.
+    * A decoder that only looks at the header for an OData-EntityId
+    * (case-insensitive) value and returns that, otherwise fail. To ensure that
+    * the id is returned in the header, you must make sure that
+    * return=representation is *not* set in the Prefer headers when the HTTP
+    * call is issued.
     */
   val ReturnedIdDecoder: EntityDecoder[IO, String] = EntityDecoder { msg =>
     (msg.headers.get("OData-EntityId") orElse msg.headers.get("odata-entityid"))
@@ -101,23 +135,29 @@ trait EntityDecoderInstances {
       .fold(DecodeResult.failure[IO,String](MissingExpectedHeader("OData-EntityId")))(id => DecodeResult.success(id))
   }
 
-  /** Body is just text. One of the simplest decoders. */
+  /** Decode body to text. */
   implicit def TextDecoder(implicit ec: ExecutionContext): EntityDecoder[IO, String] =
     EntityDecoder { msg =>
       DecodeResult.success(msg.body)
     }
 
-  /** Body is parsed into JSON using JSON.parse(). */
-  implicit def JSONDecoder(implicit ec: ExecutionContext): EntityDecoder[IO, js.Dynamic] =
+  /** 
+   * Body is parsed into JSON using JSON.parse(). Note that JSON parse could
+   * return a simple value, not a JS object.
+   */
+  implicit def JSONDecoder(reviver: Option[Reviver] = None)
+    (implicit ec: ExecutionContext): EntityDecoder[IO, js.Dynamic] =
     new EntityDecoder[IO, js.Dynamic] {
       def decode(msg: Message[IO]) =
-        DecodeResult.success(msg.body.map(js.JSON.parse(_)))
+        DecodeResult.success(msg.body.map(js.JSON.parse(_, reviver.getOrElse(js.undefined.asInstanceOf[Reviver]))))
     }
 
   /** Filter on JSON value. Create DecodeFailure if filter func returns false. */
-  def JSONDecoderValidate(f: js.Dynamic => Boolean, failedMsg: String = "Failed validation.")(
-      implicit ec: ExecutionContext): EntityDecoder[IO, js.Dynamic] = EntityDecoder { msg =>
-    JSONDecoder.decode(msg).flatMap { v =>
+  def JSONDecoderValidate(f: js.Dynamic => Boolean, failedMsg: String = "Failed validation.",
+    reviver: Option[Reviver] = None)
+    (implicit ec: ExecutionContext): EntityDecoder[IO, js.Dynamic] = EntityDecoder { msg =>
+    // flatMap on the value side of the co-product
+    JSONDecoder(reviver).decode(msg).flatMap { v =>
       if (f(v)) EitherT.right(IO.pure(v))
       else EitherT.left(IO.pure(MessageBodyFailure(failedMsg)))
     }
@@ -125,26 +165,18 @@ trait EntityDecoderInstances {
 
   /**
     * Decode the body as json and cast to A instead of JSONDecoder which casts
-    * the body to js.Dynamic. Typebounuds implies that JS traits can use this
+    * the body to js.Dynamic. Typebounds implies that JS traits can use this
     * decoder easily.
     */
-  def JsObjectDecoder[A <: js.Object](implicit ec: ExecutionContext): EntityDecoder[IO, A] =
-    JSONDecoder.map(_.asInstanceOf[A])
+  def JsObjectDecoder[A <: js.Object](reviver: Option[Reviver]=None)(implicit ec: ExecutionContext): EntityDecoder[IO, A] =
+    JSONDecoder(reviver).map(_.asInstanceOf[A])
 
-  implicit def jsObjectDecoder[A <: js.Object](implicit ec: ExecutionContext) = JsObjectDecoder[A]
+  implicit def jsObjectDecoder[A <: js.Object](implicit ec: ExecutionContext) = JsObjectDecoder[A]()
 
   /** Ignore the response completely (status and body) and return decode "unit" success. */
   implicit val void: EntityDecoder[IO, Unit] = EntityDecoder { _ =>
     DecodeResult.success(())
   }
-
-  //import play.api.libs.json._
-
-  // /** play-json */
-  // implicit val PlayJsonDecoder: EntityDecoder[JsValue] =
-  //   EntityDecoder.instance { msg =>
-  //     DecodeResult.success(msg.body.map(Json.parse(_)))
-  //   }
 
   /**
     * Check for value array and if there is a value array return the first
@@ -159,11 +191,32 @@ trait EntityDecoderInstances {
     * `FirstElementOfValueArrayIfThereIsOneOrCastWholeMessage`.
     */
   def ValueWrapper[A <: js.Object](implicit ec: ExecutionContext) =
-    JsObjectDecoder[ValueArrayResponse[A]].flatMapR[A] { arrresp =>
+    JsObjectDecoder[ValueArrayResponse[A]]().flatMapR[A] { arrresp =>
       // if no "value" array, assume its safe to cast to a single A
-      arrresp.value.fold(DecodeResult.success[IO,A](arrresp.asInstanceOf[A]))({ arr =>
+      arrresp.value.fold(DecodeResult.success[IO,A](arrresp.asInstanceOf[A]))
+      { arr =>
         if (arr.size > 0) DecodeResult.success(arr(0))
-        else DecodeResult.failure(OnlyOneExpected(s"found ${arr.size}"))
-      })
+        else DecodeResult.failure(OnlyOneExpected(s"found ${arr.size} elements in 'value' field"))
+      }
     }
+
+  /** 
+   * Decode based on the expectation of a "value" field name that has an array
+   * of "A" values. The returned value is a js Array not a scala collection.
+   * If "value" fieldname is undefined, return an empty array.
+   */
+  def ValueArrayDecoder[A <: js.Any](implicit ec: ExecutionContext): EntityDecoder[IO, js.Array[A]] =
+    JsObjectDecoder[ValueArrayResponse[A]]().map(_.value.getOrElse(js.Array[A]()))
+
+  /**
+   * Decode based on the expectation of a single value in a fieldname called
+   * "value". You might get this when you navigate to a simple/single value
+   * property on a specific entity
+   * e.g. '/myentities(theguid)/somesimpleattribute'. A null value or undefined
+   * value is automatically taken into account in the returned
+   * Option. Preversely, you could assume that "js.Array[YourSomething]" is the
+   * single value and use that instead of [[ValueArrayDecoder]].
+   */
+  def SingleValueDecoder[A <: js.Any](implicit ec: ExecutionContext): EntityDecoder[IO, Option[A]] =
+    JsObjectDecoder[SingleValueResponse[A]]().map(_.value.toNonNullOption)
 }

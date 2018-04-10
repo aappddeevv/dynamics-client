@@ -114,7 +114,7 @@ class LoadAddressesActions(val context: DynamicsContext) {
       .getOrElse(Stream.empty)
     val counter   = new java.util.concurrent.atomic.AtomicInteger(0)
     val xf        = xform(config.etl.cliParameters)
-    val toPayload = (o: js.Object) => clean(xf(o).asJson)
+    val toPayload = (o: js.Object) => clean(xf(o).toJson)
     val program = src
       .take(config.etl.take.getOrElse(Long.MaxValue))
       .drop(config.etl.drop.getOrElse(0))

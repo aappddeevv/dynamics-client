@@ -42,9 +42,12 @@ object Utils {
   def pprint(o: js.Dynamic): String = pprint(o.asInstanceOf[js.Object])
 
   /** Slurp a file as JSON and cast. No exception handling is provided. Synchronous. */
-  def slurpAsJson[T](file: String, encoding: String = "utf8"): T = {
+  def slurpAsJson[T](file: String, reviver: Option[Reviver] = None,
+    encoding: String = "utf8"): T = {
     val str = io.scalajs.nodejs.fs.Fs.readFileSync(file, encoding)
-    js.JSON.parse(str).asInstanceOf[T]
+    js.JSON.parse(str,
+      reviver.getOrElse(js.undefined.asInstanceOf[Reviver])
+    ).asInstanceOf[T]
   }
 
   /** Slurp a file as a utf8 string, synchronous. */
@@ -160,14 +163,18 @@ object Utils {
     Option(Path.basename(path)).filterNot(_.isEmpty)
 
   /**
-    * This is really just a Semigroup "combine" operation but it does
-    * *not* use "combine" at lower levels of the structure. https://stackoverflow.com/questions/36561209/is-it-possible-to-combine-two-js-dynamic-objects
+    * This is really just a Semigroup "combine" operation but it does *not* use
+    * "combine" at lower levels of the structure i.e. a shallow copy. Last
+    * object's fields
+    * wins. 
+   * 
+   * @see https://stackoverflow.com/questions/36561209/is-it-possible-to-combine-two-js-dynamic-objects
     */
   @inline def mergeJSObjects(objs: js.Dynamic*): js.Dynamic = {
     // not js.Any? maybe keep js or scala values in here....
-    val result = js.Dictionary.empty[Any]
+    val result = js.Dictionary.empty[Any] // js.Any?
     for (source <- objs) {
-      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])
+      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]]) // js.Any?
         result(key) = value
     }
     result.asInstanceOf[js.Dynamic]
@@ -175,7 +182,7 @@ object Utils {
 
   /**
     * Merge objects and Ts together. Good for merging props with data- attributes.
-    * See the note from [[mergeJSObjects]].
+    * See the note from [[mergeJSObjects]]. Last object's fields win.
     */
   @inline def merge[T <: js.Object](objs: T | js.Dynamic*): T = {
     val result = js.Dictionary.empty[Any]
@@ -187,9 +194,11 @@ object Utils {
   }
 
   /** Generate a new CRM GUID. */
-  def CRMGUID(): String = java.util.UUID.randomUUID.toString
+  @inline def CRMGUID(): String = java.util.UUID.randomUUID.toString
 
   /** Parse some json. */
-  def jsonParse(content: String): js.Dynamic = js.JSON.parse(content)
+  @inline def jsonParse(content: String,
+    reviver: Option[Reviver] = None): js.Dynamic =
+    js.JSON.parse(content, reviver.getOrElse(js.undefined.asInstanceOf[Reviver]))
 
 }
