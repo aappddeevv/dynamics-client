@@ -10,7 +10,7 @@ object Dependencies {
   val commonDependencies = Def.setting(Seq(
 
     "org.scalatest"          %%% "scalatest"    % "latest.release" % "test",
-    "co.fs2" %%% "fs2-core" % "0.10.3", //-0-RC1
+    "co.fs2" %%% "fs2-core" % "0.10.3",
     "org.typelevel" %%% "cats-core" % "1.1.0",
     "org.typelevel" %%% "cats-effect" % "0.10",
     //"com.github.mpilquist" %%% "simulacrum" % "0.10.0",

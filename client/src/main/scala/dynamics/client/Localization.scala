@@ -21,12 +21,6 @@ import MonadlessIO._
 import cats.effect._
 
 import Utils._
-import dynamics.common.implicits._
-import dynamics.http._
-import dynamics.http.implicits._
-import dynamics.client.implicits._
-import dynamics.client._
-import client.common._
 
 /**
  * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/localizedlabel?view=dynamics-ce-odata-9

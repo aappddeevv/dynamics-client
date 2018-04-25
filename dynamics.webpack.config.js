@@ -42,9 +42,15 @@ common = {
             },
             {
                 test: /\.js$/,
-                use: ["source-map-loader"],
+                use: [{
+                    loader: "scalajs-friendly-source-map-loader",
+                    options: {
+                      // skipFileURLWarnings: true
+                    }
+                }],
                 enforce: "pre",
                 exclude: [/node_modules/],
+
             }
         ]
     },

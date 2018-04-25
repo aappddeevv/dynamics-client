@@ -33,6 +33,26 @@ trait StreamSyntax {
   implicit def streamToStream[F[_], O](s: Stream[F, O]): StreamOps[F, O] = StreamOps(s)
 }
 
+/**
+ * It is common in interop code to model a value as A or null but not undefined.
+ */
+final case class OrNullOps[A <: js.Any](a: A | Null) {
+  /** Convert an A|Null to a well formed option. */
+  @inline def toNonNullOption: Option[A] =
+    if(a.asInstanceOf[js.Any] == null) Option.empty[A]
+    else Some(a.asInstanceOf[A])
+
+  /** If Null, then false, else true. */
+  @inline def toTruthy: Boolean =
+    if (js.DynamicImplicits.truthValue(a.asInstanceOf[js.Dynamic])) true
+    else false
+}
+
+trait OrNullSyntax{
+  implicit def orNullSyntax[A <: js.Any](a: A|Null): OrNullOps[A] = OrNullOps[A](a)
+}
+
+
 final case class JsAnyOps(a: js.Any) {
   @inline def asJsObj: js.Object        = a.asInstanceOf[js.Object]
   @inline def asDyn: js.Dynamic         = a.asInstanceOf[js.Dynamic]
@@ -232,6 +252,7 @@ trait AllSyntax
     with IteratorSyntax
     with JsPromiseSyntax
     with StreamSyntax
+    with OrNullSyntax
 
 // Add each individal syntax trait to this
 object syntax {
@@ -247,6 +268,7 @@ object syntax {
   object jsPromise     extends JsPromiseSyntax
   object jspromise     extends JsPromiseSyntax
   object stream        extends StreamSyntax
+  object ornull extends OrNullSyntax
 }
 
 trait AllInstances extends JsObjectInstances
