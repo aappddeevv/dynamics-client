@@ -92,7 +92,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
               .CSVFileSource(f)
               .map(obj => { val dict = obj.asDict[String]; (dict("entity"), dict("query")) })
               .evalMap(p => m.entityByName(p._1).map(_.map((p._1, p._2, _))))
-              .collect{ case Some(e) => e}
+              .collect { case Some(e) => e }
               .flatMap(t => deleteFromQuery(t._2, t._3.PrimaryIdAttribute, t._3.EntitySetName, concurrency)))
         .getOrElse(Stream.empty)
 
@@ -108,8 +108,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     println(s"Output file: $outputpath")
 
     val opts = DynamicsOptions(
-      prefers = client.common.headers.PreferOptions(maxPageSize = config.export.maxPageSize,
-                                    includeFormattedValues = Some(config.export.includeFormattedValues)))
+      prefers =
+        client.common.headers.PreferOptions(maxPageSize = config.export.maxPageSize,
+                                            includeFormattedValues = Some(config.export.includeFormattedValues)))
     val values =
       dynclient
         .getListStream[js.Object](config.export.query, opts)
@@ -137,8 +138,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     println(s"Export entity: ${config.export.entity}")
     val url = q.url(config.export.entity)
     val opts = DynamicsOptions(
-      prefers = client.common.headers.PreferOptions(maxPageSize = config.export.maxPageSize,
-                                    includeFormattedValues = Some(config.export.includeFormattedValues)))
+      prefers =
+        client.common.headers.PreferOptions(maxPageSize = config.export.maxPageSize,
+                                            includeFormattedValues = Some(config.export.includeFormattedValues)))
 
     val values = dynclient.getListStream[js.Object](url, opts).drop(config.export.skip.map(_.toLong).getOrElse(0))
 
@@ -285,7 +287,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
   }
 
   def fromJsonFile(file: String) =
-    fromMap(Utils.slurpAsJson[js.Object](file).asDict[String].toMap)
+    fromMap(IOUtils.slurpAsJson[js.Object](file).asDict[String].toMap)
 
   /** Convert to function: RetrieveTotalRecordCount if possible. */
   def count() = Action { config =>

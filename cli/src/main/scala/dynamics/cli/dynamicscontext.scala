@@ -30,18 +30,19 @@ object DynamicsContext {
     * are automatically addded. Allowed policies are ''backoff'' and any other
     * policy string is translated into a ''pause'' policy.
     */
-  def default(config: AppConfig, headers: HttpHeaders= HttpHeaders.empty)
-    (implicit ec: ExecutionContext, F: MonadError[IO, Throwable]): DynamicsContext =
+  def default(config: AppConfig, headers: HttpHeaders = HttpHeaders.empty)(
+      implicit ec: ExecutionContext,
+      F: MonadError[IO, Throwable]): DynamicsContext =
     new DynamicsContext {
       import dynamics.client._
-      val LCID = config.common.lcid
+      val LCID         = config.common.lcid
       implicit val e   = ec
       implicit val sch = Scheduler.default
-      implicit val t = IO.timerGlobal
+      implicit val t   = IO.timerGlobal
 
       private val retryPolicyMiddleware = makePolicy(config.common)
-      private val middleware = makeAuthMiddleware(config.common)(sch, e) andThen retryPolicyMiddleware
-      implicit val httpclient =  middleware(makeHTTPClient(config.common, headers)(e, F, sch))
+      private val middleware            = makeAuthMiddleware(config.common)(sch, e) andThen retryPolicyMiddleware
+      implicit val httpclient           = middleware(makeHTTPClient(config.common, headers)(e, F, sch))
       implicit val dynclient: DynamicsClient =
         DynamicsClient(httpclient, config.common.connectInfo, config.common.debug)(F, e)
 

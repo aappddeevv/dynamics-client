@@ -14,18 +14,18 @@ import cats.effect._
 package object http {
 
   @deprecated("Use Kleisli directly e.g. Kleisli[F, A, B]", "0.1.0")
-  type Service[F, A, B]      = Kleisli[IO, A, B]
+  type Service[F, A, B]         = Kleisli[IO, A, B]
   type Middleware[F[_]]         = Client[F] => Client[F]
   type HttpService[F[_]]        = Kleisli[F, HttpRequest[F], HttpResponse[F]]
   type StreamingClient[F[_], A] = fs2.Pipe[F, HttpRequest[F], F[A]]
 
-  /** 
-   * Non-streaming but good enough for our needs.  IO is used explicitly but
-   * since we have strict bodies for dynamics, why not use "Id" in the short
-   * term? Entity is the body part of a Message.
-   * 
-   * @todo Make F so we can use Id or something simpler.
-   */
+  /**
+    * Non-streaming but good enough for our needs.  IO is used explicitly but
+    * since we have strict bodies for dynamics, why not use "Id" in the short
+    * term? Entity is the body part of a Message.
+    *
+    * @todo Make F so we can use Id or something simpler.
+    */
   type Entity = IO[String]
 
   /** Basic headers are a dict of strings. */
@@ -34,8 +34,8 @@ package object http {
   /**
     * When decoding a response body, either you get an A or a DecodeFailure. The
     * effect may also carry an exception.  EitherT has a bunch of combinators.
-   * 
-   * @see https://typelevel.org/cats/api/cats/data/EitherT.html
+    *
+    * @see https://typelevel.org/cats/api/cats/data/EitherT.html
     */
   type DecodeResult[F[_], A] = EitherT[F, DecodeFailure, A]
 

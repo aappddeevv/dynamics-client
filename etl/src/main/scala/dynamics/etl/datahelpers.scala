@@ -23,7 +23,7 @@ import dynamics.common.implicits._
   * js.Dictionary. Most of these mutate the input source so create a copy of the data
   * prior to calling if you want.
   */
-package object jsdatahelpers {
+trait JSDataHelpers {
 
   /**
     * Assuming a property is a string, omit the property from the object if its blank.
@@ -138,7 +138,8 @@ package object jsdatahelpers {
 
   /**
     * Given some string definitions of keep, drop and rename, create a function that
-    * that mutates a js.Object.
+    * that mutates a js.Object. This parses the "dsl" and returns a function to
+    * perform the conversion without needing to reparse the "dsl".
     */
   def stdConverter(keeps: Option[String], drops: Option[String], renames: Option[String]): js.Object => js.Object = {
     val keep = keeps.map(_.split('|').map(_.trim))
@@ -157,3 +158,5 @@ package object jsdatahelpers {
   }
 
 }
+
+package object jsdatahelpers extends JSDataHelpers

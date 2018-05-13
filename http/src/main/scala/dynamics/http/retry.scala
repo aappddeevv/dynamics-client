@@ -37,25 +37,25 @@ trait Retry extends LazyLogger {
   )
 
   /**
-   * Return true if the status *suggests* that the request should be retried.
-   * The statuses include: InternalServerError, ServiceUnavailable, BadGateway,
-   * GatewayTimeout, TooManyRequests which is a good starting point for
-   * dynamics.
-   */
+    * Return true if the status *suggests* that the request should be retried.
+    * The statuses include: InternalServerError, ServiceUnavailable, BadGateway,
+    * GatewayTimeout, TooManyRequests which is a good starting point for
+    * dynamics.
+    */
   def shouldRetry(s: Status): Boolean = RetriableStatuses.contains(s)
 
   /**
     * Create a retry policy that retries on `CommunicationFailure`,
     * `DecodeFailure` or UnexpectedStatus (if isRetryableStatus(status) is
     * true) failures.
-   * @param policy The retry policy called if failure is detected.
+    * @param policy The retry policy called if failure is detected.
     */
-  def retryIfRetryableThrowables[F[_], A](policy: F[A] => F[A],
-    isRetryableStatus: Status => Boolean = shouldRetry)
-    (implicit F: ApplicativeError[F, Throwable]): F[A] => F[A] =
-    fa => F.recoverWith(fa) {
-        case c: CommunicationsFailure                                    => policy(fa)
-        case d: MessageBodyFailure                                       => policy(fa)
+  def retryIfRetryableThrowables[F[_], A](policy: F[A] => F[A], isRetryableStatus: Status => Boolean = shouldRetry)(
+      implicit F: ApplicativeError[F, Throwable]): F[A] => F[A] =
+    fa =>
+      F.recoverWith(fa) {
+        case c: CommunicationsFailure                                          => policy(fa)
+        case d: MessageBodyFailure                                             => policy(fa)
         case u @ UnexpectedStatus(status, _, _) if (isRetryableStatus(status)) => policy(fa)
     }
 
@@ -70,17 +70,17 @@ trait Retry extends LazyLogger {
     * effect carrying a `DisposableResponse` has converted the effect to contain
     * an error for specific status codes.
     */
-  def makeSomeStatusesErrors[F[_]](isError: Status => Boolean = shouldRetry)
-    (implicit F: ApplicativeError[F, Throwable]): Kleisli[F, DisposableResponse[F], DisposableResponse[F]] =
+  def makeSomeStatusesErrors[F[_]](isError: Status => Boolean = shouldRetry)(
+      implicit F: ApplicativeError[F, Throwable]): Kleisli[F, DisposableResponse[F], DisposableResponse[F]] =
     Kleisli { dr =>
       if (!isError(dr.response.status)) F.pure(dr)
       else F.raiseError(UnexpectedStatus(dr.response.status, None, Some(dr.response)))
     }
 
-  /** 
-   * Extract a message from `t` via "getMessage" or the underlying "cause"
-   * exception. Use fallback if neither of those found.
-   */
+  /**
+    * Extract a message from `t` via "getMessage" or the underlying "cause"
+    * exception. Use fallback if neither of those found.
+    */
   def getMessage(t: Throwable, fallback: String = "no message"): String = {
     (Option(t.getMessage()) orElse Option(t.getCause()).map(_.getMessage()) orElse Option(t.toString()))
       .getOrElse(fallback)
@@ -91,8 +91,8 @@ trait Retry extends LazyLogger {
     * status, ensure your IO has converted the desired statuses to an effect
     * failure first (see `ensureSeccussfulStatus`).
     */
-  def withBackoff[F[_], A](initialDelay: FiniteDuration = 5.seconds, maxRetries: Int = 5)
-    (ioa: F[A])(implicit F: ApplicativeError[F, Throwable], timer: Timer[F]): F[A] =
+  def withBackoff[F[_], A](initialDelay: FiniteDuration = 5.seconds, maxRetries: Int = 5)(
+      ioa: F[A])(implicit F: ApplicativeError[F, Throwable], timer: Timer[F]): F[A] =
     F.handleErrorWith(ioa) { error =>
       if (maxRetries > 0) {
         val msg = getMessage(error)
@@ -106,8 +106,8 @@ trait Retry extends LazyLogger {
     * status, ensure your IO has converted the desired statuses to an effect
     * failure first (see `ensureSeccussfulStatus`).
     */
-  def withPause[F[_], A](delayBetween: FiniteDuration = 5.seconds, maxRetries: Int = 5)
-    (ioa: F[A])(implicit F: ApplicativeError[F, Throwable], timer: Timer[F]): F[A] =
+  def withPause[F[_], A](delayBetween: FiniteDuration = 5.seconds, maxRetries: Int = 5)(
+      ioa: F[A])(implicit F: ApplicativeError[F, Throwable], timer: Timer[F]): F[A] =
     F.handleErrorWith(ioa) { error =>
       if (maxRetries > 0) {
         val msg = getMessage(error)
@@ -121,8 +121,7 @@ trait Retry extends LazyLogger {
     * status, ensure your IO has converted the desired statuses to an effect
     * failure first (see `ensureSeccussfulStatus`).
     */
-  def directly[F[_], A](maxRetries: Int = 5)(ioa: F[A])
-    (implicit F: ApplicativeError[F, Throwable]): F[A] =
+  def directly[F[_], A](maxRetries: Int = 5)(ioa: F[A])(implicit F: ApplicativeError[F, Throwable]): F[A] =
     F.handleErrorWith(ioa) { error =>
       if (maxRetries > 0) {
         val msg = getMessage(error)
@@ -157,25 +156,27 @@ trait RetryMiddleware {
     * retry. `makeSomeStatusesErrors` is automatically composed.
     */
   def makeMiddleware[F[_]](retry: F[DisposableResponse[F]] => F[DisposableResponse[F]],
-    isError: Status => Boolean = http.retry.shouldRetry)
-    (implicit F: MonadError[F, Throwable], FM: FlatMap[F]): Middleware[F] =
+                           isError: Status => Boolean = http.retry.shouldRetry)(implicit F: MonadError[F, Throwable],
+                                                                                FM: FlatMap[F]): Middleware[F] =
     client => {
-      client.copy(Kleisli { (req: HttpRequest[F]) =>
-        (client.open andThen http.retry.makeSomeStatusesErrors[F](isError) mapF retry)(req)
+      client.copy(
+        Kleisli { (req: HttpRequest[F]) =>
+          (client.open andThen http.retry.makeSomeStatusesErrors[F](isError) mapF retry)(req)
         //(client.open andThen retry.makeSomeStatusesErrors[F](isRetryable) mapF retry)(req)
-      }, client.dispose)
+        },
+        client.dispose
+      )
     }
 
-  def pause[F[_]](maxRetries: Int = 5, delayBetween: FiniteDuration = 5.seconds)
-    (implicit F: MonadError[F, Throwable], timer: Timer[F]) =
+  def pause[F[_]](maxRetries: Int = 5, delayBetween: FiniteDuration = 5.seconds)(implicit F: MonadError[F, Throwable],
+                                                                                 timer: Timer[F]) =
     makeMiddleware[F](retry.retryIfRetryableThrowables(retry.withPause(delayBetween, maxRetries)))
 
-  def directly[F[_]](maxRetries: Int = 5)
-    (implicit F: MonadError[F, Throwable]) = 
+  def directly[F[_]](maxRetries: Int = 5)(implicit F: MonadError[F, Throwable]) =
     makeMiddleware[F](retry.retryIfRetryableThrowables(retry.directly(maxRetries)))
 
-  def backoff[F[_]](maxRetries: Int = 5, initialDelay: FiniteDuration = 5.seconds)
-    (implicit eh: MonadError[F, Throwable], timer: Timer[F]) =
+  def backoff[F[_]](maxRetries: Int = 5,
+                    initialDelay: FiniteDuration = 5.seconds)(implicit eh: MonadError[F, Throwable], timer: Timer[F]) =
     makeMiddleware[F](retry.retryIfRetryableThrowables(retry.withBackoff(initialDelay, maxRetries)))
 }
 

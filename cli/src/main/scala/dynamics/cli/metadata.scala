@@ -53,11 +53,7 @@ class MetadataActions(val context: DynamicsContext) {
         Seq(Seq("#", "LogicalName", "EntitySetName", "PrimaryIdAttribute", "ObjectTypeCode")) ++
           list.zipWithIndex.map {
             case (i, idx) =>
-              Seq((idx + 1).toString,
-                  i.LogicalName,
-                  i.EntitySetName,
-                  i.PrimaryIdAttribute,
-                  i.ObjectTypeCode.toString)
+              Seq((idx + 1).toString, i.LogicalName, i.EntitySetName, i.PrimaryIdAttribute, i.ObjectTypeCode.toString)
           }
       val out = Table.table(data.map(_.toJSArray).toJSArray, topts)
       println(out)
@@ -68,7 +64,7 @@ class MetadataActions(val context: DynamicsContext) {
     config.common.outputFile
       .fold(IO(println("An output file name is required for the downloaded CSDL.")))(ofile => {
         println(s"Downloading CSDL to output file ${config.common.outputFile}")
-        getCSDL().flatMap(Utils.writeToFile(ofile, _))
+        getCSDL().flatMap(IOUtils.writeToFile(ofile, _))
       })
   }
 

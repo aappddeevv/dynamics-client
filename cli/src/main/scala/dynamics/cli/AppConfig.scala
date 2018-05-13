@@ -21,8 +21,8 @@ import dynamics.common._
     quiet: Boolean = false,
     verbose: Boolean = false,
     verbosity: Int = 0,
-  crmConfigFile: Option[String] = None,
-  officeConfigFile: Option[String] = None,
+    crmConfigFile: Option[String] = None,
+    officeConfigFile: Option[String] = None,
     outputDir: String = "./",
     outputFile: Option[String] = None,
     logFile: String = "dynamicscli.log",
@@ -51,6 +51,13 @@ import dynamics.common._
 @Lenses case class PluginConfig(
     source: Option[String] = None,
     watch: Boolean = false
+)
+
+@Lenses case class ThemesConfig(
+    source: Option[String] = None,
+    target: Option[String] = None,
+    webresourceName: Option[String] = None,
+    mergeFile: Option[String] = None,
 )
 
 @Lenses case class WebResourceConfig(
@@ -211,11 +218,11 @@ import dynamics.common._
 )
 
 /**
- * A simple cake to bundle together a data structure for capturing
- * CLI parameters and a CLI parser that can parse parameters.
- * 
- * @todo: Should probably bundle together a `run` method to run the program.
- */
+  * A simple cake to bundle together a data structure for capturing
+  * CLI parameters and a CLI parser that can parse parameters.
+  *
+  * @todo: Should probably bundle together a `run` method to run the program.
+  */
 trait CLIApplication {
 
   type AppConfig <: AppConfigLike
@@ -240,9 +247,9 @@ trait CLIApplication {
   }
 }
 
-/** 
- * Standard operations for a basic CLI.
- */
+/**
+  * Standard operations for a basic CLI.
+  */
 trait StandardCLIApplication extends CLIApplication {
 
   type AppConfig <: AppConfigLike
@@ -265,8 +272,8 @@ trait StandardCLIApplication extends CLIApplication {
     def appModule: AppModuleConfig
     def token: TokenConfig
     def user: UserConfig
+    def themes: ThemesConfig
   }
-
 }
 
 @Lenses case class AppConfig(
@@ -287,7 +294,8 @@ trait StandardCLIApplication extends CLIApplication {
     settings: SettingsConfig = SettingsConfig(),
     appModule: AppModuleConfig = AppModuleConfig(),
     token: TokenConfig = TokenConfig(),
-    user: UserConfig = UserConfig()
+    user: UserConfig = UserConfig(),
+    themes: ThemesConfig = ThemesConfig()
 ) {
   def debug       = common.debug
   def noisy       = !common.quiet

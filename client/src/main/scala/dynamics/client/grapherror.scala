@@ -18,19 +18,19 @@ import dynamics.common._
 import dynamics.http._
 
 /**
- * @see https://developer.microsoft.com/en-us/graph/docs/concepts/errors
- */
+  * @see https://developer.microsoft.com/en-us/graph/docs/concepts/errors
+  */
 @js.native
 trait GraphErrorJS extends ODataErrorJS {
   val innererror: js.UndefOr[GraphInnerErrorJS] = js.undefined
 }
 
 @js.native
-trait GraphInnerErrorJS extends js.Object {
-}
+trait GraphInnerErrorJS extends js.Object {}
 
 case class GraphInnerError(stuff: js.Object)
-case class GraphServerError(code: String, message: String, innererror: Option[GraphInnerError] = None) extends ServerError
+case class GraphServerError(code: String, message: String, innererror: Option[GraphInnerError] = None)
+    extends ServerError
 
 object GraphServerError {
 
@@ -41,8 +41,8 @@ object GraphServerError {
     }.toOption
 
     GraphServerError(err.code.filterNot(_.isEmpty).getOrElse("<no code provided>"),
-      err.message.getOrElse("<no message provided>"),
-      ierror)
+                     err.message.getOrElse("<no message provided>"),
+                     ierror)
   }
 
   /** Typically for a JSON response, is there an error field? */
@@ -71,9 +71,9 @@ sealed abstract class GraphError extends RuntimeException {
   * Concrete implementation of errors thrown by a dynamics client.
   */
 final case class GraphClientError(details: String,
-                                     val cause: Option[GraphServerError] = None,
-                                     underlying: Option[Throwable] = None,
-                                     val status: Status)
+                                  val cause: Option[GraphServerError] = None,
+                                  underlying: Option[Throwable] = None,
+                                  val status: Status)
     extends GraphError {
   //cause.foreach(initCause) // which one to use as underlying?
   def message = s"Graph client request encountered an error: $details"

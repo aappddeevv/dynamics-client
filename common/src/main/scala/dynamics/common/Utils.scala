@@ -7,12 +7,6 @@ package common
 
 import scala.scalajs.js
 import js.|
-import io.scalajs.nodejs
-import io.scalajs.nodejs._
-import io.scalajs.nodejs.path.Path
-import io.scalajs.nodejs.buffer.Buffer
-import fs._
-import path._
 import scala.concurrent._
 import cats.effect._
 import cats._
@@ -27,40 +21,6 @@ object Utils {
 
   /** Empty dynamics object read to add options in a javascript way. */
   def options() = js.Dynamic.literal()
-
-  /** Pretty print a js.Object */
-  def pprint(o: js.Object,
-             opts: nodejs.util.InspectOptions = new nodejs.util.InspectOptions(depth = null, maxArrayLength = 10)) =
-    nodejs.util.Util.inspect(o, opts)
-
-  /** Render a js.Any into a string using nodejs Inspect. */
-  def render(o: js.Any,
-             opts: nodejs.util.InspectOptions = new nodejs.util.InspectOptions(depth = null, maxArrayLength = 10)) =
-    nodejs.util.Util.inspect(o, opts)
-
-  /** Pretty print a js.Dynamic object. */
-  def pprint(o: js.Dynamic): String = pprint(o.asInstanceOf[js.Object])
-
-  /** Slurp a file as JSON and cast. No exception handling is provided. Synchronous. */
-  def slurpAsJson[T](file: String, reviver: Option[Reviver] = None,
-    encoding: String = "utf8"): T = {
-    val str = io.scalajs.nodejs.fs.Fs.readFileSync(file, encoding)
-    js.JSON.parse(str,
-      reviver.getOrElse(js.undefined.asInstanceOf[Reviver])
-    ).asInstanceOf[T]
-  }
-
-  /** Slurp a file as a utf8 string, synchronous. */
-  def slurp(file: String, encoding: String = "utf8"): String = {
-    io.scalajs.nodejs.fs.Fs.readFileSync(file, encoding)
-  }
-
-  /** Get the extension/postfix on a filename less
-    * the preceeding ".".
-    */
-  def getPostfix(path: String): Option[String] = {
-    Option(Path.extname(path)).filter(_.length > 0).map(_.substring(1))
-  }
 
   /** Infer a resource type based on the filename extension. Return none if
     * it does not match any known Web Resource resource types.
@@ -124,57 +84,19 @@ object Utils {
     else path
   }
 
-  /** Async write content to file creating paths if path
-    * contains path segments that do not exist.
-    * @param path Path name, both path and file.
-    * @param content String content.
-    * @return Unit if file written, otherwise a failed IO.
-    */
-  def writeToFile(path: String, content: String | Buffer)(implicit ec: ExecutionContext): IO[Unit] = {
-    IO.fromFuture(IO(Fse.outputFile(path, content)))
-  }
-
-  /** Write to file synchronously. */
-  def writeToFileSync(path: String, content: String | Buffer): Unit = {
-    Fs.writeFileSync(path, content)
-  }
-
-  /** Convert string from base64. */
-  def fromBase64(s: String) = Buffer.from(s, "base64")
-
-  /** Join two path segments. */
-  def pathjoin(lhs: String, rhs: String) =
-    Path.join(lhs, rhs)
-
-  /** Returns true if the file exists, false otherwise. Synchronous. */
-  def fexists(path: String) =
-    try { Fs.accessSync(path, Fs.R_OK); true } catch { case scala.util.control.NonFatal(_) => false }
-
-  /** Get an extension on a file or None. */
-  def extension(path: String): Option[String] =
-    Option(Path.extname(path)).map(_.substring(1)).filterNot(_.isEmpty)
-
-  /** Get the base(name) + extension. */
-  def namepart(path: String): Option[String] =
-    Option(Path.parse(path)).map(_.name).filterNot(_.isEmpty).map(_.get)
-
-  /** Get the filename (base + ext) if it exists. */
-  def filename(path: String): Option[String] =
-    Option(Path.basename(path)).filterNot(_.isEmpty)
-
   /**
     * This is really just a Semigroup "combine" operation but it does *not* use
     * "combine" at lower levels of the structure i.e. a shallow copy. Last
     * object's fields
-    * wins. 
-   * 
-   * @see https://stackoverflow.com/questions/36561209/is-it-possible-to-combine-two-js-dynamic-objects
+    * wins.
+    *
+    * @see https://stackoverflow.com/questions/36561209/is-it-possible-to-combine-two-js-dynamic-objects
     */
   @inline def mergeJSObjects(objs: js.Dynamic*): js.Dynamic = {
     // not js.Any? maybe keep js or scala values in here....
     val result = js.Dictionary.empty[Any] // js.Any?
     for (source <- objs) {
-      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]]) // js.Any?
+      for ((key, value) <- if (source != null) source.asInstanceOf[js.Dictionary[Any]] else js.Dictionary.empty[Any]) // js.Any?
         result(key) = value
     }
     result.asInstanceOf[js.Dynamic]
@@ -187,7 +109,7 @@ object Utils {
   @inline def merge[T <: js.Object](objs: T | js.Dynamic*): T = {
     val result = js.Dictionary.empty[Any]
     for (source <- objs) {
-      for ((key, value) <- source.asInstanceOf[js.Dictionary[Any]])
+      for ((key, value) <- if (source != null) source.asInstanceOf[js.Dictionary[Any]] else js.Dictionary.empty[Any])
         result(key) = value
     }
     result.asInstanceOf[T]
@@ -197,8 +119,9 @@ object Utils {
   @inline def CRMGUID(): String = java.util.UUID.randomUUID.toString
 
   /** Parse some json. */
-  @inline def jsonParse(content: String,
-    reviver: Option[Reviver] = None): js.Dynamic =
+  @inline def jsonParse(content: String, reviver: Option[Reviver] = None): js.Dynamic =
     js.JSON.parse(content, reviver.getOrElse(js.undefined.asInstanceOf[Reviver]))
 
+  /** Clean an id that has braces around it. */
+  @inline def cleanId(id: String): String = id.stripSuffix("}").stripPrefix("{").trim
 }

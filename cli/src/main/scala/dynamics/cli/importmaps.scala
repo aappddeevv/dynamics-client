@@ -94,12 +94,12 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
                                            Some(("importmaps", id)))(JSONDecoder())
                 .flatMap { jsdyn =>
                   val resp = jsdyn.asInstanceOf[ExportMappingsImportMapResponse]
-                  val path = Utils.pathjoin(config.common.outputDir, s"${name}.xml")
+                  val path = IOUtils.pathjoin(config.common.outputDir, s"${name}.xml")
                   val doit: IO[Unit] =
-                    if (config.common.noclobber && Utils.fexists(path))
+                    if (config.common.noclobber && IOUtils.fexists(path))
                       IO(println(s"Importmap download file $path exists and noclobber is set."))
                     else
-                      Utils
+                      IOUtils
                         .writeToFile(path, resp.MappingsXml)
                         .map(_ => println(s"Wrote importmap file: $path"))
                   doit
@@ -139,7 +139,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
   /** Upload a single import map. Potentially clobber it if it already exists. */
   def uploadOne(file: String, noclobber: Boolean): IO[Unit] = {
     // test to see if it already exists, if so, delete it?
-    val contents: String             = Utils.slurp(file)
+    val contents: String             = IOUtils.slurp(file)
     val f: JSCallbackNPM[js.Dynamic] = Xml2js.parseString[js.Dynamic](contents, _)
 
     val checkAndMaybeDelete: IO[(Boolean, String)] =
@@ -169,7 +169,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
 
     checkAndMaybeDelete.flatMap(_ match {
       case (true, name) =>
-        importImportMap(Utils.slurp(file)).attempt.map {
+        importImportMap(IOUtils.slurp(file)).attempt.map {
           case Right(_) => println(s"Import map uploaded from file ${file} to map $name successfully.")
           case Left(e) =>
             println(s"Upload failed. Was there a connectivity problem?")
@@ -182,7 +182,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
 
   def upload(files: Seq[String], noclobber: Boolean = true): IO[Unit] = {
     val loads = files.map { f =>
-      if (Utils.fexists(f)) uploadOne(f, noclobber)
+      if (IOUtils.fexists(f)) uploadOne(f, noclobber)
       else IO(println(s"Import map $f is not accessible to upload."))
     }
     loads.toList.sequence.map(_ => ())

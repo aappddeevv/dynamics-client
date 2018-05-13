@@ -161,8 +161,8 @@ class WebResourcesCommand(val context: DynamicsContext) {
             val wr = unlift(dynclient.getOneWithKey[WebResourceOData]("webresourceset", item.webresourceid))
             //println(s"Processing web resource json: ${Utils.pprint(wr)}")
             val origFilename = wr.name
-            val filename     = Utils.pathjoin(config.common.outputDir, origFilename)
-            val exists       = Utils.fexists(filename)
+            val filename     = IOUtils.pathjoin(config.common.outputDir, origFilename)
+            val exists       = IOUtils.fexists(filename)
             val downloadOrNot: IO[Unit] =
               if (exists && noclobber)
                 IO { println("Web Resource $origFilename already downloaded and noclobber is set.") } else

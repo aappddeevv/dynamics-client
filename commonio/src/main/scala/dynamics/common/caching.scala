@@ -128,7 +128,7 @@ case class LineCache(filename: String) extends OfflineCache {
   protected var fd: nodejs.FileDescriptor = _
   protected def init(): Unit = {
     try {
-      cache = Utils.slurp(filename: String).split("\n").toSet
+      cache = IOUtils.slurp(filename: String).split("\n").toSet
     } catch {
       case scala.util.control.NonFatal(_) => Set()
     }
@@ -176,7 +176,7 @@ abstract class FileCache(fname: => String, ignore: => Boolean) {
 
   /** Ensure the cache exists via a potential download and return the content. */
   protected def put(content: String): Unit = {
-    Utils.writeToFileSync(fname, content)
+    IOUtils.writeToFileSync(fname, content)
   }
 
   /** Return the offline cache potentially reading from disk or calling getContent().
@@ -185,9 +185,9 @@ abstract class FileCache(fname: => String, ignore: => Boolean) {
   def get(): IO[String] = {
     if (content != null)
       IO.pure(content)
-    else if (Utils.fexists(fname) && !ignore && content == null) {
+    else if (IOUtils.fexists(fname) && !ignore && content == null) {
       IO {
-        content = Utils.slurp(fname)
+        content = IOUtils.slurp(fname)
         content
       }
     } else

@@ -7,11 +7,11 @@ package client
 package common
 
 /**
- * OData control parameters such as OData "prefer" headers.
- */
+  * OData control parameters such as OData "prefer" headers.
+  */
 trait ClientOptions {
   def prefers: headers.PreferOptions
-  def version: Option[String] = None
-  def user: Option[String] = None
+  def version: Option[String]                     = None
+  def user: Option[String]                        = None
   def applyOptimisticConcurrency: Option[Boolean] = None
 }

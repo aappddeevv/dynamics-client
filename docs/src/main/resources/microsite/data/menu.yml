@@ -26,6 +26,9 @@ options:
   - title: systemjobs
     url: docs/systemjobs.html
 
+  - title: themes
+    url: docs/themes.html
+    
   - title: update
     url: docs/update.html
 

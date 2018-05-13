@@ -17,25 +17,25 @@ trait DynamicsClientRequests {
   val DefaultBatchRequest = HttpRequest(Method.PUT, "/$batch")
   import client.common.headers
 
-  /** 
-   * This does not handle the version tag + applyOptimisticConcurrency flag yet.
-   */
+  /**
+    * This does not handle the version tag + applyOptimisticConcurrency flag yet.
+    */
   def toHeaders(o: DynamicsOptions): HttpHeaders = {
     val prefer = headers.render(o.prefers)
     prefer.map(str => HttpHeaders("Prefer"        -> str)).getOrElse(HttpHeaders.empty) ++
-    o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty) ++
-    (
-      if(o.suppressDuplicateDetection) headers.SuppressDuplicateDetection
-      else HttpHeaders.empty
-    )
+      o.user.map(u => HttpHeaders("MSCRMCallerId" -> u)).getOrElse(HttpHeaders.empty) ++
+      (
+        if (o.suppressDuplicateDetection) headers.SuppressDuplicateDetection
+        else HttpHeaders.empty
+      )
     //++ o.version.map(etag => HttpHeaders("If-None-Match" -> etag)).getOrElse(HttpHeaders.empty)
   }
 
   def mkGetListRequest[F[_]](url: String, opts: DynamicsOptions = DefaultDynamicsOptions) =
     HttpRequest[F](Method.GET, url, headers = toHeaders(opts))
 
-  def mkCreateRequest[F[_], B](entitySet: String, body: B, opts: DynamicsOptions = DefaultDynamicsOptions)
-    (implicit e: EntityEncoder[B]) = {
+  def mkCreateRequest[F[_], B](entitySet: String, body: B, opts: DynamicsOptions = DefaultDynamicsOptions)(
+      implicit e: EntityEncoder[B]) = {
     // HttpRequest(Method.POST, s"/$entitySet", body = Entity.fromString(body), headers = toHeaders(opts))
     val (b, h) = e.encode(body)
     HttpRequest[F](Method.POST, s"/$entitySet", body = b, headers = toHeaders(opts) ++ h)
@@ -56,9 +56,9 @@ trait DynamicsClientRequests {
   }
 
   def mkExecuteActionRequest[F[_]](action: String,
-                             body: Entity,
-                             entitySetAndId: Option[(String, String)] = None,
-                             opts: DynamicsOptions = DefaultDynamicsOptions) = {
+                                   body: Entity,
+                                   entitySetAndId: Option[(String, String)] = None,
+                                   opts: DynamicsOptions = DefaultDynamicsOptions) = {
     val url = entitySetAndId.map { case (c, i) => s"/$c($i)/$action" }.getOrElse(s"/$action")
     HttpRequest[F](Method.POST, url, body = body, headers = toHeaders(opts))
   }
@@ -68,12 +68,12 @@ trait DynamicsClientRequests {
     * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/webapi/associate-disassociate-entities-using-web-api?view=dynamics-ce-odata-9
     */
   def mkAssociateRequest[F[_]](fromEntitySet: String,
-                         fromEntityId: String,
-                         navProperty: String,
-                         toEntitySet: String,
-                         toEntityId: String,
-                         base: String,
-                         singleValuedNavProperty: Boolean = true): HttpRequest[F] = {
+                               fromEntityId: String,
+                               navProperty: String,
+                               toEntitySet: String,
+                               toEntityId: String,
+                               base: String,
+                               singleValuedNavProperty: Boolean = true): HttpRequest[F] = {
     val url  = s"/${fromEntitySet}(${fromEntityId})/$navProperty/$$ref"
     val body = s"""{"@odata.id": "$base/$toEntitySet($toEntityId)"}"""
     val method =
@@ -85,29 +85,29 @@ trait DynamicsClientRequests {
   /**
     * Provide `to` if its a collection-valued navigation property, otherwise it
     * removes a single-valued navigation property.
-   * 
-   * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/webapi/associate-disassociate-entities-using-web-api?view=dynamics-ce-odata-9
+    *
+    * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/webapi/associate-disassociate-entities-using-web-api?view=dynamics-ce-odata-9
     */
   def mkDisassocatiateRequest[F[_]](fromEntitySet: String,
-                              fromEntityId: String,
-                              navProperty: String,
-                              toId: Option[String]): HttpRequest[F] = {
+                                    fromEntityId: String,
+                                    navProperty: String,
+                                    toId: Option[String]): HttpRequest[F] = {
     val navPropertyStr = toId.map(id => s"$navProperty($id)").getOrElse(navProperty)
     val url            = s"/$fromEntitySet($fromEntityId)/$navPropertyStr/$$ref"
     HttpRequest(Method.DELETE, url, body = Entity.empty)
   }
 
   /**
-   * Create a PATCH request that could also upsert. "opts" version could
+    * Create a PATCH request that could also upsert. "opts" version could
     * override upsertPreventCreate if a version value is also included, so be careful.
     */
   def mkUpdateRequest[F[_], B](entitySet: String,
-                         id: String,
-                         body: B,
-                         upsertPreventCreate: Boolean = true,
-                         upsertPreventUpdate: Boolean = false,
-                         options: DynamicsOptions = DefaultDynamicsOptions,
-                         base: Option[String] = None)(implicit enc: EntityEncoder[B]): HttpRequest[F] = {
+                               id: String,
+                               body: B,
+                               upsertPreventCreate: Boolean = true,
+                               upsertPreventUpdate: Boolean = false,
+                               options: DynamicsOptions = DefaultDynamicsOptions,
+                               base: Option[String] = None)(implicit enc: EntityEncoder[B]): HttpRequest[F] = {
     val (b, xtra) = enc.encode(body)
     val h1 =
       if (upsertPreventCreate) HttpHeaders("If-Match" -> "*")
@@ -117,7 +117,7 @@ trait DynamicsClientRequests {
       else HttpHeaders.empty
     // this may override If-Match! */
     val h3 =
-      if(options.applyOptimisticConcurrency.getOrElse(false) && options.version.isDefined)
+      if (options.applyOptimisticConcurrency.getOrElse(false) && options.version.isDefined)
         HttpHeaders("If-Match" -> options.version.get)
       else
         HttpHeaders.empty
@@ -129,8 +129,8 @@ trait DynamicsClientRequests {
   }
 
   def mkExecuteFunctionRequest[F[_]](function: String,
-                               parameters: Map[String, scala.Any] = Map.empty,
-                               entity: Option[(String, String)] = None) = {
+                                     parameters: Map[String, scala.Any] = Map.empty,
+                                     entity: Option[(String, String)] = None) = {
     // (parm, parmvalue)
     val q: Seq[(String, String)] = parameters.keys.zipWithIndex
       .map(x => (x._1, x._2 + 1))

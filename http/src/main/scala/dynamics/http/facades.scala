@@ -47,9 +47,9 @@ trait ValueArrayResponse[A <: js.Any] extends NextLinkResponse[A] {
 }
 
 /**
- * The shape when using navigation properties to a single value it is returned
- * in the fieldname "value".
- */
+  * The shape when using navigation properties to a single value it is returned
+  * in the fieldname "value".
+  */
 @js.native
 trait SingleValueResponse[A <: js.Any] extends js.Object {
   val value: js.UndefOr[A] = js.native

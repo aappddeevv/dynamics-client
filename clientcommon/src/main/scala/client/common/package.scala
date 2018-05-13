@@ -5,10 +5,8 @@
 package dynamics
 package client
 
-/** 
- * Common definitions for clients. Many of these common elements are OData
- * related since OData is the microsoft target web api protocol.
- */
-package object common {
-
-}
+/**
+  * Common definitions for clients. Many of these common elements are OData
+  * related since OData is the microsoft target web api protocol.
+  */
+package object common {}

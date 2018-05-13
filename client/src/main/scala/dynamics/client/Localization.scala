@@ -23,8 +23,8 @@ import cats.effect._
 import Utils._
 
 /**
- * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/localizedlabel?view=dynamics-ce-odata-9
- */
+  * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/localizedlabel?view=dynamics-ce-odata-9
+  */
 @js.native
 trait LocalizedLabel extends js.Object {
   val Label: String               = js.native
@@ -33,11 +33,11 @@ trait LocalizedLabel extends js.Object {
   val LanguageCode: Int           = js.native
 }
 
-/** 
- * Typically a Label or Description.
- * 
- * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/label?view=dynamics-ce-odata-9
- */
+/**
+  * Typically a Label or Description.
+  *
+  * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/label?view=dynamics-ce-odata-9
+  */
 @js.native
 trait LocalizedInfo extends js.Object {
   val LocalizedLabels: UndefOr[js.Array[LocalizedLabel]] = js.native
@@ -54,10 +54,10 @@ object LocalizedHelpers {
   def labelForUser(info: LocalizedInfo): Option[String] =
     info.UserLocalizedLabel.map(_.Label).toOption
 
-  /** 
-   * Return the localized label (based on lcid) then the user localized label
-   * then None.
-   */
+  /**
+    * Return the localized label (based on lcid) then the user localized label
+    * then None.
+    */
   def findByLCID(lcid: Int, info: LocalizedInfo): Option[LocalizedLabel] =
     info.LocalizedLabels.toOption.flatMap(_.find(_.LanguageCode == lcid)) orElse
       info.UserLocalizedLabel.toOption

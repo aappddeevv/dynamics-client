@@ -15,11 +15,10 @@ import dynamics.common._
 import dynamics.http._
 import fs2helpers._
 
-
 /**
- * Methods common to clients. Many take alot of parameters in order to allow
- * them to be used in multiple places.
- */
+  * Methods common to clients. Many take alot of parameters in order to allow
+  * them to be used in multiple places.
+  */
 trait ClientMethods extends LazyLogger {
 
   def http: Client[IO]

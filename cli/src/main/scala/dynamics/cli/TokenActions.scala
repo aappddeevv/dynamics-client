@@ -43,7 +43,7 @@ class TokenActions(context: DynamicsContext) extends LazyLogger {
       .take(n)
       .map { ti =>
         println(s"Writing token to file: ${ofile}. ${js.Date()}")
-        writeToFileSync(ofile, JSON.stringify(ti))
+        IOUtils.writeToFileSync(ofile, JSON.stringify(ti))
         1
       }
       .compile

@@ -14,14 +14,17 @@ import JSConverters._
 
 /** FetchXML source of entities. */
 trait FetchXMLQuery extends js.Object {
+
   /** Entity set name. Required for fetch queries. */
   var entitySetName: js.UndefOr[String] = js.undefined
+
   /** fetchXml string in JSON string format. */
   var fetchXML: js.UndefOr[String] = js.undefined
 }
 
 /** OData source of entities. */
 trait ODataQuery extends js.Object {
+
   /** OData query URL. */
   var odata: js.UndefOr[String] = js.undefined
 }
@@ -35,13 +38,13 @@ trait ConnectionJs extends js.Object {
   val _record1roleid_value_for: String = js.native
   @JSName("_record1roleid_value@OData.Community.Display.V1.FormattedValue")
   val _record1roleid_value_fv: String = js.native
-  val _record1roleid_value: String = js.native
+  val _record1roleid_value: String    = js.native
 
   @JSName("_record2roleid_value@OData.Community.Display.V1.FormattedValue")
   val _record2roleid_value_for: String = js.native
   @JSName("_record2roleid_value@OData.Community.Display.V1.FormattedValue")
   val _record2roleid_value_fv: String = js.native
-  val _record2roleid_value: String = js.native
+  val _record2roleid_value: String    = js.native
 
   val _record1id_value: String = js.native
   val _record2id_value: String = js.native
@@ -58,4 +61,3 @@ trait ConnectionJs extends js.Object {
 
   val ismaster: Boolean = js.native
 }
-

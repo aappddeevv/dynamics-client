@@ -160,17 +160,21 @@ object NodeFetchClient extends LazyLogger {
 
   /**
     * Create Client from connection information.
-   * 
+    *
     * @param info Connection information
     * @param debug Temporary parameter to turn debugging on or off in this client.
     * @param defaultHeaders Headers applied to every request.
     */
   def create[F[_]](info: ConnectionInfo,
-    debug: Boolean = false,
-    defaultHeaders: HttpHeaders = HttpHeaders.empty,
-    options: NodeFetchClientOptions = DefaultNodeFetchClientOptions)
-    (implicit ec: ExecutionContext, F: MonadError[F, Throwable], scheduler: Scheduler,
-      PtoF: js.Promise ~> F, IOtoF: IO ~> F, PtoIO: js.Promise ~> IO): Client[F] = {
+                   debug: Boolean = false,
+                   defaultHeaders: HttpHeaders = HttpHeaders.empty,
+                   options: NodeFetchClientOptions = DefaultNodeFetchClientOptions)(
+      implicit ec: ExecutionContext,
+      F: MonadError[F, Throwable],
+      scheduler: Scheduler,
+      PtoF: js.Promise ~> F,
+      IOtoF: IO ~> F,
+      PtoIO: js.Promise ~> IO): Client[F] = {
 
     require(info.dataUrl.isDefined)
     val donothing = F.pure(())
@@ -185,38 +189,38 @@ object NodeFetchClient extends LazyLogger {
       val mergedHeaders: HttpHeaders = defaultHeaders ++ request.headers
       val url                        = (if (!hashttp) base else "") + request.path
       // using body string, call the fetch
-      IOtoF(request.body).flatMap {
-        bodyString =>
-          if (debug) {
-            logger.debug(s"FETCH URL: $url")
-            logger.debug(s"FETCH HTTP REQUEST INPUT: $request")
-            logger.debug(s"FETCH BODY: ${bodyString}")
-            logger.debug("FETCH FINAL HEADERS: " + HttpHeaders.render(mergedHeaders))
-          }
-          val fetchopts = new RequestOptions(
-            body = bodyString,
-            headers = mergedHeaders.mapValues(_.mkString(";")).toJSDictionary,
-            compress = options.compress,
-            timeout = options.timeoutInMillis,
-            method = request.method.name
-          )
-            PtoF(fetch(url, fetchopts)).attempt.flatMap {
-            case Right(r) =>
-              // convert headers as String -> Seq[String] to just String -> String, is this wrong?
-              val headers: HttpHeaders = r.headers.raw().mapValues(_.toSeq).toMap
-              //.asInstanceOf[js.Dictionary[Seq[String]]]
-              val hresp = HttpResponse[F](Status.lookup(r.status), headers, PtoIO(r.text()))
-              val dr    = DisposableResponse(hresp, donothing)
-              if (debug) {
-                logger.debug(s"FETCH RESPONSE: $dr")
-                //println(s"Raw headers: ${Utils.pprint(r.headers.raw2().asInstanceOf[js.Dynamic])}")
-              }
-              F.pure(dr)
-            case Left(e) =>
-              logger.error(s"node-fetch failure: $e")
-              F.raiseError(CommunicationsFailure("node fetch client", Some(e)))
-          }
-      }}
+      IOtoF(request.body).flatMap { bodyString =>
+        if (debug) {
+          logger.debug(s"FETCH URL: $url")
+          logger.debug(s"FETCH HTTP REQUEST INPUT: $request")
+          logger.debug(s"FETCH BODY: ${bodyString}")
+          logger.debug("FETCH FINAL HEADERS: " + HttpHeaders.render(mergedHeaders))
+        }
+        val fetchopts = new RequestOptions(
+          body = bodyString,
+          headers = mergedHeaders.mapValues(_.mkString(";")).toJSDictionary,
+          compress = options.compress,
+          timeout = options.timeoutInMillis,
+          method = request.method.name
+        )
+        PtoF(fetch(url, fetchopts)).attempt.flatMap {
+          case Right(r) =>
+            // convert headers as String -> Seq[String] to just String -> String, is this wrong?
+            val headers: HttpHeaders = r.headers.raw().mapValues(_.toSeq).toMap
+            //.asInstanceOf[js.Dictionary[Seq[String]]]
+            val hresp = HttpResponse[F](Status.lookup(r.status), headers, PtoIO(r.text()))
+            val dr    = DisposableResponse(hresp, donothing)
+            if (debug) {
+              logger.debug(s"FETCH RESPONSE: $dr")
+              //println(s"Raw headers: ${Utils.pprint(r.headers.raw2().asInstanceOf[js.Dynamic])}")
+            }
+            F.pure(dr)
+          case Left(e) =>
+            logger.error(s"node-fetch failure: $e")
+            F.raiseError(CommunicationsFailure("node fetch client", Some(e)))
+        }
+      }
+    }
     Client(svc, donothing)
   }
 }

@@ -42,19 +42,19 @@ object AltId {
 
 case class DynamicsOptions(
     /** Prefer OData options. */
-  override val prefers: client.common.headers.PreferOptions = client.common.headers.DefaultPreferOptions,
-  /** Some operations take a version tag ("etag"). */
-  override  val version: Option[String] = None,
+    override val prefers: client.common.headers.PreferOptions = client.common.headers.DefaultPreferOptions,
+    /** Some operations take a version tag ("etag"). */
+    override val version: Option[String] = None,
     /** User GUID for MSCRMCallerId */
-  override val user: Option[String] = None,
+    override val user: Option[String] = None,
     /**
       * Controls the use of `version` in some request scenarios.
       * DELETE + version => If-Match: version, delete succeeds if etag matches (204), fails otherwise (412).
       * PATCH (update) + version => If-Match: version, update succeeds if etag matches (204), fails otherwise (412)
       */
-  override val applyOptimisticConcurrency: Option[Boolean] = None,
-  /** Supress duplicate detection. */
-  suppressDuplicateDetection: Boolean = false,
+    override val applyOptimisticConcurrency: Option[Boolean] = None,
+    /** Supress duplicate detection. */
+    suppressDuplicateDetection: Boolean = false,
 ) extends client.common.ClientOptions
 
 /**
@@ -67,7 +67,7 @@ case class DynamicsOptions(
   * possible to have cases here this client's API is insufficient for your OData
   * url and you need to go one level deeper e.g. getOne is navigating to a
   * collection valued property and the "array" is in the "value" fieldname.
- * 
+  *
   *
   * You must make sure you have a `MonadError[IO, Throwable]` in implicit scope
   * when you create the client.  If you need to you can always `val ehandler =
@@ -92,8 +92,8 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   def responseToFailedTask[A](resp: HttpResponse[IO], msg: String, req: Option[HttpRequest[IO]]): IO[A] = {
     resp.body.flatMap { body =>
       logger.debug(s"ERROR: ${resp.status}: RESPONSE BODY: $body")
-      val statuserror                       = Option(UnexpectedStatus(resp.status, request = req, response = Option(resp)))
-      val json                              = js.JSON.parse(body)
+      val statuserror                            = Option(UnexpectedStatus(resp.status, request = req, response = Option(resp)))
+      val json                                   = js.JSON.parse(body)
       val dynamicserror: Option[DynamicsErrorJS] = findDynamicsError(json)
       val derror =
         dynamicserror.map(e => DynamicsClientError(msg, Some(DynamicsServerError(e)), statuserror, resp.status))
@@ -129,10 +129,10 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
 
   //private val reg = """[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}""".r
 
-  /** 
-   * Update a single property, return the id updated.
+  /**
+    * Update a single property, return the id updated.
 @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/webapi/update-delete-entities-using-web-api?view=dynamics-ce-odata-9
-   */
+    */
   def updateOneProperty(entitySet: String,
                         id: String,
                         property: String,
@@ -149,21 +149,23 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   }
 
   /**
-   * @deprecated
-   */
-  def batch[R](r: HttpRequest[IO], m: Multipart)(implicit e: EntityEncoder[ Multipart], d: EntityDecoder[IO, R]): IO[R] =
-    batch(m,r.headers)(e, d)
+    * @deprecated
+    */
+  def batch[R](r: HttpRequest[IO], m: Multipart)(implicit e: EntityEncoder[Multipart], d: EntityDecoder[IO, R]): IO[R] =
+    batch(m, r.headers)(e, d)
 
-  /** 
-   * Run a batch request. Dynamics batch requests are POSTs. 
-   * @param headers Headers for the post. *not* for each request.
-   * @param opts dynamics options such as "prefer"
-   */
-  def batch[R](m: Multipart, headers: HttpHeaders = HttpHeaders.empty,
-    opts: DynamicsOptions = QuietDynamicsOptions)(implicit e: EntityEncoder[ Multipart], d: EntityDecoder[IO,R]): IO[R] = {
+  /**
+    * Run a batch request. Dynamics batch requests are POSTs.
+    * @param headers Headers for the post. *not* for each request.
+    * @param opts dynamics options such as "prefer"
+    */
+  def batch[R](m: Multipart, headers: HttpHeaders = HttpHeaders.empty, opts: DynamicsOptions = QuietDynamicsOptions)(
+      implicit e: EntityEncoder[Multipart],
+      d: EntityDecoder[IO, R]): IO[R] = {
     import OData._
     val (mrendered, xtra) = e.encode(m)
-    val therequest        = HttpRequest[IO](Method.POST, "/$batch", headers = headers ++ toHeaders(opts) ++ xtra, body = mrendered)
+    val therequest =
+      HttpRequest[IO](Method.POST, "/$batch", headers = headers ++ toHeaders(opts) ++ xtra, body = mrendered)
     http.fetch[R](therequest) {
       case Status.Successful(resp) => resp.as[R]
       case failedResponse =>
@@ -177,12 +179,13 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     *
     */
   def update[B](entitySet: String,
-             id: String,
-             body: B,
-             upsertPreventCreate: Boolean = true,
-             upsertPreventUpdate: Boolean = false,
-             opts: DynamicsOptions = DefaultDynamicsOptions)(implicit e: EntityEncoder[B]): IO[String] = {
-    val request = mkUpdateRequest[IO,B](entitySet, id, body, upsertPreventCreate, upsertPreventUpdate, opts, Some(base))
+                id: String,
+                body: B,
+                upsertPreventCreate: Boolean = true,
+                upsertPreventUpdate: Boolean = false,
+                opts: DynamicsOptions = DefaultDynamicsOptions)(implicit e: EntityEncoder[B]): IO[String] = {
+    val request =
+      mkUpdateRequest[IO, B](entitySet, id, body, upsertPreventCreate, upsertPreventUpdate, opts, Some(base))
     //HttpRequest(Method.PATCH, s"/$entitySet($id)", body = Entity.fromString(body), headers = toHeaders(opts) ++ h )
     http.fetch[String](request) {
       case Status.Successful(resp) => IO.pure(id)
@@ -194,10 +197,8 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   /** Create an entity and expect only its id returned. includeRepresentation is set to an explicit
     * false in the headers to ensure the id is returend in the header.
     */
-  def createReturnId[B](entityCollection: String,
-                     body: B,
-    opts: DynamicsOptions = DefaultDynamicsOptions)
-    (implicit e: EntityEncoder[B]): IO[String] = {
+  def createReturnId[B](entityCollection: String, body: B, opts: DynamicsOptions = DefaultDynamicsOptions)(
+      implicit e: EntityEncoder[B]): IO[String] = {
     val newOpts = opts.copy(prefers = opts.prefers.copy(includeRepresentation = Some(false)))
     create(entityCollection, body, newOpts)(e, ReturnedIdDecoder)
   }
@@ -205,8 +206,9 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   /** Create an entity. If return=representation then the decoder can decode the body with entity content.
     * You can return an id or body from this function.
     */
-  def create[B,R](entitySet: String, body: B, opts: DynamicsOptions = DefaultDynamicsOptions)
-    (implicit e: EntityEncoder[B], d: EntityDecoder[IO, R]): IO[R] = {
+  def create[B, R](entitySet: String, body: B, opts: DynamicsOptions = DefaultDynamicsOptions)(
+      implicit e: EntityEncoder[B],
+      d: EntityDecoder[IO, R]): IO[R] = {
     //val request = HttpRequest(Method.POST, s"/$entitySet", body=Entity.fromString(body), headers=toHeaders(opts))
     val request = mkCreateRequest[IO, B](entitySet, body, opts)
     http.fetch(request) {
@@ -237,15 +239,15 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
   }
 
   /**
-    * Execute an action. Can be bound or unbound depending on entityCollectionAndId
+    * Execute an action. Can be bound or unbound depending on entityCollectionAndId. Action
+    * name may be prefixed with a namespace like `Microsoft.Dynamics.CRM`.
     *
     * TODO: Map into a http.expect.
     */
   def executeAction[A](action: String,
                        body: Entity,
                        entitySetAndId: Option[(String, String)] = None,
-    opts: DynamicsOptions = DefaultDynamicsOptions)
-    (implicit d: EntityDecoder[IO, A]): IO[A] = {
+                       opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[IO, A]): IO[A] = {
     val request = mkExecuteActionRequest[IO](action, body, entitySetAndId, opts)
     http.fetch(request) {
       case Status.Successful(resp) => resp.as[A]
@@ -264,8 +266,7 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     */
   def executeFunction[A](function: String,
                          parameters: Map[String, scala.Any] = Map.empty,
-    entity: Option[(String, String)] = None)
-    (implicit d: EntityDecoder[IO,A]): IO[A] = {
+                         entity: Option[(String, String)] = None)(implicit d: EntityDecoder[IO, A]): IO[A] = {
     val req = mkExecuteFunctionRequest[IO](function, parameters, entity)
     http.expect(req)(d)
   }
@@ -313,10 +314,13 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     * it in id--you should know ahead of time.
     *
     * Allow you to specify a queryspec somehow as well.
+    *
+    * @todo Return an Option?
     */
-  def getOneWithKey[A](entitySet: String, keyInfo: DynamicsId,
-    attributes: Seq[String] = Nil, opts: DynamicsOptions = DefaultDynamicsOptions)
-    (implicit d: EntityDecoder[IO, A]): IO[A] = {
+  def getOneWithKey[A](entitySet: String,
+                       keyInfo: DynamicsId,
+                       attributes: Seq[String] = Nil,
+                       opts: DynamicsOptions = DefaultDynamicsOptions)(implicit d: EntityDecoder[IO, A]): IO[A] = {
     val q = QuerySpec(select = attributes)
     getOne(q.url(s"/$entitySet(${keyInfo.render()})"), opts)(d)
   }
@@ -328,17 +332,19 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     * If you use a URL that returns a OData response with a `value` array that
     * needs be automatically extracted, you need to use an explict EntityDecoder
     * that first looks for that array then obtains your `A`. See
-    * `EntityDecoder.ValueWrapper` for an example.  You often use this pattern
+    * `EntityDecoder.ValueWrapper` for an example.
+    *
+    * You also use this pattern
     * when employing `getOne` to obtain related records in a 1:M navigation
     * property e.g. a single entity's set of connections or some child
     * entity. In this case, your URL will typically have an "expand" segment.
-    * Note that if you navigate to a simple attribute, then it is return as a
+    * Note that if you navigate to a simple attribute, then it is returned as a
     * simple object also attached to "value" so choose your decoder wisely.
-   * 
-   * @todo This should really return an optional value
+    *
+    * @todo Return an Option?
     */
-  def getOne[A](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)
-    (implicit d: EntityDecoder[IO,A]): IO[A] = {
+  def getOne[A](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(
+      implicit d: EntityDecoder[IO, A]): IO[A] = {
     val request = HttpRequest[IO](Method.GET, url, headers = toHeaders(opts))
     http.fetch(request) {
       case Status.Successful(resp) => resp.as[A]
@@ -352,8 +358,8 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     * results into memory. Prefer [[getListStream]]. For now, the caller must
     * decode external to this method. The url is typically created from a
     * QuerySpec.
-   * 
-   * @see getListStream
+    *
+    * @see getListStream
     */
   def getList[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(): IO[Seq[A]] =
     _getListStream[A](url, toHeaders(opts)).compile.toVector

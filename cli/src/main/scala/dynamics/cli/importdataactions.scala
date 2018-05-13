@@ -86,7 +86,7 @@ class ImportDataActions(val context: DynamicsContext) {
   def reportErrors(importfileid: String) =
     dynclient.getList[ImportLogJS](s"/importlogs?$$filter=importfileid/importfileid eq $importfileid").map { i =>
       println("TODO: Make this a table.")
-      println(s"${Utils.render(i)}")
+      println(s"${IOUtils.render(i)}")
     }
 
   val ProcessingStatus = Map(
@@ -110,12 +110,12 @@ class ImportDataActions(val context: DynamicsContext) {
       val path          = config.importdata.importDataInputFile
       val importmapname = config.importdata.importDataImportMapName
       val name =
-        config.importdata.importDataName.getOrElse(Utils.filename(path).get) + " using " + importmapname
+        config.importdata.importDataName.getOrElse(IOUtils.filename(path).get) + " using " + importmapname
       println(s"Import job name: [$name]")
 
-      val filename = Utils.namepart(path)
+      val filename = IOUtils.namepart(path)
 
-      val ftype     = Utils.extension(path)
+      val ftype     = IOUtils.extension(path)
       val ftypeint  = ftype.map(ext => FileType.extToInt(ext.toLowerCase)).getOrElse(FileType.csv)
       val modecode  = if (config.importdata.importDataCreate) ModeCode.Create else ModeCode.Update
       val importRec = new ImportJson(s"$name", modecode = modecode)
@@ -125,7 +125,7 @@ class ImportDataActions(val context: DynamicsContext) {
       //   new TestJS(name = "blah")
       // }
 
-      if (!Utils.fexists(path))
+      if (!IOUtils.fexists(path))
         IO(println(s"File $path is not accessible for importing."))
       else
         lift {
@@ -145,7 +145,7 @@ class ImportDataActions(val context: DynamicsContext) {
 
           //val x = new TestJS(name = "blah")
 
-          val content        = Utils.slurp(path)
+          val content        = IOUtils.slurp(path)
           val recordsOwnerId = config.importdata.recordsOwnerId.getOrElse(whoami.UserId)
           val importfile = new ImportFileJson {
             name = s"$name import"

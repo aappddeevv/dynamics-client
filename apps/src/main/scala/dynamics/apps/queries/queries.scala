@@ -11,8 +11,10 @@ import dynamics.common.implicits._
 
 package object queries {
 
-  def mkIdentifierExtractor[A <: js.Object](idName: String, nameName: String,
-    altId: String="<no id>", altName: String = "<no name>"): A => FriendlyIdentifier =
+  def mkIdentifierExtractor[A <: js.Object](idName: String,
+                                            nameName: String,
+                                            altId: String = "<no id>",
+                                            altName: String = "<no name>"): A => FriendlyIdentifier =
     obj => {
       val d = obj.asDict[js.Any]
       FriendlyIdentifier(
@@ -22,12 +24,12 @@ package object queries {
     }
 
   /** Break out the | to either. */
-  implicit class EitherQuery(query: ODataQuery|FetchXMLQuery) {
+  implicit class EitherQuery(query: ODataQuery | FetchXMLQuery) {
     def toEither(): Either[FetchXMLQuery, ODataQuery] = {
       query match {
         case q if query.merge[js.Object].hasOwnProperty("fetchXML") => Left(q.asInstanceOf[FetchXMLQuery])
-        case q if query.merge[js.Object].hasOwnProperty("odata") => Right(q.asInstanceOf[ODataQuery])
-      }}}
+        case q if query.merge[js.Object].hasOwnProperty("odata")    => Right(q.asInstanceOf[ODataQuery])
+      }
+    }
+  }
 }
-
-

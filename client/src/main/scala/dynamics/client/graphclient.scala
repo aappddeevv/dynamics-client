@@ -17,18 +17,21 @@ import dynamics.common._
 import dynamics.http._
 import dynamics.client.common._
 
-/** 
- * Microsoft Graph specific client
- */
-case class GraphClient(http: Client[IO], private val connectInfo: ConnectionInfo)
-  (implicit F: ApplicativeError[IO,Throwable], ec: ExecutionContext)
-    extends LazyLogger with DynamicsClientRequests with ClientMethods {
+/**
+  * Microsoft Graph specific client
+  */
+case class GraphClient(http: Client[IO], private val connectInfo: ConnectionInfo)(
+    implicit F: ApplicativeError[IO, Throwable],
+    ec: ExecutionContext)
+    extends LazyLogger
+    with DynamicsClientRequests
+    with ClientMethods {
 
   def responseToFailedTask[A](resp: HttpResponse[IO], msg: String, req: Option[HttpRequest[IO]]): IO[A] = {
     resp.body.flatMap { body =>
       logger.debug(s"ERROR: ${resp.status}: RESPONSE BODY: $body")
-      val statuserror                       = Option(UnexpectedStatus(resp.status, request = req, response = Option(resp)))
-      val json                              = js.JSON.parse(body)
+      val statuserror                         = Option(UnexpectedStatus(resp.status, request = req, response = Option(resp)))
+      val json                                = js.JSON.parse(body)
       val dynamicserror: Option[GraphErrorJS] = findGraphError(json)
       val derror =
         dynamicserror.map(e => GraphClientError(msg, Some(GraphServerError(e)), statuserror, resp.status))
@@ -37,6 +40,7 @@ case class GraphClient(http: Client[IO], private val connectInfo: ConnectionInfo
       F.raiseError((derror orElse simpleerror orElse fallback).get)
     }
   }
+
   /**
     * Not sure when this might apply. Do we get errors where the error property
     * is embedded on a Message (capital?) field?
@@ -53,15 +57,14 @@ case class GraphClient(http: Client[IO], private val connectInfo: ConnectionInfo
     } else None
   }
 
-
-    def getList[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(): IO[Seq[A]] =
-    _getListStream[A](url, HttpHeaders.empty /*toHeaders(opts)*/).compile.toVector
+  def getList[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions)(): IO[Seq[A]] =
+    _getListStream[A](url, HttpHeaders.empty /*toHeaders(opts)*/ ).compile.toVector
 
   /**
     * Get a list of values as a stream. Follows @odata.nextLink. For now, the
     * caller must decode external to this method.
     */
   def getListStream[A <: js.Any](url: String, opts: DynamicsOptions = DefaultDynamicsOptions): Stream[IO, A] =
-    _getListStream[A](url, HttpHeaders.empty /*toHeaders(opts)*/)
+    _getListStream[A](url, HttpHeaders.empty /*toHeaders(opts)*/ )
 
 }

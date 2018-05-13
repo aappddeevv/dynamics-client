@@ -8,8 +8,6 @@ package cli
 import scala.scalajs.js
 import js._
 import annotation._
-
-
 @js.native
 @JSImport("shorthash", JSImport.Namespace)
 object ShortHash extends js.Object {

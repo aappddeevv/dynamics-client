@@ -50,8 +50,8 @@ class PoolOptions(
 @JSImport("mssql", JSImport.Namespace)
 object MSSQL extends js.Object with IEventEmitter {
   def connect(config: js.Dynamic | RawOptions | String | MSSQLConfig): js.Promise[ConnectionPool] = js.native
-  def Request(): Request                                                             = js.native
-  def ConnectionPool(options: js.UndefOr[PoolOptions | RawOptions]): ConnectionPool  = js.native
+  def Request(): Request                                                                          = js.native
+  def ConnectionPool(options: js.UndefOr[PoolOptions | RawOptions]): ConnectionPool               = js.native
 }
 
 @js.native

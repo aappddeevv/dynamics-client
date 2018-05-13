@@ -19,8 +19,8 @@ import dynamics.http._
 
 @js.native
 trait ODataErrorJS extends js.Object {
-  val code: js.UndefOr[String]                = js.undefined
-  val message: js.UndefOr[String]             = js.undefined
+  val code: js.UndefOr[String]    = js.undefined
+  val message: js.UndefOr[String] = js.undefined
 }
 
 /**
@@ -33,7 +33,7 @@ trait DynamicsErrorJS extends ODataErrorJS {
 }
 
 /**
- * Dynamics related inner error.
+  * Dynamics related inner error.
   * See https://msdn.microsoft.com/en-us/library/mt770385.aspx
   */
 @js.native
@@ -48,7 +48,6 @@ trait ServerError {
   def code: String
   def message: String
 }
-
 
 case class InnerError(etype: String, message: String, stacktrace: String)
 case class DynamicsServerError(code: String, message: String, innererror: Option[InnerError] = None) extends ServerError

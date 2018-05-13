@@ -27,92 +27,110 @@ import dynamics.client.implicits._
 import dynamics.client.crmqueryfunctions._
 import http.instances.entitydecoder.ValueArrayDecoder
 
-case class RelatedEntity(
-  ename: String, esname: String, objectTypeCode: Int,
-  roleName: String, roleId: apps.Id,
-  id: apps.Id)
+case class RelatedEntity(ename: String,
+                         esname: String,
+                         objectTypeCode: Int,
+                         roleName: String,
+                         roleId: apps.Id,
+                         id: apps.Id)
 
 /**
- * Used when we need to print out information about a record. Think of this as
- * a generic annotation.
- */
+  * Used when we need to print out information about a record. Think of this as
+  * a generic annotation.
+  */
 case class FriendlyIdentifier(id: String, name: String)
 
-class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int = 4, verbosity: Int = 0)
-  (implicit ec: ExecutionContext) {
+class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int = 4, verbosity: Int = 0)(
+    implicit ec: ExecutionContext) {
 
   /** Get application uniquename -> id for creating URLs. */
   def getAppMapping(): IO[js.Object] = {
     val q = QuerySpec(
-      select = Seq("name", "uniquename","appmoduleid")
+      select = Seq("name", "uniquename", "appmoduleid")
     )
-    dynclient.getList[AppModule](q.url("appmodules"))
-      .map{ apps =>
+    dynclient
+      .getList[AppModule](q.url("appmodules"))
+      .map { apps =>
         apps.map(a => (a.uniquename.get, a.appmoduleid.get)).toMap.toJSDictionary.asJsObj
       }
   }
 
-    /**
-   * Fetch entities (from record2) that match the specified record2 entity
-   * logical names and roles.
-   * @return record2 derived fat tuples (entity name, entity object type code, role name, role id, entity id)
-   * @todo fromEntitySet is not technically needed for the query if we have an id
-   */
+  /**
+    * Fetch entities (from record2) that match the specified record2 entity
+    * logical names and roles.
+    * @return record2 derived fat tuples (entity name, entity object type code, role name, role id, entity id)
+    * @todo fromEntitySet is not technically needed for the query if we have an id
+    */
   def entitiesFromConnectionsUsingNames(fromEntityId: apps.Id,
-    toEntityNames: Traversable[String] = Nil, toRoleNames: Traversable[String] = Nil): IO[Seq[RelatedEntity]] = {
+                                        toEntityNames: Traversable[String] = Nil,
+                                        toRoleNames: Traversable[String] = Nil): IO[Seq[RelatedEntity]] = {
     val params = for {
       codes <- toEntityNames.map(m.objectTypeCode(_)).toList.sequence
       roles <- toRoleNames.map(m.connectionRole(_).map(_.map(_.connectionroleid))).toList.sequence
     } yield (codes, roles)
 
-    params.flatMap{ case (codes, roles) =>
-      entitiesFromConnections(fromEntityId,
-        codes.collect{case Some(c) => c },
-        roles.collect{case Some(r) => apps.Id(r)})
+    params.flatMap {
+      case (codes, roles) =>
+        entitiesFromConnections(fromEntityId, codes.collect { case Some(c) => c }, roles.collect {
+          case Some(r)                                                     => apps.Id(r)
+        })
     }
   }
 
   def entitiesFromConnections(fromEntityId: apps.Id,
-    toCodes: Traversable[Int] = Nil, toRoleIds: Traversable[apps.Id] = Nil): IO[Seq[RelatedEntity]] = {
+                              toCodes: Traversable[Int] = Nil,
+                              toRoleIds: Traversable[apps.Id] = Nil): IO[Seq[RelatedEntity]] = {
     val codesq =
-      if(!toCodes.isEmpty) "and " + In("record2objecttypecode", toCodes.map(_.toString))
+      if (!toCodes.isEmpty) "and " + In("record2objecttypecode", toCodes.map(_.toString))
       else ""
     val rolesq =
-      if(!toRoleIds.isEmpty) "and " + In("record2roleid", toRoleIds.map(_.asString)) // not _record2roleid_value!
+      if (!toRoleIds.isEmpty) "and " + In("record2roleid", toRoleIds.map(_.asString)) // not _record2roleid_value!
       else ""
     val q = QuerySpec(
-      filter=Some(s"""_record1id_value eq $fromEntityId $codesq $rolesq"""),
+      filter = Some(s"""_record1id_value eq $fromEntityId $codesq $rolesq"""),
     )
-    dynclient.getListStream[ConnectionJs](q.url("connections"))
+    dynclient
+      .getListStream[ConnectionJs](q.url("connections"))
       .map { c =>
-        m.entitySetName(c._record2id_entityname).map(_.map{ esname =>
-          RelatedEntity(
-            c._record2id_entityname, esname, c.record2objecttypecode,
-            c._record2roleid_value_fv, apps.Id(c._record2roleid_value),
-            apps.Id(c._record2id_value)
-          )})
+        m.entitySetName(c._record2id_entityname)
+          .map(_.map { esname =>
+            RelatedEntity(
+              c._record2id_entityname,
+              esname,
+              c.record2objecttypecode,
+              c._record2roleid_value_fv,
+              apps.Id(c._record2roleid_value),
+              apps.Id(c._record2id_value)
+            )
+          })
       }
       .map(Stream.eval(_))
       .join(concurrency)
-      .collect{ case Some(e) => e }
-      .compile.toVector
+      .collect { case Some(e) => e }
+      .compile
+      .toVector
   }
 
   /**
-   * Return systemmusers that have systemuser connections to the specified
-   * entity. record1=entity, record2=sysemusers connected via he record2roleids
-   * list.
-   */
-  def systemusersFromConnections(entitySet: String, entityId: apps.Id, record2roleids: Seq[String]): IO[Seq[SystemuserJS]] = {
+    * Return systemmusers that have systemuser connections to the specified
+    * entity. record1=entity, record2=sysemusers connected via he record2roleids
+    * list.
+    */
+  def systemusersFromConnections(entitySet: String,
+                                 entityId: apps.Id,
+                                 record2roleids: Seq[String]): IO[Seq[SystemuserJS]] = {
     val q = QuerySpec(
-      filter=Some(s"""_record1id_value eq $entityId"""),
-      expand=Seq(Expand("record2_systemuser"))
+      filter = Some(s"""_record1id_value eq $entityId"""),
+      expand = Seq(Expand("record2_systemuser"))
     )
-    dynclient.getList[ConnectionJs](q.url("connections"))
-      .map{ _.map { c =>
-        if(c.asDyn.record2id_systemuser.toTruthy) c.asDyn.record2id_systemuser.toNonNullOption[SystemuserJS]
-        else None
-      }.collect{ case Some(id) => id }}
+    dynclient
+      .getList[ConnectionJs](q.url("connections"))
+      .map {
+        _.map { c =>
+          if (c.asDyn.record2id_systemuser.toTruthy) c.asDyn.record2id_systemuser.toNonNullOption[SystemuserJS]
+          else None
+        }.collect { case Some(id) => id }
+      }
   }
 
   /** Fetch email address from dynamics systemuser record. */
@@ -128,26 +146,26 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
     fetchSystemuser(id)
       .map { user =>
         //if(user.isemailaddressapprovedbyo365admin && !user.isdisabled) Some(user)
-        if(!user.isdisabled && user.islicensed) Some(user)
+        if (!user.isdisabled && user.islicensed) Some(user)
         else Option.empty
       }
 
   /**
-   * Given an entity id, find its owner. If the owner is a team,
-   * retrieve those systemusers. If errors occur along the way,
-   * ignore them and return Nil as appropriate.
-   */
+    * Given an entity id, find its owner. If the owner is a team,
+    * retrieve those systemusers. If errors occur along the way,
+    * ignore them and return Nil as appropriate.
+    */
 //  def fetchOwnerUserOrTeam(esname: String, id: apps.Id): IO[Seq[String]] = {
 //    dynclient.getOne()
 //  }
 
   def fetchTeamSystemuserIds(teamId: apps.Id): IO[Seq[String]] = {
     val q = QuerySpec(
-      select=Seq("systemuserid"),
-      properties=Seq(NavProperty("teammembership_association"))
+      select = Seq("systemuserid"),
+      properties = Seq(NavProperty("teammembership_association"))
     )
-    dynclient.getOne[js.Array[SystemuserJS]](q.url("teams", Some(teamId.asString)))(
-      ValueArrayDecoder[SystemuserJS])
+    dynclient
+      .getOne[js.Array[SystemuserJS]](q.url("teams", Some(teamId.asString)))(ValueArrayDecoder[SystemuserJS])
       .map(_.map(_.systemuserid).toSeq)
   }
 

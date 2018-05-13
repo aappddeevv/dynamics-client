@@ -61,7 +61,7 @@ class LoadAddressesActions(val context: DynamicsContext) {
     */
   def dbStream(query: String, dbConfigFile: String) = {
     //println(s"query: $query, cfile: $dbConfigFile")
-    val cinfo = JSON.parse(Utils.slurp(dbConfigFile))
+    val cinfo = JSON.parse(IOUtils.slurp(dbConfigFile))
     MSSQLSource(query, cinfo.asJsObj, 10000)
   }
 
@@ -110,7 +110,7 @@ class LoadAddressesActions(val context: DynamicsContext) {
   val loadAddresses = Action { config =>
     val src: Stream[IO, js.Object] = cats
       .Applicative[Option]
-      .map2(config.etl.query orElse config.etl.queryFile.map(Utils.slurp(_)), config.etl.connectionFile)(dbStream _)
+      .map2(config.etl.query orElse config.etl.queryFile.map(IOUtils.slurp(_)), config.etl.connectionFile)(dbStream _)
       .getOrElse(Stream.empty)
     val counter   = new java.util.concurrent.atomic.AtomicInteger(0)
     val xf        = xform(config.etl.cliParameters)
@@ -123,7 +123,7 @@ class LoadAddressesActions(val context: DynamicsContext) {
         val id      = jobj._1
         val records = jobj._2
         if (config.etl.verbosity > 0)
-          println(s"parentid: ${id}, records: ${records.map(r => Utils.render(r))}")
+          println(s"parentid: ${id}, records: ${records.map(r => IOUtils.render(r))}")
         counter.getAndAdd(records.length)
         // First two already exist and are updates else inserts
         val updates = records.take(2).zipWithIndex.map { addr =>

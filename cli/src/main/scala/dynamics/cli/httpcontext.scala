@@ -19,8 +19,8 @@ import dynamics.common.instances.io._
 import dynamics.common.instances.jsPromise._
 
 /**
- * General HTTP context that is not dynamics specific. 
- */
+  * General HTTP context that is not dynamics specific.
+  */
 trait HTTPContext extends Context[IO] {
   def LCID: Int
   implicit val client: http.Client[IO]
@@ -39,14 +39,14 @@ object HTTPContext {
   def default(config: AppConfig)(implicit ec: ExecutionContext, F: MonadError[IO, Throwable]): HTTPContext =
     new HTTPContext {
       import dynamics.client._
-      val LCID = config.common.lcid
+      val LCID         = config.common.lcid
       implicit val e   = ec
       implicit val sch = Scheduler.default
-      implicit val t = IO.timerGlobal
+      implicit val t   = IO.timerGlobal
 
-      private val retryPolicyMiddleware = makePolicy(config.common)
+      private val retryPolicyMiddleware      = makePolicy(config.common)
       private val middleware: Middleware[IO] = makeAuthMiddleware(config.common)(sch, e) andThen retryPolicyMiddleware
-      implicit val client: Client[IO] =  middleware(makeHTTPClient(config.common)(e, F, sch))
+      implicit val client: Client[IO]        = middleware(makeHTTPClient(config.common)(e, F, sch))
 
       def close() = client.dispose
 

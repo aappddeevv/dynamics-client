@@ -1,6 +1,9 @@
 import scala.sys.process._
 
 resolvers += Resolver.sonatypeRepo("releases")
+//resolvers += Resolver.sonatypeRepo("snapshots")
+resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+resolvers += Resolver.typesafeRepo("snapshots")
 resolvers += Resolver.bintrayRepo("softprops", "maven") // for retry
 resolvers += Resolver.bintrayRepo("scalameta", "maven") // for latset scalafmt
 resolvers += Resolver.jcenterRepo
@@ -9,8 +12,6 @@ resolvers += Resolver.jcenterRepo
 //scalaJSLinkerConfig ~= {_.withModuleKind(ModuleKind.CommonJSModule) }
 
 autoCompilerPlugins := true
-
-//scalafmtVersion in ThisBuild := "1.3.0" // all projects
 
 lazy val licenseSettings = Seq(
   headerMappings := headerMappings.value +
@@ -25,8 +26,10 @@ lazy val licenseSettings = Seq(
 lazy val buildSettings = Seq(
   organization := "com.github.aappddeevv.dynamics",
   licenses ++= Seq(("MIT", url("http://opensource.org/licenses/MIT"))),
+
   scalaVersion := "2.12.4",
-  scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true)))
+  scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
+  scalafmtVersion in ThisBuild := "1.5.1",    
 ) ++ licenseSettings
 
 lazy val noPublishSettings = Seq(
@@ -69,6 +72,14 @@ lazy val common = project
   .settings(name := "dynamics-client-common")
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
+lazy val commonio = project
+  .settings(dynamicsSettings)
+  .settings(description := "Common components that involve IO (server based).")
+  .settings(libraryDependencies ++= Dependencies.monadlessDependencies.value)
+  .settings(name := "dynamics-client-common-io")
+  .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
+  .dependsOn(common)
+
 lazy val apps = project
   .settings(dynamicsSettings)
   .settings(description := "CLI application frameworks")
@@ -76,7 +87,7 @@ lazy val apps = project
   .settings(libraryDependencies ++= Dependencies.appDependencies.value)
   .settings(name := "dynamics-client-apps")
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
-  .dependsOn(cli,client,common,http)
+  .dependsOn(cli,client,common,http,commonio)
 
 lazy val clientcommon = project
   .settings(dynamicsSettings)
@@ -91,7 +102,7 @@ lazy val etl = project
   .settings(name := "dynamics-client-etl")
   .settings(description := "ETL support")
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
-  .dependsOn(common, client, http)
+  .dependsOn(common, commonio, client, http)
 
 lazy val http = project
   .settings(dynamicsSettings)
@@ -111,7 +122,8 @@ lazy val client = project
   .settings(dynamicsSettings)
   .settings(name := "dynamics-client-clients")
   .settings(description := "dynamics client")
-  .dependsOn(http, clientcommon, common)
+  // need to get rid of dependency on commoni
+  .dependsOn(http, clientcommon, common, commonio)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val cli = project
@@ -120,7 +132,7 @@ lazy val cli = project
   .settings(description := "common CLI client infrastructure")
   .settings(libraryDependencies ++=
     Dependencies.cliDependencies.value ++ Dependencies.monadlessDependencies.value)
-  .dependsOn(client, etl, adal)
+  .dependsOn(client, etl, adal, commonio)
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin, BuildInfoPlugin)
   .settings(
     unmanagedResourceDirectories in Compile += baseDirectory.value / "cli/src/main/js",
@@ -138,7 +150,7 @@ lazy val `cli-main` = project
     scalaJSUseMainModuleInitializer := true,
     mainClass in Compile := Some("dynamics.cli.Main"),
   )
-  .dependsOn(cli) 
+  .dependsOn(cli, commonio) 
   .enablePlugins(ScalaJSPlugin, AutomateHeaderPlugin)
 
 lazy val docs = project

@@ -49,8 +49,8 @@ class SettingsActions(context: DynamicsContext) extends LazyLogger {
   def post() = Action { config =>
     val settingsFileOpt = config.settings.settingsFile orElse Some(defaultSettingsFile)
     settingsFileOpt match {
-      case Some(settingsFile) if (Utils.fexists(settingsFile)) =>
-        val body = JSON.parse(Utils.slurp(settingsFile))
+      case Some(settingsFile) if (IOUtils.fexists(settingsFile)) =>
+        val body = JSON.parse(IOUtils.slurp(settingsFile))
         val nameOpt =
           if (js.DynamicImplicits.truthValue(body.name)) {
             // remove it from the json
@@ -116,7 +116,7 @@ class SettingsActions(context: DynamicsContext) extends LazyLogger {
     dynclient
       .getList[OrganizationJS](qopts.url("organizations"))
       .map { list =>
-        list.foreach(org => println(Utils.render(org)))
+        list.foreach(org => println(IOUtils.render(org)))
       }
   }
 

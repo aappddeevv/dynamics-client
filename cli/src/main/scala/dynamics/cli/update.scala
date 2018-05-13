@@ -58,7 +58,7 @@ class UpdateActions(val context: DynamicsContext) {
   val test = Action { config =>
     val items = JSONFileSource[js.Object]("test.json")
     val process = items.map { item =>
-      println(s"item: ${Utils.render(item)}")
+      println(s"item: ${IOUtils.render(item)}")
     }
 
     IO(println("json streaming test"))

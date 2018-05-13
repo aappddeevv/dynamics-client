@@ -96,7 +96,7 @@ class PluginActions(val context: DynamicsContext) {
 
   def runOnce(src: Option[String]) = {
     val source = src.getOrElse("")
-    val pname  = Utils.namepart(source).getOrElse(source)
+    val pname  = IOUtils.namepart(source).getOrElse(source)
     lift {
       println(s"Update assembly ${pname} content from contents of ${source}.")
       unlift(getByName(pname)) match {

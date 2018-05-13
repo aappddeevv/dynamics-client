@@ -23,13 +23,13 @@ import dynamics.common._
   */
 trait MessageOps[F[_]] extends Any {
 
-  /** Attempt to decode the body given an implicit decoder. */
+  /** Decode the body given an implicit decoder to a DecodeResult. */
   def attemptAs[T](implicit F: FlatMap[F], decoder: EntityDecoder[F, T]): DecodeResult[F, T]
 
   /**
-    * Obtain the body as a specific type inside the effect.  A decode exception
-    * is translated into a failed effect. If the DecodeResult was already failed,
-    * that failure is kept.
+    * Decode the body to specific type inside an effect. A decode exception is
+    * translated into a failed effect. If the DecodeResult was already failed,
+    * that failure is kept. This is just one way to handle the DecodeResult.
     */
   final def as[T](implicit F: FlatMap[F], decoder: EntityDecoder[F, T]): F[T] =
     //attemptAs(decoder).fold(F.raiseError(_), _.pure[F]).flatten
@@ -93,12 +93,11 @@ trait MethodInstances {
   implicit val showForMethod: Show[Method] = Show.fromToString
 }
 
-
 /** A low-level request. */
 case class HttpRequest[F[_]](method: Method,
-                       path: String,
-                       headers: HttpHeaders = HttpHeaders.empty,
-                       body: Entity = Entity.empty)
+                             path: String,
+                             headers: HttpHeaders = HttpHeaders.empty,
+                             body: Entity = Entity.empty)
     extends Message[F]
 
 /** A low-level response. */
@@ -108,21 +107,25 @@ case class HttpResponse[F[_]](status: Status, headers: HttpHeaders, body: Entity
   * A response that allows the response object to used then calls an effect
   * after its has been consumed via `apply`. This is essentially a resource
   * management hook.
+  *
+  * @todo Use some type of bracket capability, is that universal?
   */
 final case class DisposableResponse[F[_]](response: HttpResponse[F], dispose: F[Unit]) {
   def apply[A](f: HttpResponse[F] => F[A])(implicit F: MonadError[F, Throwable]): F[A] = {
     val task =
       try f(response)
       catch {
-        case e: Throwable =>
+        // all of throwable?
+        case scala.util.control.NonFatal(e) =>
+          //case e: Throwable =>
           // log something here..
           F.raiseError(e)
       }
 
     for {
       result <- task.attempt
-      _ <- dispose
-      fold <- result.fold[F[A]](F.raiseError, F.pure)
+      _      <- dispose
+      fold   <- result.fold[F[A]](F.raiseError, F.pure)
     } yield fold
   }
 }

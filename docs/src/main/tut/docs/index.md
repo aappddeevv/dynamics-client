@@ -24,13 +24,18 @@ dynamicscli <command> <subcommand> args optional-args -c connectionfile.json
 The `connectionfile.json` is a file that specifies the connection parameters in
 json format. By default it is named 'dynamics.json' and it looks in the current
 directory for it. If the file exists, you can just type `dyanmicscli <command>
-<subcommand> args optional-args`. If the enviroment variable
-`DYNAMCIS_CRMCONFIG` is defined, that value will be used. The precedence is the
-CLI parameter, the environment variable and then the default `./dynamics.json`.
+<subcommand> args optional-args`.
+
+If the enviroment variable `DYNAMCIS_CRMCONFIG` is defined, that value will be
+used. The precedence is the CLI parameter, the environment variable and then the
+default `./dynamics.json`.
 
 Environment variables include:
+
 * DYNAMICS_CRMCONFIG: connection config file
 * DYNAMICS_IMPERSONATE: impersonate crm systemuserid
 * DYNAMICS_PASSWORD: dynamics org password
 
-Throughout the rest of the documentation, we will assume that DYNAMICS_CRMCONFIG is pointing to a config file and leave that agument (--c or --crm-config) off of the examples.
+Throughout the rest of the documentation, we will assume that DYNAMICS_CRMCONFIG
+is pointing to a config file and leave that agument (--c or --crm-config) off of
+the examples.

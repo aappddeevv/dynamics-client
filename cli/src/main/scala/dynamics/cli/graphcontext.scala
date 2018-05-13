@@ -30,19 +30,19 @@ object GraphContext {
     * are automatically addded. Allowed policies are ''backoff'' and any other
     * policy string is translated into a ''pause'' policy.
     */
-  def default(config: AppConfig, headers: HttpHeaders = HttpHeaders.empty)
-    (implicit ec: ExecutionContext, F: MonadError[IO, Throwable]): GraphContext =
+  def default(config: AppConfig, headers: HttpHeaders = HttpHeaders.empty)(implicit ec: ExecutionContext,
+                                                                           F: MonadError[IO, Throwable]): GraphContext =
     new GraphContext {
       import dynamics.client._
-      val LCID = config.common.lcid
+      val LCID         = config.common.lcid
       implicit val e   = ec
       implicit val sch = Scheduler.default
-      implicit val t = IO.timerGlobal
+      implicit val t   = IO.timerGlobal
 
       private val retryPolicyMiddleware = makePolicy(config.common)
-      private val middleware = makeAuthMiddleware(config.common)(sch, e) andThen retryPolicyMiddleware
-      private implicit val httpclient =  middleware(makeHTTPClient(config.common, headers)(e, F, sch))
-      implicit val gclient:GraphClient = GraphClient(httpclient, config.common.connectInfo)(F, e)
+      private val middleware            = makeAuthMiddleware(config.common)(sch, e) andThen retryPolicyMiddleware
+      private implicit val httpclient   = middleware(makeHTTPClient(config.common, headers)(e, F, sch))
+      implicit val gclient: GraphClient = GraphClient(httpclient, config.common.connectInfo)(F, e)
 
       def close() = httpclient.dispose
 

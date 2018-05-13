@@ -52,12 +52,12 @@ object QueryParts {
     )
 }
 
-/** 
- * To navigate to child lists. id accesses a specific child. Cast may be
- * required e.g. with AttributeMetadata you need
- * Microsoft.Dynamics.CRM.PicklistAttributeMetadata to return the proper set of
- * attributes.
- */
+/**
+  * To navigate to child lists. id accesses a specific child. Cast may be
+  * required e.g. with AttributeMetadata you need
+  * Microsoft.Dynamics.CRM.PicklistAttributeMetadata to return the proper set of
+  * attributes.
+  */
 case class NavProperty(name: String, id: Option[String] = None, cast: Option[String] = None)
 
 object NavProperty {
@@ -145,10 +145,10 @@ object Expand {
 
 final class QuerySpecOps(val spec: QuerySpec) extends AnyVal {
 
-  /** 
-   * Convert Query spec to a URL. You must specify the entity set name and key
-   * that it applies to as the first navigation property.
-   */
+  /**
+    * Convert Query spec to a URL. You must specify the entity set name and key
+    * that it applies to as the first navigation property.
+    */
   def url(name: String, keyInfo: Option[String] = None) = {
     val rest       = QuerySpec.render(spec)
     val keyInfoStr = keyInfo.map(ki => s"($ki)").getOrElse("")

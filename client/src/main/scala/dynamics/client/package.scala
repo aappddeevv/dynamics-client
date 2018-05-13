@@ -5,14 +5,15 @@
 package dynamics
 
 package object client {
+
   /** Options with as much as possible being returned. */
   val DefaultDynamicsOptions = DynamicsOptions()
 
   /** Options with as little as possble being returned. */
-  val QuietDynamicsOptions = DynamicsOptions(prefers=client.common.headers.QuietPreferOptions)
+  val QuietDynamicsOptions = DynamicsOptions(prefers = client.common.headers.QuietPreferOptions)
 
   /** Options with as little as possble being returned. */
-  val NoisyDynamicsOptions = DynamicsOptions(prefers=client.common.headers.NoisyPreferOptions)
+  val NoisyDynamicsOptions = DynamicsOptions(prefers = client.common.headers.NoisyPreferOptions)
 
   /** Boolean header value to suppress duplicate detection. */
   val SuppressDuplicateDetection = "MSCRM.SuppressDuplicateDetection"

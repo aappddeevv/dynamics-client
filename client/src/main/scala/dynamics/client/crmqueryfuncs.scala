@@ -6,12 +6,12 @@ package dynamics
 package client
 
 /**
- * Use with QuerySpec.filter e.g. `filter=Some(Between("age", 1, 10))`. Values are always single quoted.
-*
-* @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/equalbusinessid?view=dynamics-ce-odata-9
-    *
-* @todo: Allow query parameters to be returned as a separate part to reduce URL size.
- */
+  * Use with QuerySpec.filter e.g. `filter=Some(Between("age", 1, 10))`. Values are always single quoted.
+  *
+  * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/equalbusinessid?view=dynamics-ce-odata-9
+  *
+  * @todo: Allow query parameters to be returned as a separate part to reduce URL size.
+  */
 object crmqueryfunctions {
 
   val prefix = "Microsoft.Dynamics.CRM"
@@ -25,7 +25,7 @@ object crmqueryfunctions {
   def Contains(pname: String, value: String): String =
     s"""$prefix.Contains(PropertyName='$pname',PropertyValue='$value'"""
 
-  def ContainsValues(pname: String, values: Traversable[String]): String = 
+  def ContainsValues(pname: String, values: Traversable[String]): String =
     s"""$prefix.ContainsValues(PropertyName='$pname',PropertyValues=[${squote(values).mkString(",")}])"""
 
   /** Returns: datetime'2010-07-15' or datetime'2010-07-15T16:19:54Z' depending on input. */
@@ -40,7 +40,7 @@ object crmqueryfunctions {
   def EqualUserTeams(pname: String): String =
     s"""$prefix.EqualUserTeam(PropertyName='$pname')"""
 
-  /** Single quote if your values are strings. */
+  /** Single quotes added. */
   def In(pname: String, values: Traversable[String]): String =
     s"""$prefix.In(PropertyName='$pname',PropertyValues=[${squote(values).mkString(",")}])"""
 

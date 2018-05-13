@@ -112,14 +112,14 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
 
   def upload(): Action = Kleisli { config =>
     val jsonconfig = config.solution.solutionJsonConfigFile
-      .map(Utils.slurp(_))
+      .map(IOUtils.slurp(_))
       .map(JSON.parse(_))
       .map(_.asInstanceOf[ImportSolution])
       .fold(new ImportSolution())(identity)
     println(s"Solution upload config:\n${PrettyJson.render(jsonconfig)}")
 
     if (!jsonconfig.ImportJobId.isDefined) jsonconfig.ImportJobId = CRMGUID()
-    jsonconfig.CustomizationFile = slurp(config.solution.solutionUploadFile, "base64")
+    jsonconfig.CustomizationFile = IOUtils.slurp(config.solution.solutionUploadFile, "base64")
     jsonconfig.PublishWorkflows = config.solution.solutionPublishWorkflows
 
     val merged = merge(new ImportSolution(), jsonconfig)
@@ -135,11 +135,11 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
 
   def export() = Action { config =>
     val jsonconfig = config.solution.solutionJsonConfigFile
-      .map(Utils.slurp(_))
+      .map(IOUtils.slurp(_))
       .map(JSON.parse(_))
       .map(_.asInstanceOf[ExportSolution])
       .fold(new ExportSolution())(identity)
-    logger.debug(s"configfile content: ${Utils.render(jsonconfig)}")
+    logger.debug(s"configfile content: ${IOUtils.render(jsonconfig)}")
     if (!jsonconfig.SolutionName.isDefined) jsonconfig.SolutionName = config.solution.solutionName
     if (!jsonconfig.Managed.isDefined) jsonconfig.Managed = config.solution.solutionExportManaged
     val merged = merge(new ExportSolution(), jsonconfig)
@@ -152,9 +152,9 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
         getOne[SolutionOData](q.url("solutions"))(dec).flatMap { solninfo =>
           val mergedext = if (merged.Managed.getOrElse(false)) "_managed" else ""
           val version   = solninfo.version.map(_.replaceAllLiterally(".", "_")).getOrElse("noversion")
-          val file      = pathjoin(config.common.outputDir, s"${merged.SolutionName}_${version}${mergedext}.zip")
+          val file      = IOUtils.pathjoin(config.common.outputDir, s"${merged.SolutionName}_${version}${mergedext}.zip")
           println(s"Output solution file: $file")
-          writeToFile(file, fromBase64(filecontent.ExportSolutionFile.orEmpty))
+          IOUtils.writeToFile(file, IOUtils.fromBase64(filecontent.ExportSolutionFile.orEmpty))
         }
       }
     }
@@ -176,12 +176,17 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
       })
   }
 
+  val publishAll = Action { config =>
+    dynclient.executeAction("PublishAllXml", Entity.empty, None)(void)
+  }
+
   def get(command: String): Action =
     command match {
-      case "export" => export()
-      case "list"   => list()
-      case "delete" => delete()
-      case "upload" => upload()
+      case "export"     => export()
+      case "list"       => list()
+      case "delete"     => delete()
+      case "upload"     => upload()
+      case "publishAll" => publishAll
       case _ =>
         Action { _ =>
           IO(println(s"solutions command '${command}' not recognized."))

@@ -33,12 +33,11 @@ private[dynamics] object ADALHelpers {
 
   /** Unwind the return value into an effect. */
   def acquireTokenWithUsernamePassword[F[_]](
-    ctx: AuthenticationContext,
-    resource: String,
-    username: String,
-    password: String,
-    applicationId: String)
-    (implicit FAsync: Async[F], PtoF: js.Promise ~> F): F[TokenInfo] = {
+      ctx: AuthenticationContext,
+      resource: String,
+      username: String,
+      password: String,
+      applicationId: String)(implicit FAsync: Async[F], PtoF: js.Promise ~> F): F[TokenInfo] = {
     FAsync.async { (cb: Either[Throwable, TokenInfo] => Unit) =>
       ctx.acquireTokenWithUsernamePassword(
         resource,
@@ -67,8 +66,7 @@ private[dynamics] object ADALHelpers {
   * it is attempted to derive them from username (the demain part) and using a default authority hostname
   * `https://login.windows.net`. If acquireTokenResource is undefined, dataUrl is tried in its place.
   */
-class AuthManager[F[_]](info: ConnectionInfo)
-  (implicit F: Async[F], PtoF: scalajs.js.Promise ~> F) extends LazyLogger {
+class AuthManager[F[_]](info: ConnectionInfo)(implicit F: Async[F], PtoF: scalajs.js.Promise ~> F) extends LazyLogger {
   //, scheduler: Scheduler
   require(
     info.username.isDefined &&
@@ -92,31 +90,32 @@ class AuthManager[F[_]](info: ConnectionInfo)
   /** Obtain an AuthenticatonContext. Throw TokenRequestError
     * on failure.
     */
-  def getAuthContext() = Try {
-    new AuthenticationContext(authority.get)
-  } match {
-    case scala.util.Success(c) => c
-    case Failure(t) =>
-      println(s"Failed to obtain auth token: $t")
-      throw new TokenRequestError(s"Unable to create authentication context using authority $authority: $t")
-  }
+  def getAuthContext() =
+    Try {
+      new AuthenticationContext(authority.get)
+    } match {
+      case scala.util.Success(c) => c
+      case Failure(t) =>
+        println(s"Failed to obtain auth token: $t")
+        throw new TokenRequestError(s"Unable to create authentication context using authority $authority: $t")
+    }
 
   /** Get a token wrapped in an effect. No retry is performed if the request fails. */
   def getToken(ctx: AuthenticationContext): F[TokenInfo] =
     ADALHelpers.acquireTokenWithUsernamePassword[F](ctx,
-                                                 tokenResource.get,
-                                                 info.username.get,
-                                                 info.password.get,
-                                                 info.applicationId.get)
+                                                    tokenResource.get,
+                                                    info.username.get,
+                                                    info.password.get,
+                                                    info.applicationId.get)
 
   /** Get a token with a potential retry. */
   def getTokenWithRetry(ctx: AuthenticationContext, retryPolicy: F[TokenInfo] => F[TokenInfo]): F[TokenInfo] =
     retryPolicy(getToken(ctx))
 
   /** Get a token stream. */
-  def tokenStream(ctx: AuthenticationContext, retryPolicy: F[TokenInfo] => F[TokenInfo],
-    calc: TokenInfo => FiniteDuration = AuthManager.defaultCalc)
-    (implicit timer: Timer[F]) =
+  def tokenStream(ctx: AuthenticationContext,
+                  retryPolicy: F[TokenInfo] => F[TokenInfo],
+                  calc: TokenInfo => FiniteDuration = AuthManager.defaultCalc)(implicit timer: Timer[F]) =
     AuthManager.tokenStream(getTokenWithRetry(ctx, retryPolicy), calc)
 }
 
@@ -130,14 +129,14 @@ object AuthManager {
   val defaultCalc: TokenInfo => FiniteDuration =
     ti => shortenDelay(delay = FiniteDuration(ti.expiresIn.toLong, TU.SECONDS))
 
-  /** 
-   * Stream of TokenInfo. Default is to renew at 95% of expiration time.
-   * @param f Create a token. Generally from `AuthManager.getTokenWithRetry`.
-   * @param calc Calculate when to get the next token.
-   * @return Stream that provides auth tokens.
-   */
-  def tokenStream[F[_]](f: => F[TokenInfo], calc: TokenInfo => FiniteDuration = defaultCalc)
-    (implicit F: Async[F], timer: Timer[F]) =
+  /**
+    * Stream of TokenInfo. Default is to renew at 95% of expiration time.
+    * @param f Create a token. Generally from `AuthManager.getTokenWithRetry`.
+    * @param calc Calculate when to get the next token.
+    * @return Stream that provides auth tokens.
+    */
+  def tokenStream[F[_]](f: => F[TokenInfo], calc: TokenInfo => FiniteDuration = defaultCalc)(implicit F: Async[F],
+                                                                                             timer: Timer[F]) =
     unfoldEvalWithDelay[F, TokenInfo](F.map(F.attempt(f))(_.toOption), calc)
 
 }

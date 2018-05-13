@@ -37,15 +37,15 @@ import Utils._
 
 object MainHelpers extends LazyLogger {
 
-  /** 
-   * Run the program with a way to provide some more options if desired. All standard options
-   * are added by default.
-   */
+  /**
+    * Run the program with a way to provide some more options if desired. All standard options
+    * are added by default.
+    */
   //def run[T <: AppConfig](zero: T, options: Seq[CommandLine.OptionProvider[T]] = Nil): Unit = {
   def run(zero: AppConfig,
           moreOpts: Option[scopt.OptionParser[AppConfig] => Unit] = None,
-    moreCommands: Option[ActionSelector] = None)
-      (implicit ec: ExecutionContext, F: MonadError[IO, Throwable]): Unit = {
+          moreCommands: Option[ActionSelector] = None)(implicit ec: ExecutionContext,
+                                                       F: MonadError[IO, Throwable]): Unit = {
     // remove nodejs bin and nodejs script name, make it look java like
     val args = process.argv.drop(2)
 
@@ -91,6 +91,8 @@ object MainHelpers extends LazyLogger {
         .lens(_.common.impersonate)
         .set(impersonateOpt)
 
+    // todo: use IO.bracket with context, wrap in an outer monad
+
     val context = DynamicsContext.default(config2)
 
     // io.scalajs.nodejs.process.onUnhandledRejection{(reason: String, p: js.Any) =>
@@ -113,8 +115,8 @@ object MainHelpers extends LazyLogger {
 
   /**
     * Process an Attempt (Either) from an Action run. Left exceptions are matched
-   * and printed out otherwise the run time is printed.
-   * 
+    * and printed out otherwise the run time is printed.
+    *
     * @param start Start time information array from `process.hrtime`.
     */
   def actionPostProcessor[A](noisy: Boolean, start: Array[Int]): Either[Throwable, A] => Unit =
@@ -142,8 +144,8 @@ object MainHelpers extends LazyLogger {
             println(x)
           case x @ UnexpectedStatus(s, reqOpt, respOpt) =>
             println(s"A server call returned an unexpected status and processing stopped: $s.")
-            println(s"Request: $reqOpt")
-            println(s"Response: $respOpt")
+            println(reqOpt.map(r => s"Request: $r").getOrElse("Request: NA"))
+            println(respOpt.map(r => s"Response: $r").getOrElse("Response: NA"))
             println("Stack trace:")
             x.printStackTrace()
           case x @ _ =>
@@ -200,6 +202,10 @@ object MainHelpers extends LazyLogger {
 
       case "applications" =>
         val ops = new ApplicationActions(context)
+        ops.get(config.common.subcommand)
+
+      case "themes" =>
+        val ops = new ThemeActions(context)
         ops.get(config.common.subcommand)
 
       case "importmaps" =>

@@ -10,10 +10,7 @@ import cats._
 import cats.effect._
 import cats.implicits._
 
-object OData {
-
-
-}
+object OData {}
 
 /** Boundary marker for batch or changesets. */
 final case class Boundary(value: String) extends AnyVal
@@ -69,8 +66,8 @@ final case class SinglePart[F[_]](request: HttpRequest[F], xtra: HttpHeaders = H
   * @param xtra Extra headers after the changeset boundary but not in the actual requests.
   */
 final case class ChangeSet[F[_]](parts: Seq[SinglePart[F]],
-                           boundary: Boundary = Boundary.mkBoundary("changeset_"),
-                           xtra: HttpHeaders = HttpHeaders.empty)
+                                 boundary: Boundary = Boundary.mkBoundary("changeset_"),
+                                 xtra: HttpHeaders = HttpHeaders.empty)
     extends Part
 
 /** Renders to empty. */

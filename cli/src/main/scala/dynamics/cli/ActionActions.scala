@@ -21,7 +21,7 @@ class ActionActions(ctx: DynamicsContext) extends LazyLogger {
     * Execute an action using the dynamics client.
     */
   val execute = Action { config =>
-    val body = config.action.payloadFile.fold("")(f => Utils.slurp(f))
+    val body = config.action.payloadFile.fold("")(f => IOUtils.slurp(f))
     executeAction[String](config.action.action, body.toEntity._1)
       .map { r =>
         if (config.action.pprint) PrettyJson.render(Utils.jsonParse(r).asJsObj)

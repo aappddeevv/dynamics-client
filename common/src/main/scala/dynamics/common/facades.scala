@@ -37,6 +37,16 @@ trait BulkDeleteResponse extends js.Object {
   val JobId: js.UndefOr[String] = js.native
 }
 
+@js.native
+@JSImport("prettyjson", JSImport.Namespace)
+object PrettyJson extends js.Object {
+  def render(data: js.Object, options: js.UndefOr[PrettyJsonOptions] = js.undefined): String = js.native
+}
+
+class PrettyJsonOptions(
+    val noColor: js.UndefOr[Boolean] = js.undefined
+) extends js.Object
+
 class WebResourceUpsertArgs(
     val name: String,
     val displayname: String,
@@ -124,34 +134,6 @@ trait ImportDataJS extends js.Object {
   val linenumber: js.UndefOr[Int]      = js.native
   val recordid: js.UndefOr[String]     = js.native
   val solutionid: js.UndefOr[String]   = js.native
-}
-
-@js.native
-@JSImport("prettyjson", JSImport.Namespace)
-object PrettyJson extends js.Object {
-  def render(data: js.Object, options: js.UndefOr[PrettyJsonOptions] = js.undefined): String = js.native
-}
-
-class PrettyJsonOptions(
-    val noColor: js.UndefOr[Boolean] = js.undefined
-) extends js.Object
-
-@js.native
-@JSImport("fs-extra", JSImport.Namespace)
-object FsExtra extends js.Object {
-  def mkdirs(path: String, callback: js.Function1[js.Error, Unit]): Unit = js.native
-
-  def outputFile(file: String,
-                 data: String | io.scalajs.nodejs.buffer.Buffer,
-                 options: FileOutputOptions = null,
-                 callback: FsCallback0): Unit = js.native
-}
-
-object Fse {
-  def outputFile(file: String,
-                 data: String | io.scalajs.nodejs.buffer.Buffer,
-                 options: FileOutputOptions = null): Future[Unit] =
-    promiseWithError0[FileIOError](FsExtra.outputFile(file, data, options, _))
 }
 
 @js.native
@@ -308,12 +290,6 @@ object WebResource {
   )
 }
 
-@js.native
-@JSImport("process", JSImport.Namespace)
-object processhack extends js.Object {
-  def hrtime(previous: UndefOr[Array[Int]] = js.undefined): Array[Int] = js.native
-}
-
 trait WhoAmI extends js.Object {
   val BusinessUnitId: String
   val OrganizationId: String
@@ -344,13 +320,6 @@ object Object2 extends js.Object {
 
   /** For the given target, add sources to it. */
   def assign(target: js.Any, sources: js.Any*): js.Object = js.native
-}
-
-@js.native
-@JSImport("glob", JSImport.Namespace)
-object glob extends js.Object {
-  @JSName("sync")
-  def apply(pattern: String, options: js.Dynamic = js.Dynamic.literal()): Array[String] = js.native
 }
 
 object ComponentType {
@@ -611,34 +580,6 @@ trait PluginType extends js.Object {
   val overwritetime_f: js.UndefOr[String] = js.undefined
 }
 
-/**
-  * Uses https://github.com/uhop/stream-json
-  */
-@js.native
-trait Source extends js.Object {
-  val input: io.scalajs.nodejs.stream.Writable  = js.native
-  val output: io.scalajs.nodejs.stream.Readable = js.native
-  val streams: js.Array[js.Any]                 = js.native
-}
-
-/**
-  * Uses https://github.com/uhop/stream-json
-  */
-@js.native
-@JSImport("stream-json/utils/StreamJsonObjects", JSImport.Namespace)
-object StreamJsonObjects extends js.Object {
-  def make(options: js.UndefOr[RawOptions] = js.undefined): Source = js.native
-}
-
-/**
-  * Uses https://github.com/uhop/stream-json
-  */
-@js.native
-//@JSImport("stream-json/utils/StreamArray", JSImport.Namespace)
-object StreamArray extends js.Object {
-  def make(options: js.UndefOr[RawOptions] = js.undefined): Source = js.native
-}
-
 trait AppModule extends js.Object {
   var appmoduleid: js.UndefOr[String]         = js.undefined
   var appmoduleidunique: js.UndefOr[String]   = js.undefined
@@ -688,22 +629,22 @@ trait RetrieveTotalRecordCountResponse extends js.Object {
 
 @js.native
 trait SystemuserJS extends js.Object {
-  val systemuserid: String = js.native
-  val internalemailaddress: String = js.native
-  val lastname: String = js.native
-  val firstname: String = js.native
-  val fullname: String             = js.native  
-  val isdisabled: Boolean = js.native
+  val systemuserid: String                       = js.native
+  val internalemailaddress: String               = js.native
+  val lastname: String                           = js.native
+  val firstname: String                          = js.native
+  val fullname: String                           = js.native
+  val isdisabled: Boolean                        = js.native
   val isemailaddressapprovedbyo365admin: Boolean = js.native
-  val isintegrationuser: Boolean = js.native
-  val islicensed: Boolean = js.native
-  val nickname: String = js.native
-  val jobtitle: String = js.native
-  val personalemailaddress: String = js.native
-  val photourl: String = js.native
-  val setupuser: Boolean = js.native
-  val sharepointemailaddress: Boolean = js.native
-  val userlicensetype: Int = js.native
+  val isintegrationuser: Boolean                 = js.native
+  val islicensed: Boolean                        = js.native
+  val nickname: String                           = js.native
+  val jobtitle: String                           = js.native
+  val personalemailaddress: String               = js.native
+  val photourl: String                           = js.native
+  val setupuser: Boolean                         = js.native
+  val sharepointemailaddress: Boolean            = js.native
+  val userlicensetype: Int                       = js.native
 
   // ...
 }
@@ -723,19 +664,19 @@ trait SystemuserJS extends js.Object {
  */
 
 @js.native
-trait TeamJS  extends js.Object {
-  val teamid: String = js.native
-  val ownerid: String = js.native
-  val teamtype: Int = js.native
-  val name: String = js.native
-  val description: String = js.native
+trait TeamJS extends js.Object {
+  val teamid: String         = js.native
+  val ownerid: String        = js.native
+  val teamtype: Int          = js.native
+  val name: String           = js.native
+  val description: String    = js.native
   val organizationid: String = js.native
 
-  /** 
-   * Only present when using expand=teammembership_association on team fetch.
-   * Or use getList with a property path to a "collection value property"
-   * and the list will in "value".
-   */
+  /**
+    * Only present when using expand=teammembership_association on team fetch.
+    * Or use getList with a property path to a "collection value property"
+    * and the list will in "value".
+    */
   val teammembership_association: js.UndefOr[js.Array[SystemuserJS]] = js.native
 }
 
@@ -759,4 +700,13 @@ trait RoleJS extends RoleNameJS {
   val _parentrootroleid_value_fv: String = js.native
   @JSName("componentstate@OData.Community.Display.V1.FormattedValue")
   val componentstate_fv: String = js.native
+}
+
+@js.native
+trait Theme extends js.Object {
+  val themeid: String
+  val name: String
+  val `type`: Boolean
+  val isdefaulttheme: Boolean
+  val _logoimage_value: js.UndefOr[String] = js.undefined
 }

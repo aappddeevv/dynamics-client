@@ -269,7 +269,7 @@ object CommandLine {
           .action((x, c) => withSub(c, "entity"))
           .children(
             arg[String]("entity")
-              .text("Entity set to update. Use the entity set name which is usually lowercase and ends with an 's'.")
+              .text("Entity set (plural) to update. Use the entity set name which is usually lowercase and ends with an 's'.")
               .action((x, c) => c.copy(update = c.update.copy(updateEntity = x))),
             arg[String]("inputfile")
               .text("JSON streaming data file. JSON records separated by newlines.")
@@ -730,7 +730,10 @@ object CommandLine {
             arg[String]("solution")
               .text("Solution unique name")
               .action((x, c) => c.lens(_.solution.solutionName).set(x))
-          )
+          ),
+        sub("publish-all")
+          .text("Publish all")
+          .action((x,c) => withSub(c, "publishAll"))
       )
   }
 
@@ -962,6 +965,54 @@ object CommandLine {
       )
   }
 
+  def themes(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    val h = CliHelpers(op)
+    import h.sub
+    cmd("themes")
+      .text("Manage themes.")
+      .action((x, c) => withCmd(c, "themes"))
+      .children(
+        sub("list")
+          .text("List all themes.")
+          .action((x, c) => withSub(c, "list")),
+        sub("publish")
+          .text("Publish a theme and make it the default.")
+          .action((x, c) => withSub(c, "publish"))
+          .children(
+            arg[String]("source")
+              .text("Name of source theme.")
+              .action((x, c) => c.lens(_.themes.source).set(Some(x))),
+          ),
+        sub("set-logo")
+          .text("Set logo.")
+          .action((x, c) => withSub(c, "setlogo"))
+          .children(
+            arg[String]("source")
+              .text("Name of source theme.")
+              .action((x, c) => c.lens(_.themes.source).set(Some(x))),
+            arg[String]("webresourcee")
+              .text("Web resource name.")
+              .action((x, c) => c.lens(_.themes.webresourceName).set(Some(x))),
+          ),
+        sub("copy")
+          .text("Copy an existing theme.")
+          .action((x, c) => withSub(c, "copy"))
+          .children(
+            arg[String]("source")
+              .text("Name of source theme.")
+              .action((x, c) => c.lens(_.themes.source).set(Some(x))),
+            arg[String]("target")
+              .text("Name of target theme.")
+              .action((x, c) => c.lens(_.themes.target).set(Some(x))),
+            opt[String]("merge-json")
+              .text("Merge json properties into the clone.")
+              .action((x,c) => c.lens(_.themes.mergeFile).set(Some(x)))
+          ),
+        note("The most recently published theme is set as the 'default' theme."),
+      )
+  }
+
   def users(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     val h = CliHelpers(op)
@@ -1119,6 +1170,7 @@ object CommandLine {
     solutions,
     systemjobs,
     test,
+    themes,
     token,
     update,
     users,
@@ -1151,7 +1203,7 @@ object CommandLine {
     */
   def readConnectionInfo(file: String, passwordEnvVar: Option[String]): Either[String, ConnectionInfo] = {
     import scala.util.{Try, Success, Failure}
-    Try { slurpAsJson[ConnectionInfo](file) } match {
+    Try { IOUtils.slurpAsJson[ConnectionInfo](file) } match {
       case Success(ci) =>
         // look for password in env variable
         val envpassword = passwordEnvVar.flatMap(ev => nodejs.process.env.get(ev))
@@ -1175,7 +1227,7 @@ object CommandLine {
   def readConnectionInfo(filesInPrecedenceOrder: Seq[String], passwordEnvVar: Option[String]):
       Either[String, ConnectionInfo] = {
     // find first file in seq that exists
-    val configFileOpt = filesInPrecedenceOrder.map(f => (f, Utils.fexists(f)))
+    val configFileOpt = filesInPrecedenceOrder.map(f => (f, IOUtils.fexists(f)))
       .collect{ case (f, exists) if(exists) => f }
       .headOption
 

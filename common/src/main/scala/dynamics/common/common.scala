@@ -17,8 +17,7 @@ package object common {
 
   type JsAnyDict = js.Dictionary[js.Any]
 
-  private[dynamics]
-  def _jsPromiseToIO[A](p: js.Promise[A])(implicit ec: ExecutionContext): IO[A] =
+  private[dynamics] def _jsPromiseToIO[A](p: js.Promise[A])(implicit ec: ExecutionContext): IO[A] =
     IO.async { cb =>
       p.`then`[Unit](
         { (v: A) =>

@@ -29,19 +29,20 @@ trait Context[F[_]] {
 object contextdefaults {
   def makePolicy(common: CommonConfig): Middleware[IO] =
     common.retryPolicy match {
-      case "backoff" => RetryMiddleware.backoff[IO](common.numRetries, common.pauseBetween)
+      case "backoff"  => RetryMiddleware.backoff[IO](common.numRetries, common.pauseBetween)
       case "directly" => RetryMiddleware.directly[IO](common.numRetries)
-      case _         => RetryMiddleware.pause[IO](common.numRetries, common.pauseBetween)
+      case _          => RetryMiddleware.pause[IO](common.numRetries, common.pauseBetween)
     }
 
   /** Auth retry is the default from `RetryMiddleware.pause`. */
-  def makeAuthMiddleware(common: CommonConfig) 
-    (implicit sch: fs2.Scheduler, ec: ExecutionContext): Middleware[IO] =
+  def makeAuthMiddleware(common: CommonConfig)(implicit sch: fs2.Scheduler, ec: ExecutionContext): Middleware[IO] =
     ADALMiddleware[IO](common.connectInfo, retry.withPause())
 
-    /** Create a default node-fetch based Client based on the common config. */
-  def makeHTTPClient(common: CommonConfig, headers: HttpHeaders = HttpHeaders.empty)
-    (implicit ec: ExecutionContext, F: MonadError[IO, Throwable], scheduler: Scheduler): Client[IO] = {
+  /** Create a default node-fetch based Client based on the common config. */
+  def makeHTTPClient(common: CommonConfig, headers: HttpHeaders = HttpHeaders.empty)(
+      implicit ec: ExecutionContext,
+      F: MonadError[IO, Throwable],
+      scheduler: Scheduler): Client[IO] = {
     val fetchOpts = NodeFetchClientOptions(
       timeoutInMillis = common.requestTimeOutInMillis.getOrElse(0),
     )

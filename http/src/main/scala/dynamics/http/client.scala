@@ -46,8 +46,7 @@ final case class Client[F[_]](open: Kleisli[F, HttpRequest[F], DisposableRespons
       case Status.Successful(resp) =>
         d.decode(resp).fold(throw _, identity)
       case failedResponse =>
-        F.raiseError(
-          UnexpectedStatus(failedResponse.status, request = Option(req), response = Option(failedResponse)))
+        F.raiseError(UnexpectedStatus(failedResponse.status, request = Option(req), response = Option(failedResponse)))
     }
   }
 
@@ -70,6 +69,13 @@ final case class Client[F[_]](open: Kleisli[F, HttpRequest[F], DisposableRespons
   /** Same as `expect` but request is in an effect. */
   def expect[A](req: F[HttpRequest[F]])(implicit d: EntityDecoder[F, A]): F[A] =
     req.flatMap(expect(_)(d))
+
+  /** Return only the status. */
+  def status(req: HttpRequest[F]): F[Status] =
+    fetch(req)(resp => F.pure(resp.status))
+
+  /** Conveience. */
+  def status(req: F[HttpRequest[F]]): F[Status] = req.flatMap(status)
 
   /** Creates a funcion that acts like "client.fetch" but without need to call `.fetch`. */
   def toService[A](f: HttpResponse[F] => F[A]): Kleisli[F, HttpRequest[F], A] =
