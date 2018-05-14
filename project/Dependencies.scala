@@ -30,7 +30,7 @@ object Dependencies {
 
   val cliDependencies = Def.setting(Seq(
     "com.github.scopt"       %%% "scopt"       % "latest.version",
-    "com.definitelyscala" %%% "scala-js-xmldoc" % "latest.release",
+    "com.definitelyscala" %%% "scala-js-xmldoc" % "1.0.2",
     "com.github.julien-truffaut" %%%  "monocle-core"  % monocleVersion,
     "com.github.julien-truffaut" %%%  "monocle-macro" % monocleVersion,
     "org.scala-lang.modules" %% "scala-xml" % "1.1.0",

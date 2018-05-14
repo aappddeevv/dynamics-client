@@ -10,17 +10,16 @@ import js.UndefOr
 import js.annotation._
 
 /** User provided configuration informmation. */
-@js.native
 trait ConnectionInfo extends js.Object {
-  val tenant: UndefOr[String]               = js.native
-  val username: UndefOr[String]             = js.native
-  def password: UndefOr[String]             = js.native
-  def password_=(v: UndefOr[String]): Unit  = js.native
-  val applicationId: UndefOr[String]        = js.native
-  val dataUrl: UndefOr[String]              = js.native
-  val acquireTokenResource: UndefOr[String] = js.native
-  val authorityHostUrl: UndefOr[String]     = js.native
-  val renewalFraction: UndefOr[Int]         = js.native
+  var tenant: UndefOr[String]               = js.undefined
+  var username: UndefOr[String]             = js.undefined
+  var password: UndefOr[String]             = js.undefined
+  var applicationId: UndefOr[String]        = js.undefined
+  var dataUrl: UndefOr[String]              = js.undefined
+  var acquireTokenResource: UndefOr[String] = js.undefined
+  var authorityHostUrl: UndefOr[String]     = js.undefined
+  var renewalFraction: UndefOr[Int]         = js.undefined
+  var secret: UndefOr[String]         = js.undefined
 }
 
 /**

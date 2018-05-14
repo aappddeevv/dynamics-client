@@ -91,14 +91,14 @@ object MainHelpers extends LazyLogger {
         .lens(_.common.impersonate)
         .set(impersonateOpt)
 
-    // todo: use IO.bracket with context, wrap in an outer monad
-
-    val context = DynamicsContext.default(config2)
-
     // io.scalajs.nodejs.process.onUnhandledRejection{(reason: String, p: js.Any) =>
     //   println(s"Unhandled promise error: $reason, $p")
     //   js.undefined
     // }
+
+    // todo: use IO.bracket with context, wrap in an outer monad
+
+    val context = DynamicsContext.default(config2)
 
     // Determine the action.
     val action: Action =
@@ -106,56 +106,85 @@ object MainHelpers extends LazyLogger {
         config2.common.actionSelector.flatMap(_(config2, context)))
         .getOrElse(NoArgAction(println(s"No actions registered to select from.")))
 
-    // Run the action, then cleanup, then print messages/errors
-    action(config2).flatMap(_ => context.close()).unsafeRunAsync { attempt =>
-      actionPostProcessor[Unit](config2.noisy, start)(attempt)
-      process.exit(0) // since this is running in the background
-    }
+    // Run the action, print messages/errors, cleanup.
+    action(config2)
+      .flatMap(_ => context.close())
+      .attempt
+      .flatMap(actionResultProcessor[Unit](config2.noisy, start))
+      .unsafeRunAsync{ _ =>
+        process.exit(0) // since this is running in the background, exit explicitly
+      }
   }
 
   /**
-    * Process an Attempt (Either) from an Action run. Left exceptions are matched
-    * and printed out otherwise the run time is printed.
-    *
-    * @param start Start time information array from `process.hrtime`.
-    */
-  def actionPostProcessor[A](noisy: Boolean, start: Array[Int]): Either[Throwable, A] => Unit =
+   * Process an `Attempt[A] = Either[Throwable, A]` from an Action run. Left
+   * exceptions are matched and printed out otherwise the program result is
+   * printed.
+   *
+   * @param noisy Whether to print the runtime out.
+   * @param start Start time information array from `process.hrtime`.
+   */
+  def actionResultProcessor[A](noisy: Boolean, start: Array[Int]):
+      Either[Throwable, A] => IO[Unit] =
     _ match {
       case Right(_) =>
-        val delta = processhack.hrtime(start)
-        if (noisy) {
-          println("\nRun time: " + delta(0) + " seconds.")
+        IO {
+          val delta = processhack.hrtime(start)
+          if (noisy) { println("\nRun time: " + delta(0) + " seconds.") }
         }
       case Left(t) =>
+        def runtime() = {
+          val delta = processhack.hrtime(start)
+          if (noisy) println("\nRun time: " + delta(0) + " seconds.")
+        }
         t match {
           case x: DynamicsError =>
-            println(s"An error occurred communicating with the CRM server.")
-            println(x.show)
-            x.underlying.foreach { ex =>
-              println(s"Underlying stacktrace:")
-              ex.printStackTrace()
+            IO {
+              println(s"An error occurred communicating with the CRM server.")
+              println(x.show)
+              x.underlying.foreach { ex =>
+                println(s"Underlying stacktrace:")
+                ex.printStackTrace()
+              }
+              runtime()
             }
           case x: js.JavaScriptException =>
-            println(s"Internal error during processing: ${x}. Processing stopped.")
-            println("Report this as a bug.")
-            x.printStackTrace()
+            IO {
+              println(s"Internal error during processing: ${x}. Processing stopped.")
+              println("Report this as a bug.")
+              x.printStackTrace()
+              runtime()
+            }
           case x: TokenRequestError =>
-            println(s"Unable to acquire authentication token. Processing stopped.")
-            println(x)
+            IO {
+              println(s"Unable to acquire authentication token. Processing stopped.")
+              println(x)
+              runtime()              
+            }
           case x @ UnexpectedStatus(s, reqOpt, respOpt) =>
-            println(s"A server call returned an unexpected status and processing stopped: $s.")
-            println(reqOpt.map(r => s"Request: $r").getOrElse("Request: NA"))
-            println(respOpt.map(r => s"Response: $r").getOrElse("Response: NA"))
-            println("Stack trace:")
-            x.printStackTrace()
+            val reqb = reqOpt.fold(IO(println(s"Body: NA")))(_.body.map(b => println(s"Body:\n$b")))
+            val respb = respOpt.fold(IO(println(s"Body: NA")))(_.body.map(b => println(s"Body:\n$b")))
+            List(
+              IO {
+                println(s"A server call returned an unexpected status and processing stopped: $s.")
+                println(reqOpt.map(r => s"Request: $r").getOrElse("Request: NA"))
+              },
+              reqb,
+              IO { println(respOpt.map(r => s"Response: $r").getOrElse("Response: NA")) },
+              respb,
+              IO {
+                println("Stack trace:")
+                x.printStackTrace()
+                runtime()
+              })
+              .sequence
+              .void
           case x @ _ =>
-            println(s"Processing failed with a program exception ${t}")
-            x.printStackTrace()
-        }
-        val delta = processhack.hrtime(start)
-        if (noisy) {
-          println()
-          println("Run time: " + delta(0) + " seconds.")
+            IO {
+              println(s"Processing failed with a program exception ${t}")
+              x.printStackTrace()
+              runtime()              
+            }
         }
     }
 

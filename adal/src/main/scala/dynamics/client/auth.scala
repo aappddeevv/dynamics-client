@@ -37,7 +37,8 @@ private[dynamics] object ADALHelpers {
       resource: String,
       username: String,
       password: String,
-      applicationId: String)(implicit FAsync: Async[F], PtoF: js.Promise ~> F): F[TokenInfo] = {
+    applicationId: String)
+    (implicit FAsync: Async[F], PtoF: js.Promise ~> F): F[TokenInfo] = {
     FAsync.async { (cb: Either[Throwable, TokenInfo] => Unit) =>
       ctx.acquireTokenWithUsernamePassword(
         resource,
@@ -59,6 +60,34 @@ private[dynamics] object ADALHelpers {
       )
     }
   }
+
+  def acquireTokenWithClientCredentials[F[_]](
+      ctx: AuthenticationContext,
+    resource: String,
+    secret: String,          
+    applicationId: String)
+    (implicit FAsync: Async[F], PtoF: js.Promise ~> F): F[TokenInfo] = {
+    FAsync.async { (cb: Either[Throwable, TokenInfo] => Unit) =>
+      ctx.acquireTokenWithClientCredentials(
+        resource,
+        applicationId,        
+        secret,
+        (err, resp) => {
+          if (err != null) cb(Left(new TokenRequestError(toMessage(err))))
+          else if (!resp.isDefined) cb(Left(new TokenRequestError("Unknown error")))
+          else {
+            resp.get match {
+              case response if response.merge[js.Object].hasOwnProperty("accessToken") =>
+                cb(Right(response.asInstanceOf[TokenInfo]))
+              case response =>
+                cb(Left(new TokenRequestError(toMessage(response.asInstanceOf[ErrorResponse]))))
+            }
+          }
+        }
+      )
+    }
+  }
+
 }
 
 /**
@@ -69,8 +98,7 @@ private[dynamics] object ADALHelpers {
 class AuthManager[F[_]](info: ConnectionInfo)(implicit F: Async[F], PtoF: scalajs.js.Promise ~> F) extends LazyLogger {
   //, scheduler: Scheduler
   require(
-    info.username.isDefined &&
-      info.password.isDefined &&
+    ((info.username.isDefined && info.password.isDefined) || (info.secret.isDefined)) &&
       info.applicationId.isDefined &&
       info.dataUrl.isDefined)
 
@@ -86,6 +114,8 @@ class AuthManager[F[_]](info: ConnectionInfo)(implicit F: Async[F], PtoF: scalaj
   val authority = (info.authorityHostUrl.toOption orElse
     Some("https://login.windows.net")) map (_ + "/" + tenant)
   val tokenResource = (info.acquireTokenResource orElse info.dataUrl)
+  /** true if we should use username/password, false use client credentials. */
+  val hasUsernameAndPassword = info.username.isDefined && info.password.isDefined
 
   /** Obtain an AuthenticatonContext. Throw TokenRequestError
     * on failure.
@@ -102,11 +132,18 @@ class AuthManager[F[_]](info: ConnectionInfo)(implicit F: Async[F], PtoF: scalaj
 
   /** Get a token wrapped in an effect. No retry is performed if the request fails. */
   def getToken(ctx: AuthenticationContext): F[TokenInfo] =
-    ADALHelpers.acquireTokenWithUsernamePassword[F](ctx,
-                                                    tokenResource.get,
-                                                    info.username.get,
-                                                    info.password.get,
-                                                    info.applicationId.get)
+    if(hasUsernameAndPassword)
+      ADALHelpers.acquireTokenWithUsernamePassword[F](ctx,
+        tokenResource.get,
+        info.username.get,
+        info.password.get,
+        info.applicationId.get)
+    else {
+      ADALHelpers.acquireTokenWithClientCredentials[F](ctx,
+        tokenResource.get,
+        info.secret.get,        
+        info.applicationId.get)
+    }
 
   /** Get a token with a potential retry. */
   def getTokenWithRetry(ctx: AuthenticationContext, retryPolicy: F[TokenInfo] => F[TokenInfo]): F[TokenInfo] =

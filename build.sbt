@@ -4,7 +4,7 @@ resolvers += Resolver.sonatypeRepo("releases")
 //resolvers += Resolver.sonatypeRepo("snapshots")
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
 resolvers += Resolver.typesafeRepo("snapshots")
-resolvers += Resolver.bintrayRepo("softprops", "maven") // for retry
+resolvers += Resolver.bintrayRepo("softprops", "maven") // for retry, what else?
 resolvers += Resolver.bintrayRepo("scalameta", "maven") // for latset scalafmt
 resolvers += Resolver.jcenterRepo
 
@@ -156,8 +156,9 @@ lazy val `cli-main` = project
 lazy val docs = project
   .settings(buildSettings)
   .settings(noPublishSettings)
-  .enablePlugins(MicrositesPlugin)
-  .enablePlugins(ScalaUnidocPlugin)
+  .settings(libraryDependencies ++=
+    Dependencies.cliDependencies.value ++ Dependencies.monadlessDependencies.value)
+  .enablePlugins(MicrositesPlugin, ScalaUnidocPlugin)
   .dependsOn(clientcommon, client, http, cli, `cli-main`, etl, common, apps).
   settings(
     micrositeName := "dynamics-client",

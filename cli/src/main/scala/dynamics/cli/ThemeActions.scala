@@ -164,7 +164,10 @@ class ThemeActions(val context: DynamicsContext) {
       t <- theme
     } yield {
       t.map { t =>
-        dynclient.executeAction[Unit]("Microsoft.Dynamics.CRM.PublishTheme", Entity.empty, Some(("themes", t.themeid)))
+        dynclient.executeAction[Unit]("Microsoft.Dynamics.CRM.PublishTheme",
+          /*Entity.fromString("""{"blah": 10}""")*/
+          Entity.empty,
+          Some(("themes", t.themeid)))
       }
     }
     io.flatMap(
