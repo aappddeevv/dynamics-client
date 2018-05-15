@@ -1,19 +1,55 @@
-dynamicscli - a nodejs CLI application and client framework for working with online Microsoft Dynamics applications. The application will not currently authenticate with on-premise systems (or at least I do not think so).
+dynamicscli - a nodejs CLI application and client framework for working with
+online Microsoft Dynamics applications. The application will not currently
+authenticate with on-premise systems (or at least I do not think so).
 
-dynamicscli uses the ODatav4 REST data api which means that you must register the application with Azure Active Directory to allow the CLI to connect to the server. Registering is easy to do, but you need Admin access to create the registration. You can use any application registration that allows your userid access to the data and has an application id.
+dynamicscli uses the ODatav4 REST data api which means that you must register
+the application with Azure Active Directory to allow the CLI to connect to the
+server. Registering is easy to do, but you need Admin access to create the
+registration. You can use any application registration that allows your userid
+access to the data and has an application id. You can follow the simple
+instructions
+[here](https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/walkthrough-register-dynamics-365-app-azure-active-directory)
+to create a registration. The new administrative portal for managing application
+registrations does not know about dynamics yet so you need to register directly
+in your own azure active directory portaly (https://aad.portal.azure.com). The
+deprecated SOAP library did not need this extra step. The application
+registration is good for any copy of this CLI that runs. Since you still provide
+your own login credentials, creating the application registration, is equivalent
+to authorizing any application to access the dynamics server. You can also setup
+a service account (choose Web / API registration type) and create a client
+secret that runs independent of your personal credentials.
 
 dynamics-client two personalities:
-* A CLI that can be used from any OS. While one could use PowerShell for everything, its much easier to add commands or make commands robust using an application directly.
-* An extensive client library that is performant on the nodejs platform. You can use this as a framework for developing small Dynamics applications like ETL or platform management. For example, I added a command to help manage the dynamics platform in around 30 minutes and it worked the first time.
+* A CLI that can be used from any OS. While one could use PowerShell for
+  everything, its much easier to add commands or make commands robust using an
+  application directly that has advanced support. To do anything interesting in
+  powershell you would have to write a .dll anyway and load it.
+* An extensive client library that is performant on the nodejs platform. You can
+  use this as a framework for developing small Dynamics applications like ETL or
+  platform management. For example, I added a command to help manage the
+  dynamics platform in around 30 minutes and it worked the first time.
 
-dynamicscli is written in scala.js which is a small language with more extensive type-safety, immutability and greater consistency. It is a great language for writing logic and effects heavy code.
+dynamicscli is written in scala.js which is a small language similar to
+typescript with more type-safety, immutability and greater consistency. It is a
+great language for writing logic and "effects" heavy code. Where needed,
+dynamics-client uses extensive asynchronous programming constructs. You can load
+millions of data items per hour.
 
-Why nodejs? nodejs has an extensive array of web oriented resources and is lightweight on memory while still being fast enough. You could also use the client framework for CRM web applications directly. You can also use it for hot-reload, local development that seamlessly integrates with CRM so you get easy development of new CRM UI extensions. Running a nodejs instance on azure also means that you can deploy dynamicscli to azure and have a continuously running Dynamics platform processing platform ready to go.
+Why nodejs? nodejs has an extensive array of web oriented resources and is
+lightweight on memory while still being fast enough. You could also use the
+client framework for CRM web applications directly. You can also use it for
+hot-reload, local development that seamlessly integrates with CRM so you get
+easy development of new CRM UI extensions. Running a nodejs instance on azure
+also means that you can deploy dynamicscli to azure and have a continuously
+running Dynamics platform processing platform ready to go. The web apis provided
+by Microsoft Dynamics allows one to use nearly any platform.
 
-dynamicscli automatically handles paging through multi-paged results from dynamics as well as automatic retry.
+dynamicscli automatically handles paging through multi-paged results from
+dynamics as well as automatic retry.
 
 ## Installing
-Currently, you need to build the solution from github. We will publish the CLI progarm on npm shortly.
+Currently, you need to build the solution from github. We will publish the CLI
+progarm on npm shortly.
 
 ```sh
 npm i -g dynamics-client
@@ -30,7 +66,11 @@ node /path/to/dynamicscli <args for dynamicscli>
 ```
 
 ## CRM Connection Parameters
-Dynamics connection parameters should be placed in a json file. The default is crm.json. The file should look like below. Some typical values are also shown but you must find the values that match your application.
+
+Dynamics connection parameters should be placed in a json file. The default is
+crm.json. The file should look like below. Some typical values are also shown
+but you must find the values that match your application.
+
 ```javascript
 {
     "tenant" : "<yourorgname>.onmicrosoft.com",
@@ -42,13 +82,28 @@ Dynamics connection parameters should be placed in a json file. The default is c
     "acquireTokenResource": "https://<yourorg>.crm.dynamics.com"
 }
 ```
-Your password can also be in the environment variable `DYNAMICS_PASSWORD` as you should avoid passwords in config files that may get checked into version control.
 
-The above shows the domain name to be `<yourorg>.onmicrosoft.com` but the domain varies, It could be `mycompany.com`. The `dataUrl` can be obtained from Developers page in the CRM application's Settings area. `applicationId` can only be obtained from our Azure Active Directory application's registration page. Sometimes, applicationId is called clientId. `authorityHostUrl` should only be changed if you know that you should change it, otherwise, leave it the same as the value above.
+Your password can also be in the environment variable `DYNAMICS_PASSWORD` as you
+should avoid passwords in config files that may get checked into version
+control.
 
-Some information can be inferred if left out. For example, the tenant can be inferred from username and the dataUrl can be inferred from acquireTokenResource but its best to specify them directly.
+The above shows the domain name to be `<yourorg>.onmicrosoft.com` but the domain
+varies, It could be `mycompany.com`. The `dataUrl` can be obtained from
+Developers page in the CRM application's Settings area. `applicationId` can only
+be obtained from our Azure Active Directory application's registration
+page. Sometimes, applicationId is called clientId. `authorityHostUrl` should
+only be changed if you know that you should change it, otherwise, leave it the
+same as the value above.
 
-Once you have created your connection file, use it with the `-c <connectionfile>` option. If you connect to several organizations just name the connection file after the organization e.g. myorg1.json or myorg2.json then use it `-c myorg1.json`. Or, specify the config file in `DYNAMICS_CRMCONFIG` and skip providing the option on the command line.
+Some information can be inferred if left out. For example, the tenant can be
+inferred from username and the dataUrl can be inferred from acquireTokenResource
+but its best to specify them directly.
+
+Once you have created your connection file, use it with the `-c
+<connectionfile>` option. If you connect to several organizations just name the
+connection file after the organization e.g. myorg1.json or myorg2.json then use
+it `-c myorg1.json`. Or, specify the config file in `DYNAMICS_CRMCONFIG` and
+skip providing the option on the command line.
 
 If you are using Graph via the GraphClient, use the following parameters:
 
@@ -62,7 +117,8 @@ If you are using Graph via the GraphClient, use the following parameters:
 }
 ```
 
-You could also use `https://outlook.office.com` to access the outlook API directly at `https://outlook.office.com/api/v2.0` for the data url.
+You could also use `https://outlook.office.com` to access the outlook API
+directly at `https://outlook.office.com/api/v2.0` for the data url.
 
 ## Commands
 The general CLI usage is `dynamics command [subcommand] [opts]`.
@@ -72,6 +128,7 @@ Use `dynamics --help` to print out help and see the commands.
 ## What can you do?
 Some of the things you can do with the CLI include:
 
+* Create a fully automated instance deployment.
 * List and manage:
    * Publishers
    * Solutions
@@ -84,6 +141,8 @@ Some of the things you can do with the CLI include:
       * List/activate/deactivate/run (against a query)
    * SDK Messages
       * List/activate/deactivate
+   * themes
+   * applications
 * Webresources
    * List and manage
    * Upload / update / download
@@ -104,9 +163,12 @@ Some of the things you can do with the CLI include:
 
 See [dynamics-client](https://aappddeevv.github.io/dynamics-client) for details.
 
-Ingredients for packaging up parts of a solution deployment are here so you can create your own scripted solution deployer by just creating a directory and a standard script.
+Ingredients for packaging up parts of a solution deployment are here so you can
+create your own scripted solution deployer by just creating a directory and a
+standard script.
 
-You can use the general `GraphClient` to connect and run processing against much of the Microsoft app universe.
+You can use the general `GraphClient` to connect and run processing against much
+of the Microsoft app universe.
 
 ## Credit
 

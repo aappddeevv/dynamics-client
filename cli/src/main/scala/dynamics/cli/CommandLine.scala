@@ -803,22 +803,22 @@ object CommandLine {
       .action((x,c) => withCmd(c, "applications"))
       .children(
         sub("list")
-          .text("List applications")
+          .text("List applications including both its display and unique name.")
           .action((x,c) => withSub(c, "list"))
           .children(mkFilterOpt()),
-        sub("role")
+        sub("roles")
           .text("Add/remove role to an application by name.")
-          .action((x,c) => withSub(c, "role"))
+          .action((x,c) => withSub(c, "roles"))
           .children(
+            arg[String]("application-name")
+              .text("Application unique name (not its display name).")
+              .action((x,c) => c.lens(_.appModule.appName).set(Some(x))),                          
             arg[String]("change")
               .text("add or remove")
-              .action((x,c) => c.lens(_.appModule.change).set(Option(x))),
+              .action((x,c) => c.lens(_.appModule.change).set(Some(x))),
             arg[Seq[String]]("rolename")
-              .text("Role names. Comma separated if more than one.")
+              .text("Role names. Comma separated if more than one. If there are space, quote or escape them.")
               .action((x,c) => c.lens(_.appModule.roleName).modify(names => names ++ x)),
-            arg[String]("application- name")
-              .text("Application name")
-              .action((x,c) => c.lens(_.appModule.appName).set(Option(x))),              
           )
       )
   }

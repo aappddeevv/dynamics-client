@@ -15,7 +15,7 @@ import cats.effect._
 import Utils._
 import dynamics.client.implicits._
 
-import retry._
+//import retry._
 import scala.concurrent.duration._
 import java.util.concurrent.{TimeUnit => TU}
 

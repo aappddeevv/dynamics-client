@@ -22,6 +22,7 @@ import dynamics.client._
 import dynamics.client.implicits._
 import dynamics.http.implicits._
 import client.common._
+import fs2helpers.evalN
 
 class ApplicationActions(val context: DynamicsContext) extends {
   import context._
@@ -90,14 +91,49 @@ class ApplicationActions(val context: DynamicsContext) extends {
     }
   }
 
+  def getByUniqueName(uname: String): IO[Option[AppModule]] = {
+    val qs = QuerySpec(filter = Some(s"uniquename eq '$uname'"))
+    dynclient.getOne[Option[AppModule]](qs.url("appmodules"))(ExpectOnlyOneToOption)
+  }
+
+  def getRoleByName(name: String): IO[Option[RoleJS]] = {
+    val qs = QuerySpec(filter = Some(s"name eq '$name'"))
+    dynclient.getOne[Option[RoleJS]](qs.url("roles"))(ExpectOnlyOneToOption)
+  }
+
+  def parallelWithLimit2[A](limit: Int, as: List[IO[A]]): IO[List[A]] =
+    as.grouped(limit).toList.flatTraverse(_.parSequence)
+
   val role = Action { config =>
-    IO(println("NOT IMPLEMENTED"))
+    val aname = config.appModule.appName.get
+    val anameiov = IO.shift *> getByUniqueName(aname).map(_.toValidNel[String](s"Application name not found."))
+    // control evaluation with evalN otherwise could just use List(io,io,io,...).parSequence
+    val rnamesiov = IO.shift *>
+    evalN(config.appModule.roleName.map(name => getRoleByName(name).map(n => n.toValidNel[String](s"Role $name was not found."))))
+
+    val io = (anameiov, rnamesiov).parMapN{ (appv, rolesv) =>
+      (appv, rolesv.sequence).mapN { (app, roles) =>
+        config.appModule.change match {
+          case Some("add") =>
+            evalN(roles.map(role => dynclient.associate("appmodules", app.appmoduleid.get, "appmoduleroles_association", "roles", role.roleid, false)))
+              .map(_ => s"Roles added.")
+          case Some("remove") =>
+            evalN(roles.map(role => dynclient.disassociate("appmodules", app.appmoduleid.get, "appmoduleroles_association", Some(role.roleid))))
+              .map(_ => s"Roles removed.")
+          case _ => IO.pure(s"Unknown role command. Must be add or remove.")
+        }
+      }}
+
+    io.flatMap {
+      case Validated.Invalid(msglist) => IO(msglist.toList.foreach(println))
+      case Validated.Valid(iomsg) => iomsg.map(println)
+    }
   }
 
   def get(command: String): Action = {
     command match {
       case "list" => list
-      case "role" => role
+      case "roles" => role
       case _ =>
         Action { _ =>
           IO(println(s"applications command '${command}' not recognized."))

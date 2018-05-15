@@ -198,7 +198,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
   def upload() = Action { config =>
     val f: String => IO[Seq[WebResourceOData]] = getWRByName(_)
     val sources = determineCreateOrUpdateActions(config.webResource.webResourceUploadSource flatMap interpretGlob,
-                                                 config.webResource.webResourceUploadPrefix,
+                                                config.webResource.webResourceUploadPrefix,
                                                  f,
                                                  config.webResource.webResourceUploadType)
     _process(config, sources)
@@ -208,7 +208,6 @@ class WebResourcesCommand(val context: DynamicsContext) {
     IO { println(s"$prefix> $a"); a }
   }
 
-  //def watchAndUpload(config: AppConfig): (Stream[Task, Unit], Task[Unit])  = {
   def watchAndUpload() = Action { config =>
     import dynamics.common.FSWatcher.{add, unlink, change, error}
 
@@ -260,7 +259,8 @@ class WebResourcesCommand(val context: DynamicsContext) {
       })
       .map(identifyFileAction)
       .map(_process(config, _))
-      .flatMap(Stream.eval(_))
+      .map(Stream.eval(_))
+      .join(config.common.concurrency)
 
     IO(println("Watching for changes in web resources..."))
       .flatMap(_ => estr.compile.drain)
@@ -359,9 +359,8 @@ class WebResourcesCommand(val context: DynamicsContext) {
     def maybeAddToSoln(id: String, mkMsg: String => String = identity): IO[Unit] =
       if (canAddToSoln)
         addToSolution(id, config.webResource.webResourceUploadSolution)
-          .map(_ => ())
-          .map(_ => println(mkMsg(s"Added to solution: ${config.webResource.webResourceUploadSolution}.")))
-      else IO.pure(println(mkMsg(s"Added to solution: Default.")))
+          .flatMap(_ => IO(println(mkMsg(s"Added to solution: ${config.webResource.webResourceUploadSolution}."))))
+      else IO(println(mkMsg(s"Added to solution: Default.")))
 
     val factions: Seq[IO[Option[String]]] = sources.toList map {
       _ flatMap { action =>
@@ -442,11 +441,12 @@ class WebResourcesCommand(val context: DynamicsContext) {
       . // strip None's from list
       flatMap { ids =>
       if (shouldPublish && ids.size > 0)
-        publishXml(ids).map(_ => println(format("*", "Published changes.")))
+        publishXml(ids).flatMap(_ => IO(println(format("*", "Published changes."))))
       else IO(println(s"No publishing occurred."))
     }
   }
 
+  /** Get a web resource by name. There may be more than one so return a list. */
   def getWRByName(name: String) = {
     val query = s"/webresourceset?$$filter=name eq '$name'&$$select=webresourceid"
     dynclient.getList[WebResourceOData](query)

@@ -118,11 +118,10 @@ class ThemeActions(val context: DynamicsContext) {
           }
       }
     }
-    io.flatMap(
-      _ fold (
-        msglist => IO(msglist.toList.foreach(println)),
-        identity
-      ))
+    io.flatMap{
+      case Validated.Invalid(msglist) =>  IO(msglist.toList.foreach(println))
+      case Validated.Valid(x) => x
+    }
   }
 
   def getByName(name: String) = {
@@ -150,11 +149,10 @@ class ThemeActions(val context: DynamicsContext) {
           }
       }
     }
-    io.flatMap(
-      _ fold (
-        msglist => IO(msglist.toList.foreach(println)),
-        _.map(println)
-      ))
+    io.flatMap{
+      case Validated.Invalid(msglist) => IO(msglist.toList.foreach(println))
+      case Validated.Valid(msg) => msg.map(println)
+    }
   }
 
   val publish = Action { config =>
@@ -170,11 +168,10 @@ class ThemeActions(val context: DynamicsContext) {
           Some(("themes", t.themeid)))
       }
     }
-    io.flatMap(
-      _ fold (
-        msglist => IO(msglist.toList.foreach(println)),
-        _.map(output => println(s"Published theme $name."))
-      ))
+    io.flatMap {
+      case Validated.Valid(outputf) => outputf.map(_ => println(s"Published theme $name"))
+      case Validated.Invalid(msglist) => IO(msglist.toList.foreach(println))
+    }
   }
 
   def get(command: String): Action =

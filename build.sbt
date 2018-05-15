@@ -1,15 +1,13 @@
 import scala.sys.process._
 
-resolvers += Resolver.sonatypeRepo("releases")
-//resolvers += Resolver.sonatypeRepo("snapshots")
-resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
-resolvers += Resolver.typesafeRepo("snapshots")
-resolvers += Resolver.bintrayRepo("softprops", "maven") // for retry, what else?
-resolvers += Resolver.bintrayRepo("scalameta", "maven") // for latset scalafmt
-resolvers += Resolver.jcenterRepo
-
-// placeholder for scala-js 1.x, must be placed in settings
-//scalaJSLinkerConfig ~= {_.withModuleKind(ModuleKind.CommonJSModule) }
+resolvers in ThisBuild += Resolver.sonatypeRepo("releases")
+resolvers in ThisBuild += Resolver.sonatypeRepo("snapshots")
+resolvers in ThisBuild += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+resolvers in ThisBuild += Resolver.typesafeRepo("snapshots")
+//resolvers += Resolver.bintrayRepo("softprops", "maven") // for retry, what else?
+resolvers in ThisBuild += Resolver.bintrayRepo("scalameta", "maven") // for latset scalafmt
+resolvers in ThisBuild += Resolver.bintrayRepo("definitelyscala", "maven") // for latest facades
+resolvers in ThisBuild += Resolver.jcenterRepo
 
 autoCompilerPlugins := true
 
@@ -26,7 +24,6 @@ lazy val licenseSettings = Seq(
 lazy val buildSettings = Seq(
   organization := "com.github.aappddeevv.dynamics",
   licenses ++= Seq(("MIT", url("http://opensource.org/licenses/MIT"))),
-
   scalaVersion := "2.12.4",
   scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),
   scalafmtVersion in ThisBuild := "1.5.1",    
@@ -44,6 +41,7 @@ lazy val publishSettings = Seq(
 )
 
 lazy val commonSettings = Seq(
+  autoAPIMappings := true,
   scalacOptions ++=
     Dependencies.commonScalacOptions ++
     (if (scalaJSVersion.startsWith("0.6."))
@@ -156,11 +154,11 @@ lazy val `cli-main` = project
 lazy val docs = project
   .settings(buildSettings)
   .settings(noPublishSettings)
-  .settings(libraryDependencies ++=
-    Dependencies.cliDependencies.value ++ Dependencies.monadlessDependencies.value)
-  .enablePlugins(MicrositesPlugin, ScalaUnidocPlugin)
-  .dependsOn(clientcommon, client, http, cli, `cli-main`, etl, common, apps).
-  settings(
+  .settings(commonSettings)
+  .settings(libraryDependencies ++= Dependencies.appDependencies.value)
+  .enablePlugins(MicrositesPlugin, ScalaUnidocPlugin, ScalaJSPlugin)
+  .aggregate(clientcommon, client, http, cli, `cli-main`, etl, common, apps)
+  .settings(
     micrositeName := "dynamics-client",
     micrositeDescription := "A Microsoft Dynamics CLI swiss-army knife and browser/server library.",
     micrositeBaseUrl := "/dynamics-client",

@@ -107,7 +107,7 @@ class AuthManager[F[_]](info: ConnectionInfo)(implicit F: Async[F], PtoF: scalaj
   import fs2helpers._
   import java.util.concurrent.{TimeUnit => TU}
   import scala.concurrent.duration._
-  import retry._
+  //import retry._
 
   // Fill in missing information.
   val tenant = info.tenant orElse info.username.flatMap("^.+@(.+)$".r.findFirstMatchIn(_).map(_.group(1)))

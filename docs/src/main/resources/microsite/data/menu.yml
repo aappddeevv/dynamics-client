@@ -5,6 +5,9 @@ options:
   - title: actions
     url: docs/actions.html
 
+  - title: applications
+    url: docs/applications.html
+
   - title: entity
     url: docs/entity.html
 

@@ -10,16 +10,14 @@ object Dependencies {
   val commonDependencies = Def.setting(Seq(
 
     "org.scalatest"          %%% "scalatest"    % "latest.release" % "test",
-    //"co.fs2" %%% "fs2-core" % "0.10.3",
     "co.fs2" %%% "fs2-core" % "0.10.4",
     "org.typelevel" %%% "cats-core" % "1.1.0",
     "org.typelevel" %%% "cats-effect" % "0.10",
     //"com.github.mpilquist" %%% "simulacrum" % "0.10.0",
-    //"com.typesafe.play" %%% "play-json" % "2.6.0",
-    "com.softwaremill.retry" %%% "retry" % "0.3.0",
+    //"com.softwaremill.retry" %%% "retry" % "0.3.0",
     "com.github.cb372" %%% "scalacache-core" % "0.10.0",
     "org.scala-js" %%% "scalajs-java-time" % "latest.version",
-    "org.scala-sbt" % "test-interface" % "1.0",
+    "org.scala-sbt" % "test-interface" % "1.0"
   ))
 
   val monadlessDependencies = Def.setting(Seq(
@@ -30,11 +28,10 @@ object Dependencies {
 
   val cliDependencies = Def.setting(Seq(
     "com.github.scopt"       %%% "scopt"       % "latest.version",
-    "com.definitelyscala" %%% "scala-js-xmldoc" % "1.0.2",
+    "com.definitelyscala" % "scala-js-xmldoc_sjs0.6_2.12" % "1.1.0",
     "com.github.julien-truffaut" %%%  "monocle-core"  % monocleVersion,
     "com.github.julien-truffaut" %%%  "monocle-macro" % monocleVersion,
     "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
-    // no lucid xtract? may be hard to use then...
   ))
 
   val appDependencies = Def.setting(Seq(
@@ -42,14 +39,16 @@ object Dependencies {
     "ru.pavkin" %%% "scala-js-momentjs" % "0.9.1",
   ))
 
+  val npmver = "0.4.2"
+
   /** js only libraries */
   val myJSDependencies = Def.setting(Seq(
-    "io.scalajs.npm" %%% "chalk" % "latest.version",
-    "io.scalajs.npm" %%% "node-fetch" % "latest.version",
-    "io.scalajs"             %%% "nodejs"      % "latest.version",
-    "io.scalajs.npm" %%% "csv-parse" % "latest.version",
-    "io.scalajs.npm" %%% "winston" % "0.4.0",
-    "io.scalajs.npm" %%% "xml2js" % "0.4.0",
+    "io.scalajs.npm" %%% "chalk" % npmver,
+    "io.scalajs.npm" %%% "node-fetch" % npmver,
+    "io.scalajs"             %%% "nodejs"      % npmver,
+    "io.scalajs.npm" %%% "csv-parse" % npmver,
+    "io.scalajs.npm" %%% "winston" % npmver,
+    "io.scalajs.npm" %%% "xml2js" % npmver
   ))
 
   val commonScalacOptions = Seq(

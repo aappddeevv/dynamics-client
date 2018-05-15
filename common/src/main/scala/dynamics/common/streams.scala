@@ -19,9 +19,10 @@ import cats.effect._
 object fs2helpers {
 
   /**
-    * from cats-effect gitter channel
+    * From cats-effect gitter channel. This does not use fs2 at all actually and does
+   * not work from a queue so its incrementally parallel.
     */
-  def parallelWithLimit[A](limit: Int, as: List[IO[A]]) =
+  def parallelWithLimit[A](limit: Int, as: List[IO[A]]): IO[List[A]] =
     as.grouped(limit).toList.flatTraverse(_.parSequence)
 
   /** Given a list of Fs, eval them at most N at a time. Output order is not preserved. */
