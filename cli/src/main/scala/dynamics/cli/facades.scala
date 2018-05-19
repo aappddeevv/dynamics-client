@@ -41,21 +41,21 @@ object CSVStringifyX {
 
   /** Allows you to register for events. */
   @js.native
-  class Stringifier() extends Readable with Writable {
+  trait Stringifier extends Readable with Writable {
     def write(data: js.Array[_]): Boolean = js.native
     def write(data: js.Object): Boolean   = js.native
   }
 
-  implicit class StringifierEvents(val s: Stringifier) extends AnyVal {
-    @inline
-    def onError(listener: Error => Any): s.type = s.on("error", listener)
-    @inline
-    def onFinish(listener: () => Any): s.type = s.on("finish", listener)
-    @inline
-    def onReadable(listener: () => Any): s.type = s.on("readable", listener)
-    @inline
-    def onRecord(listener: (js.Array[js.Any], Int) => Any): s.type = s.on("record", listener)
-  }
+  // implicit class StringifierEvents(val s: Stringifier) extends AnyVal {
+  //   @inline
+  //   def onError(listener: Error => Any): s.type = s.on("error", listener)
+  //   @inline
+  //   def onFinish(listener: () => Any): s.type = s.on("finish", listener)
+  //   @inline
+  //   def onReadable(listener: () => Any): s.type = s.on("readable", listener)
+  //   @inline
+  //   def onRecord(listener: (js.Array[js.Any], Int) => Any): s.type = s.on("record", listener)
+  // }
 
   @js.native
   @JSImport("csv-stringify", JSImport.Namespace)

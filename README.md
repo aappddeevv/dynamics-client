@@ -11,7 +11,7 @@ instructions
 [here](https://docs.microsoft.com/en-us/dynamics365/customer-engagement/developer/walkthrough-register-dynamics-365-app-azure-active-directory)
 to create a registration. The new administrative portal for managing application
 registrations does not know about dynamics yet so you need to register directly
-in your own azure active directory portaly (https://aad.portal.azure.com). The
+in your own azure active directory portal (https://aad.portal.azure.com). The
 deprecated SOAP library did not need this extra step. The application
 registration is good for any copy of this CLI that runs. Since you still provide
 your own login credentials, creating the application registration, is equivalent

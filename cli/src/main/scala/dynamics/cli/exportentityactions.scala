@@ -19,7 +19,8 @@ import io.scalajs.nodejs
 import io.scalajs.nodejs.buffer.Buffer
 import io.scalajs.nodejs.stream.{Readable, Writable}
 import io.scalajs.nodejs.events.IEventEmitter
-import io.scalajs.util.PromiseHelper.Implicits._
+//import io.scalajs.util.PromiseHelper.Implicits._
+import io.scalajs.util.PromiseHelper._
 import io.scalajs.nodejs.fs
 import io.scalajs.nodejs.fs._
 import fs2._
@@ -154,10 +155,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     val outputpath = config.common.outputFile.getOrElse(s"${config.export.entity}.csv")
 
     println(s"Output path: $outputpath")
-    // TODO, resource control the file descriptor
-    val f = Fs.openSync(outputpath, "w")
+    //val f = Fs.openSync(outputpath, "w")
 
-    def mkStreamer() =
+    def mkOutputStreamer() =
       columns.map { cols =>
         logger.debug(s"Columns: $cols")
         val soptions =
@@ -168,26 +168,36 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
         CSVStringify(soptions)
       }
 
-    val withSink = Stream.bracket(mkStreamer())(
-      streamer => {
-        import Readable._
-        streamer.onReadable(() => {
+    val icounter = new java.util.concurrent.atomic.AtomicInteger(0)
+    val withSink = Stream.bracket(mkOutputStreamer().map(s => (Fs.openSync(outputpath, "w"), s)))(
+      p => {
+        val f = p._1
+        val out = p._2
+        out.onFinish(() => Fs.closeSync(f))
+        out.onReadable(() => {
           // must read chunks of the string from Readable
-          streamer.iterator[Buffer].filter(_ != null).foreach { b =>
-            val out = b.toString()
-            Fs.writeSync(f, out)
-          //println(s"item: buffer=$b, out=$out, isbuffer=${Buffer.isBuffer(b)}")
+          out.iterator[Buffer].filter(_ != null).foreach { b =>
+            val content = b.toString()
+            Fs.writeSync(f, content)
           }
         })
-        values.to(_ map { jobj =>
-          streamer.write(jobj)
-          () // sink sign is to return unit
+        values.to(Sink{ jobj =>
+          promiseWithError0[nodejs.Error](out.write(jobj.asInstanceOf[Buffer],_))
+            .toIO
+            .map(_ => icounter.getAndIncrement())
+            .void
         })
       },
-      streamer => IO(streamer.end())
+      p => p._2.endFuture().toIO
     )
 
-    withSink.map(_ => () /*Fs.closeSync(f)*/ ).compile.drain // build Stream into a Task
+    // Quick hack since we are not terminating correctly. Wait 5 seconds to
+    // write the last buffer out. HACK!
+    withSink
+      .compile
+      .drain //*>
+      .flatMap(_ => IO(println(s"""# input records: ${icounter.get()}
+                                  |No records written count available.""".stripMargin)))
   }
 
   /** Get column names by retrieving a single record. */

@@ -48,7 +48,7 @@ object CommandLine {
   def withCmd(ac: AppConfig, command: String)    = ac.lens(_.common.command).set(command)
   def withSub(ac: AppConfig, subcommand: String) = ac.lens(_.common.subcommand).set(subcommand)
 
-  def general(op: scopt.OptionParser[AppConfig]): Unit = {
+  def common(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
 
     note("Common options")
@@ -1045,6 +1045,15 @@ object CommandLine {
           .children(
             addUserEmail(),
           ),
+        sub("add-roles-from-query")
+          .text("Add roles to the results of a query against systemusers.")
+          .action((x,c) => withSub(c, "addRolesFromQuery"))
+          .children(
+            arg[String]("users-query")
+              .text("Query against users. Query looks like /systemusers?$filter=internalemailaddress eq 'blah@blah.com'")
+              .action((x,c) => c.lens(_.user.userQuery).set(Some(x))),
+            addRoles()
+          ),
         sub("add-roles")
           .text("Add one or more roles to a user.")
           .action((x, c) => withSub(c, "addRoles"))
@@ -1160,7 +1169,7 @@ object CommandLine {
     entity,
     importdata,
     importmaps,
-    general,
+    common,
     metadata,
     optionsets,
     plugins,

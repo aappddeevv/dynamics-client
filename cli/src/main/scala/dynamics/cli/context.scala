@@ -26,6 +26,9 @@ trait Context[F[_]] {
   def close(): F[Unit]
 }
 
+/**
+ * Utilities for creating contexts.
+ */
 object contextdefaults {
   def makePolicy(common: CommonConfig): Middleware[IO] =
     common.retryPolicy match {

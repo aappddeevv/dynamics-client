@@ -17,7 +17,7 @@ import io.scalajs.RawOptions
 import io.scalajs.nodejs.events.IEventEmitter
 
 class MSSQLOptions(
-    val encrypet: js.UndefOr[Boolean] = js.undefined
+    val encrypt: js.UndefOr[Boolean] = js.undefined
 ) extends js.Object
 
 class MSSQLConfig(
@@ -79,7 +79,7 @@ trait SQLResult[A] extends js.Object {
 }
 
 @js.native
-trait Request extends js.Object with IEventEmitter {
+class Request(pool: ConnectionPool) extends js.Object with IEventEmitter {
   def input(p: String, t: Int, value: js.Any): Request = js.native
   def input(p: String, value: js.Any): Request         = js.native
   var stream: js.UndefOr[Boolean]                      = js.native

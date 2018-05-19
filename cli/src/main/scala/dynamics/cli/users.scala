@@ -20,6 +20,10 @@ import io.scalajs.npm.chalk._
 import js.Dynamic.{literal => jsobj}
 import cats.effect._
 
+import monocle.Lens
+import monocle.macros.GenLens
+import monocle.macros.syntax.lens._
+
 import dynamics.common._
 import dynamics.common.implicits._
 import dynamics.client._
@@ -27,10 +31,12 @@ import dynamics.client.implicits._
 import dynamics.http._
 import dynamics.http.implicits._
 import dynamics.client.common._
+import dynamics.common.fs2helpers.evalN
 import MonadlessIO._
 
 trait UsersDAO {
   val dynclient: DynamicsClient
+  val ec: ExecutionContext
 
   def getUsers() = {
     val query =
@@ -52,25 +58,15 @@ trait UsersDAO {
       filter = Some(s"internalemailaddress eq '${email}'"),
       expand = Seq(Expand("systemuserroles_association"))
     )
-    dynclient
-      .getList[SystemuserJS](q.url("systemusers"))
-      .map { u =>
-        if (u.size == 1) Some(u(0))
-        else None
-      }
+    dynclient.getOne[Option[SystemuserJS]](q.url("systemusers"))(ExpectOnlyOneToOption(ec))
   }
 
   def getRoleByName(name: String): IO[Option[RoleJS]] = {
     val q = QuerySpec(filter = Some(s"name eq '${name}'"))
-    dynclient
-      .getList[RoleJS](q.url("roles"))
-      .map { roles =>
-        if (roles.size == 1) Some(roles(0))
-        else None
-      }
+    dynclient.getOne[Option[RoleJS]](q.url("roles"))(ExpectOnlyOneToOption(ec))
   }
 
-  def getRolesForUser(id: String) = {
+  def getRolesForUser(id: String): IO[Seq[RoleJS]] = {
     val q = QuerySpec(
       properties = Seq(NavProperty("systemuserroles_association"))
     )
@@ -78,12 +74,11 @@ trait UsersDAO {
   }
 
   /** Get user and roles if user does not exist return None. */
-  def getUserAndCurrentRolesByEmail(email: String) = {
-    getUserByEmail(email)
-      .flatMap { userOpt =>
-        userOpt.fold(IO.pure(Option.empty[(SystemuserJS, Seq[RoleJS])]))(u =>
-          getRolesForUser(u.systemuserid).map(roles => Some((u, roles))))
-      }
+  def getUserAndCurrentRolesByEmail(email: String): IO[Option[(SystemuserJS, Seq[RoleJS])]] = {
+    getUserByEmail(email).flatMap {
+      case Some(user) => getRolesForUser(user.systemuserid).map(roles => Some((user, roles)))
+      case None => IO.pure(Option.empty)
+    }
   }
 
   def addRole(systemuserId: String, roleId: String) =
@@ -112,6 +107,7 @@ trait UsersDAO {
 
 class UsersActions(context: DynamicsContext) extends UsersDAO {
   import context._
+  val ec = context.e
   implicit val dec = JsObjectDecoder[SystemuserJS]()
   val dynclient    = context.dynclient
 
@@ -185,23 +181,26 @@ class UsersActions(context: DynamicsContext) extends UsersDAO {
                   currentRoles: Seq[RoleJS],
                   valid: Seq[String],
                   invalid: Seq[String],
-                  allRoles: Seq[RoleNameJS]): IO[String] = {
-    val roleNamesToAdd = valid intersect currentRoles.map(_.name)
+    allRoles: Seq[RoleNameJS]): IO[String] = {
+    val upn = user.internalemailaddress
+    val existing  = currentRoles.map(_.name)
+    val roleNamesToAdd = valid diff currentRoles.map(_.name) // valid intersect currentRoles.map(_.name)
     val rolesToAdd     = allRoles.filter(r => roleNamesToAdd.contains(r.name))
     //rolesToAdd.foreach{ e => js.Dynamic.global.console.log(e)}
-    rolesToAdd
-      .map(role => addRole(user.systemuserid, role.roleid).map(wasAdded => (role.name, wasAdded)))
-      .toList
-      .sequence
+    evalN(rolesToAdd.map(role => addRole(user.systemuserid, role.roleid).map(wasAdded => (role.name, wasAdded))))
       .flatMap { listOfResults =>
         val nonAdds = listOfResults.filterNot(p => p._2).map(_._1)
         val adds    = listOfResults.filter(p => p._2).map(_._1)
         val rolesAddedMsg =
-          if (adds.length == 0) s"""No roles added."""
-          else s"""Roles added (${listOfResults.length}): ${adds.mkString(", ")}"""
-        val rolesNotAdded = s"""Roles not added: ${nonAdds.mkString(", ")}"""
-        if (nonAdds.length > 0) IO(s"${rolesAddedMsg}\n${rolesNotAdded}")
-        else IO(rolesAddedMsg)
+          if (adds.length == 0) s"""$upn:\nNo roles added."""
+          else s"""$upn:\nRoles added (${listOfResults.length}): ${adds.mkString(", ")}"""
+        val rolesNotAdded =
+          if(nonAdds.length>0) s"""\nRoles not added: ${nonAdds.mkString(", ")}"""
+          else ""
+        val existingMsg =
+          if(existing.length>0) s"""\nExisting: ${existing.mkString(", ")}"""
+          else "User does did have any existing roles."
+        IO(s"${rolesAddedMsg}${rolesNotAdded}${existingMsg}")
       }
   }
 
@@ -209,7 +208,8 @@ class UsersActions(context: DynamicsContext) extends UsersDAO {
                      currentRoles: Seq[RoleJS],
                      valid: Seq[String],
                      invalid: Seq[String],
-                     allRoles: Seq[RoleNameJS]): IO[String] = {
+    allRoles: Seq[RoleNameJS]): IO[String] = {
+    val upn = user.internalemailaddress
     val currentRoleNames  = currentRoles.map(_.name)
     val roleNamesToRemove = valid intersect currentRoleNames
     val rolesToRemove     = allRoles.filter(r => roleNamesToRemove.contains(r.name))
@@ -221,8 +221,8 @@ class UsersActions(context: DynamicsContext) extends UsersDAO {
         val nonRemoves = listOfResults.filterNot(p => p._2).map(_._1)
         val removes    = listOfResults.filter(p => p._2).map(_._1)
         val rolesRemovedMsg =
-          if (removes.length == 0) s"""No roles removed."""
-          else s"""Roles removed (${listOfResults.length}): ${removes.mkString(", ")}"""
+          if (removes.length == 0) s"""$upn:\nNo roles removed."""
+          else s"""$upn:\nRoles removed (${listOfResults.length}): ${removes.mkString(", ")}"""
         val rolesNotRemoved = s"""Roles not added: ${nonRemoves.mkString(", ")}"""
         if (nonRemoves.length > 0) IO(s"${rolesRemovedMsg}\n${rolesNotRemoved}")
         else IO(rolesRemovedMsg)
@@ -236,7 +236,6 @@ class UsersActions(context: DynamicsContext) extends UsersDAO {
           validateRoleNames(config.user.roleNames)
             .map(roleCheck => (userStuff, roleCheck)))
         .flatMap {
-          _ match {
             case (_, (_, invalid, _)) if (invalid.length > 0) =>
               IO.pure(s"""Invalid names: ${invalid.mkString(", ")}""")
             case (None, _) =>
@@ -245,10 +244,22 @@ class UsersActions(context: DynamicsContext) extends UsersDAO {
               action(user, currentRoles, valid, Nil, allRoles)
             case _ =>
               IO.pure(s"""Internal error. Report this as a bug.""")
-          }
         }
         .map(println)
     }
+
+  val addRolesFromQuery = Action { config =>
+    // slow, but no time for writing cleaner code
+    dynclient.getListStream[SystemuserJS](config.user.userQuery.get)
+      .map { user =>
+        // coy entire config record changing just the userid (=UPN)
+        val ccopy = config.lens(_.user.userid).set(Some(user.internalemailaddress))
+        Stream.eval(doit(add _)(ccopy))
+      }
+      .join(config.common.concurrency)
+      .compile
+      .drain
+  }
 
   val addRoles    = doit(add _)
   val removeRoles = doit(remove _)
@@ -256,6 +267,7 @@ class UsersActions(context: DynamicsContext) extends UsersDAO {
   def get(command: String): Action = {
     command match {
       case "listUsers"     => list
+      case "addRolesFromQuery"     => addRolesFromQuery
       case "listUserRoles" => listUserRoles
       case "listRoles"     => listRoles
       case "addRoles"      => addRoles

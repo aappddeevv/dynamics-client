@@ -85,11 +85,7 @@ object MainHelpers extends LazyLogger {
     }
 
     // Add environment variables
-    val impersonateOpt = config.common.impersonate orElse nodejs.process.env.get("DYNAMICS_IMPERSONATE")
-    val config2 =
-      config
-        .lens(_.common.impersonate)
-        .set(impersonateOpt)
+    val config2 = config.lens(_.common).set(gatherEnvVariables(config.common))
 
     // io.scalajs.nodejs.process.onUnhandledRejection{(reason: String, p: js.Any) =>
     //   println(s"Unhandled promise error: $reason, $p")
@@ -111,9 +107,14 @@ object MainHelpers extends LazyLogger {
       .flatMap(_ => context.close())
       .attempt
       .flatMap(actionResultProcessor[Unit](config2.noisy, start))
-      .unsafeRunAsync{ _ =>
-        process.exit(0) // since this is running in the background, exit explicitly
+      .unsafeRunAsync{
+        case Left(t) =>
+          println(s"Error processing final results: ${t.getMessage()}")
+          process.exit(-1)
+        case Right(code) => process.exit(code)
       }
+    // End will be reached, but node will not exit until callbacks
+    // have completed.
   }
 
   /**
@@ -123,19 +124,25 @@ object MainHelpers extends LazyLogger {
    *
    * @param noisy Whether to print the runtime out.
    * @param start Start time information array from `process.hrtime`.
+   * @return program exit code
    */
   def actionResultProcessor[A](noisy: Boolean, start: Array[Int]):
-      Either[Throwable, A] => IO[Unit] =
+      Either[Throwable, A] => IO[Int] =
     _ match {
       case Right(_) =>
+        // completd Ok
         IO {
           val delta = processhack.hrtime(start)
           if (noisy) { println("\nRun time: " + delta(0) + " seconds.") }
+          0
         }
       case Left(t) =>
+        // completed with an exeception
+        // print runtime, return -1 exit code
         def runtime() = {
           val delta = processhack.hrtime(start)
           if (noisy) println("\nRun time: " + delta(0) + " seconds.")
+          -1
         }
         t match {
           case x: DynamicsError =>
@@ -175,10 +182,9 @@ object MainHelpers extends LazyLogger {
               IO {
                 println("Stack trace:")
                 x.printStackTrace()
-                runtime()
               })
               .sequence
-              .void
+              .map(_ => runtime())
           case x @ _ =>
             IO {
               println(s"Processing failed with a program exception ${t}")
@@ -303,4 +309,15 @@ object MainHelpers extends LazyLogger {
       case _ =>
         NoArgAction { println(s"Unrecognized command. This may be a bug. Please report it.") }
     })
+
+  /** Create a copy of CommonConfig to reflect enviroment variables relevant to
+   * dynamicsclient.
+   */ 
+  def gatherEnvVariables(c: CommonConfig): CommonConfig = {
+    val impersonateOpt = nodejs.process.env.get("DYNAMICS_IMPERSONATE") orElse c.impersonate
+    c
+      .lens(_.impersonate)
+      .set(impersonateOpt)
+
+  }
 }

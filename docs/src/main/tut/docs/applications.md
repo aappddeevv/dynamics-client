@@ -26,7 +26,7 @@ space in it, use proper shell quoting in your CLI. The application name must be
 the application unique name.
 
 Examples:
-* `dynamicscli applications roles add Salesperson new_MyApp`: Add the role to the application.
-* `dynamicscli applications roles remove Salesperson new_MyApp`: Remove the role from the application.
-* `dynamicscli applications roles add Salesperson,"Sales Manager" new_MyApp`: Add
+* `dynamicscli applications roles new_MyApp add Salesperson`: Add the role to the application.
+* `dynamicscli applications roles remove new_MyApp Salesperson_MyApp`: Remove the role from the application.
+* `dynamicscli applications roles new_MyApp add Salesperson,"Sales Manager"`: Add
   the Salesperson and "Sales Manager" roles to the application.

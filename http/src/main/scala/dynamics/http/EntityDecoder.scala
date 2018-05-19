@@ -259,8 +259,8 @@ trait EntityDecoderInstances {
   def ExpectOnlyOne[A <: js.Object](implicit ec: ExecutionContext) = ValueWrapper[A](ec)
 
   /**
-    * Transform a `DecodeFailure(OnlyOneExpected)` to None if present, otherwis
-    * Some.  Use as an explicit encoder and use a type of `Option[A]` e.g.
+    * Transform a `DecodeFailure(OnlyOneExpected)` to None if present, otherwise
+    * Some. Use as an explicit encoder and use a type of `Option[A]` e.g.
     * `dynamicsclient.getOne[Option[A]](..)(ExpectOnlyOneToOption)`.
     */
   def ExpectOnlyOneToOption[A <: js.Object](implicit ec: ExecutionContext) =

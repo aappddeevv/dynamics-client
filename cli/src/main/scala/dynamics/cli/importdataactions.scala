@@ -76,18 +76,20 @@ class ImportDataActions(val context: DynamicsContext) {
   }.compile.drain
 
   def reportImportStatus(importid: String): IO[Unit] =
-    dynclient.getOneWithKey[ImportJson]("imports", importid).map { i =>
-      val msg = AsyncOperation.ImportStatusCode
-        .get(i.statuscode.getOrElse(-1))
-        .getOrElse(s"No status code label for value ${i.statuscode}")
-      println(s"Import status (last process step completed): $msg")
-    }
+    dynclient.getOneWithKey[ImportJson]("imports", importid)
+      .map { i =>
+        val msg = AsyncOperation.ImportStatusCode
+          .get(i.statuscode.getOrElse(-1))
+          .getOrElse(s"No status code label for value ${i.statuscode}")
+        println(s"Import status (last process step completed): $msg")
+      }
 
   def reportErrors(importfileid: String) =
-    dynclient.getList[ImportLogJS](s"/importlogs?$$filter=importfileid/importfileid eq $importfileid").map { i =>
-      println("TODO: Make this a table.")
-      println(s"${IOUtils.render(i)}")
-    }
+    dynclient.getList[ImportLogJS](s"/importlogs?$$filter=importfileid/importfileid eq $importfileid")
+      .map { i =>
+        if(i.length>0) println("Import Logs:")
+        i.foreach(item => println(PrettyJson.render(item)))
+      }
 
   val ProcessingStatus = Map(
     1  -> "Not Started",
@@ -121,37 +123,31 @@ class ImportDataActions(val context: DynamicsContext) {
       val importRec = new ImportJson(s"$name", modecode = modecode)
       val waitforit = waitForJobStreamPrint(_: String, config.importdata.importDataPollingInterval.seconds) //curry
 
-      // val x = lift {
-      //   new TestJS(name = "blah")
-      // }
-
       if (!IOUtils.fexists(path))
         IO(println(s"File $path is not accessible for importing."))
       else
         lift {
           println("Creating import.")
-          val importid = unlift(dynclient.createReturnId("imports", JSON.stringify(importRec)))
-          println(s"Processing import job [$name] with id $importid.")
+          val _importid = unlift(dynclient.createReturnId("imports", JSON.stringify(importRec)))
+          println(s"Processing import job [$name] with id ${_importid}.")
 
           val whoami = unlift(dynclient.executeFunction[WhoAmI]("WhoAmI"))
           println(s"Using system user record owner with id ${whoami.UserId}")
 
           val qurl        = s"/importmaps?$$filter=name eq '$importmapname'&$$select=importmapid"
-          val importmapid = unlift(dynclient.getList[ImportMapOData](qurl).map(_(0).importmapid))
-          println(s"Using import map $importmapname with id $importmapid")
+          val _importmapid = unlift(dynclient.getList[ImportMapOData](qurl).map(_(0).importmapid))
+          println(s"Using import map $importmapname with id ${_importmapid}")
 
-          val mappingXml = unlift(new ImportMapActions(context).getImportMapXml(importmapid))
+          val mappingXml = unlift(new ImportMapActions(context).getImportMapXml(_importmapid))
           val (s, t)     = ImportMapUtils.getSourceAndTarget(mappingXml, importmapname)
 
-          //val x = new TestJS(name = "blah")
-
-          val content        = IOUtils.slurp(path)
+          val _content        = IOUtils.slurp(path)
           val recordsOwnerId = config.importdata.recordsOwnerId.getOrElse(whoami.UserId)
           val importfile = new ImportFileJson {
-            name = s"$name import"
+            name = s"${this.name} import"
             source = filename.get
             filetypecode = ftypeint
-            content = content
+            content = _content
             isfirstrowheader = true
             usesystemmap = false
             enableduplicatedetection = config.importdata.importDataEnableDuplicateDetection
@@ -160,8 +156,8 @@ class ImportDataActions(val context: DynamicsContext) {
             fielddelimitercode = FieldDelimiter.comma
             datadelimitercode = DataDelimiter.doublequote
             processcode = ProcessCode.Process
-            importid = s"/imports($importid)"
-            importmapid = s"/importmaps($importmapid)"
+            importid = s"/imports(${_importid})"
+            importmapid = s"/importmaps(${_importmapid})"
             recordsownerid_systemuser = s"/systemusers($recordsOwnerId)"
           }
           println("Starting import file stage.")
@@ -171,24 +167,24 @@ class ImportDataActions(val context: DynamicsContext) {
           val after = (jobid: String) =>
             for {
               _ <- waitforit(jobid)
-              _ <- reportImportStatus(importid)
+              _ <- reportImportStatus(_importid)
               _ <- reportErrors(ifileid)
             } yield jobid
 
           println("Starting parsing stage.")
-          unlift(requestParsing(importid) flatMap after)
+          unlift(requestParsing(_importid) flatMap after)
 
           println("Starting transform stage.")
-          unlift(requestTransform(importid) flatMap after)
+          unlift(requestTransform(_importid) flatMap after)
 
           println("Starting import records to CRM database stage.")
-          unlift(requestImport(importid) flatMap after)
+          unlift(requestImport(_importid) flatMap after)
 
           // Report import stats from the input file...
           unlift(reportImportFileBasicStats(ifileid, config.common.debug))
 
           // Report final status.
-          unlift(reportImportStatus(importid))
+          unlift(reportImportStatus(_importid))
         }
     }
   }
@@ -196,7 +192,7 @@ class ImportDataActions(val context: DynamicsContext) {
   def reportImportFileBasicStats(ifileid: String, debug: Boolean = false): IO[Unit] = {
     dynclient.getOneWithKey[ImportFileJson]("importfiles", ifileid).map { importrec =>
       if (debug) println(s"Importfile record: ${PrettyJson.render(importrec)}")
-      println(s"Status       : ${importrec.statuscode}")
+      println(s"Status       : ${importrec.statuscode_fv}")
       println(s"Total count  : ${importrec.totalcount}")
       println(s"Success count: ${importrec.successcount}")
       println(s"Failure count: ${importrec.failurecount}")

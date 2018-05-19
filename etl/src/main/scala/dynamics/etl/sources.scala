@@ -33,6 +33,11 @@ import dynamics.common._
 import fs2helpers._
 import dynamics.common.implicits._
 
+trait StreamValue[A] extends js.Object {
+  val index: Int
+  val value: A
+}
+
 object sources {
 
   type EventRegistration[F[_], A] = QueueForStream[F, A] => js.UndefOr[A] => Unit
@@ -97,7 +102,8 @@ object sources {
     * Stream a file containing JSON objects separated by newlines. Newlines
     * should be escaped inside JSON values. isArray = true implies that json
     * objects inside are wrapped in an array and hence have commas separating
-    * the objects.
+    * the objects. When streaming, the data structure returned has an index
+   * and a value field with the actual data. See [[StreamValue]].
     */
   def JSONFileSource[A](file: String, isArray: Boolean = false)(implicit ec: ExecutionContext): Stream[IO, A] = {
     Stream.bracket(IO {

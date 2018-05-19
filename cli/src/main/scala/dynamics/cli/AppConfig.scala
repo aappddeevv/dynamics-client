@@ -44,7 +44,8 @@ import dynamics.common._
     batch: Boolean = false,
     metadataCacheFile: Option[String] = None,
     ignoreMetadataCache: Boolean = false,
-    actionSelector: Option[ActionSelector] = Some(MainHelpers.defaultActionSelector),
+  actionSelector: Option[ActionSelector] = Some(MainHelpers.defaultActionSelector),
+  /** Also obtaned from the environment, normally. */
     impersonate: Option[String] = None,
 )
 
@@ -171,7 +172,6 @@ import dynamics.common._
     connectionFile: Option[String] = None,
 ) {
   val defaultConnectionFile = "sqlserver-connection.json"
-
   def connectionFileOrDefault: String = connectionFile.getOrElse(defaultConnectionFile)
 }
 
@@ -180,8 +180,10 @@ import dynamics.common._
 )
 
 @Lenses case class UserConfig(
+  /** Could be id or UPN... */
     userid: Option[String] = None,
-    roleNames: Seq[String] = Nil
+  roleNames: Seq[String] = Nil,
+  userQuery: Option[String] = None,
 )
 
 @Lenses case class TestConfig(

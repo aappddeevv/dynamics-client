@@ -710,3 +710,9 @@ trait Theme extends js.Object {
   val isdefaulttheme: Boolean
   val _logoimage_value: js.UndefOr[String] = js.undefined
 }
+
+@js.native
+trait BusinessUnitJS extends js.Object {
+  val businessunitid: String
+  val name: String
+}
