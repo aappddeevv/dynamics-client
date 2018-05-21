@@ -3,6 +3,8 @@ layout: docs
 title: actions
 ---
 
+# actions
+
 The `actions` command issues Action requests to the Dynamics server then prints the payload response to the standard output. 
 
 ## Subcommands

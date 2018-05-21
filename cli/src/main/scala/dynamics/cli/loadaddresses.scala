@@ -29,7 +29,7 @@ import dynamics.client._
 import dynamics.etl
 import etl._
 import etl.sources._
-import etl.jsdatahelpers._
+import dynamics.common.jsdatahelpers._
 
 import dynamics.client._
 import dynamics.http._
@@ -81,7 +81,7 @@ class LoadAddressesActions(val context: DynamicsContext) {
   def insertAddress(payload: String) = dynclient.createReturnId("/customeraddresses", payload)
 
   def xform(params: Map[String, String]) =
-    jsdatahelpers.stdConverter(params.get("keeps"), params.get("drops"), params.get("renames"))
+    stdConverter(params.get("keeps"), params.get("drops"), params.get("renames"))
 
   /**
     * Assumes parentid holds id. Mutates record.  Not currently used as its

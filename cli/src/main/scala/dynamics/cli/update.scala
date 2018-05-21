@@ -42,65 +42,107 @@ import dynamics.client._
 import dynamics.client.implicits._
 import dynamics.http.implicits._
 
+/** Rename a field from source to target. */
+trait Rename extends js.Object {
+  var source: js.UndefOr[String] = js.undefined
+  var target: js.UndefOr[String] = js.undefined  
+}
+
+/**
+ * Configuration for performing an update.
+ */
+trait UpdateProcessingConfig extends js.Object {
+  val entity: String
+  /** PK to use automatically based on entity if not specified. */
+  var pk: js.UndefOr[String] = js.undefined
+  /** Fieldnames to expand whitespace escape (\n,\t) in. */
+  var expandWhitespace: js.UndefOr[js.Array[String]] = js.undefined
+  var drops: js.UndefOr[js.Array[String]] = js.undefined
+  var keeps: js.UndefOr[js.Array[String]] = js.undefined
+  var renames: js.UndefOr[Rename] = js.undefined  
+  var take: js.UndefOr[Int] = js.undefined
+  var drop: js.UndefOr[Int] = js.undefined
+  var upsert: js.UndefOr[Boolean] = js.undefined
+  var upsertpreventcreate: js.UndefOr[Boolean] = js.undefined
+  var upsertpreventupdate: js.UndefOr[Boolean] = js.undefined
+}
+
 /**
   * Can run a generic upsert operation but requires data in a specific
   * format. The format is a sequence of json objects that are ready for an
   * update post. The payload should contain the id to be updated. If it's
-  * present but not yet an id, it will be used for an upsert operation.
+  * present but not yet an id, it will be used for an upsert operation.  Some
+  * advanced processing of individual attributes is available to help make
+  * updates easier e.g. lookups and newline expands.
   */
 class UpdateActions(val context: DynamicsContext) {
 
   import context._
   import dynamics.common.syntax.all._
   import dynamics.etl._
+  val meta = new MetadataCache(dynclient)
 
-  /** Run a quick stream test. */
-  val test = Action { config =>
-    val items = JSONFileSource[js.Object]("test.json")
-    val process = items.map { item =>
-      println(s"item: ${IOUtils.render(item)}")
+  def toProcessingConfig(config: UpdateConfig): UpdateProcessingConfig =
+    new UpdateProcessingConfig {
+      val entity = config.entity
+      pk = config.pk.orUndefined
+      upsert = config.upsert
+      drops = js.defined(config.drops.toJSArray)
+      keeps = js.defined(config.keeps.toJSArray)
+      //renames  = js.defined(config.renames.map)
+      take = config.take.orUndefined
+      drop = config.drop.orUndefined
+      upsertpreventcreate = config.upsertPreventCreate
+      upsertpreventupdate = config.upsertPreventUpdate
     }
-
-    IO(println("json streaming test"))
-      .flatMap { _ =>
-        process.compile.drain
-      }
-  }
 
   // TODO: Convert to batch
   val update = Action { config =>
+    // obtain processing config
+    val pconfig =
+      Utils.merge[UpdateProcessingConfig](
+        config.update.configFile.map(IOUtils.slurpAsJson[UpdateProcessingConfig](_)).getOrElse(null),
+        toProcessingConfig(config.update),
+      )
+
     println("Update records from a set of JSON objects.")
     val uc    = config.update
-    val pkcol = uc.updatePKColumnName
+    val pkcol = uc.pk
 
     val updateone =
-      dynclient.update(uc.updateEntity, _: String, _: String, uc.upsertPreventCreate, uc.upsertPreventUpdate)
+      dynclient.update(uc.entity, _: String, _: String, uc.upsertPreventCreate, uc.upsertPreventUpdate)
     //val updateone = (id: String, body: String) => dynclient.createReturnId(uc.updateEntity, body)
 
     // wraps actual file json object in another json object with the index, etc., data key is "value"
-    val records = JSONFileSource[js.Object](config.update.inputFile)
+    val records = JSONFileSource[StreamValue[js.Object]](config.update.inputFile)
     val updater = new UpdateProcessor(context)
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
     val runme =
-      records
-        .through(DropTake(uc.updateDrop.getOrElse(0), uc.updateTake.getOrElse(Int.MaxValue)))
-        .map(_.asDict[js.Object]("value"))
-        .through(toInput())
-        .map { a =>
-          counter.getAndIncrement(); a
+      Stream.eval(meta.pk(pconfig.entity))
+        .flatMap {
+          case Some(pk) =>
+            records
+              .through(DropTake(uc.drop.getOrElse(0), uc.take.getOrElse(Int.MaxValue)))
+              .map(_.value)
+              .through(toInput())
+              .map { a =>
+                counter.getAndIncrement(); a
+              }
+              .through(log[InputContext[js.Object]] { ic =>
+                if (config.common.debug) println(s"Input: $ic\n${PrettyJson.render(ic.input)}")
+              })
+            //.through(mkPipe(FilterAttributes(uc.updateDrops, uc.updateRenames, uc.updateKeeps)))
+            //.through(LogTransformResult[js.Object, js.Object]())
+            //.through(EmitResultDataWithTag[js.Object, js.Object]())
+              .map { p =>
+                //val ic = InputContext(p._1, p._2)
+                val ic = p
+                updater.mkOne(ic, pk, updateone)
+              }
+              .map(Stream.eval(_).map(println))
+          case _ =>
+            Stream(Stream.eval(IO(println(s"PK for entity ${pconfig.entity} not found."))))
         }
-        .through(log[InputContext[js.Object]] { ic =>
-          if (config.common.debug) println(s"Input: $ic\n${PrettyJson.render(ic.input)}")
-        })
-        //.through(mkPipe(FilterAttributes(uc.updateDrops, uc.updateRenames, uc.updateKeeps)))
-        //.through(LogTransformResult[js.Object, js.Object]())
-        //.through(EmitResultDataWithTag[js.Object, js.Object]())
-        .map { p =>
-          //val ic = InputContext(p._1, p._2)
-          val ic = p
-          updater.mkOne(ic, uc.updatePKColumnName, updateone)
-        }
-        .map(Stream.eval(_).map(println))
 
     runme
       .join(config.common.concurrency)
@@ -112,7 +154,6 @@ class UpdateActions(val context: DynamicsContext) {
   def get(command: String): Action = {
     command match {
       case "entity" => update
-      case "test"   => test
       case _ =>
         Action { _ =>
           IO(println(s"update command '${command}' not recognized."))

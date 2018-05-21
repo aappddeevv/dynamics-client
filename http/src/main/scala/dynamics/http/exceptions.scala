@@ -6,7 +6,7 @@ package dynamics
 package http
 
 import scala.collection.mutable
-
+import cats._
 import dynamics.common._
 
 /**
@@ -23,6 +23,14 @@ final case class UnexpectedStatus[F[_]](status: Status,
       .toString()}, response=${response.toString()}"""
   }
 }
+
+trait HTTPExceptionsInstances {
+  implicit def showForUnexpectedStatus[F[_]: Monad] = Show.show[UnexpectedStatus[F]]{ ex =>
+    val reason = Option(ex.status.reason).map("(" + _ + ")").getOrElse("")
+    s"UnexpectedStatus status=${ex.status}$reason"
+  }
+}
+
 
 /** Message failure in the http layer. */
 sealed abstract class MessageFailure extends RuntimeException {

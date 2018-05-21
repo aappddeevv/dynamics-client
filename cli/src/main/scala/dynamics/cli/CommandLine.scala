@@ -270,7 +270,7 @@ object CommandLine {
           .children(
             arg[String]("entity")
               .text("Entity set (plural) to update. Use the entity set name which is usually lowercase and ends with an 's'.")
-              .action((x, c) => c.copy(update = c.update.copy(updateEntity = x))),
+              .action((x, c) => c.copy(update = c.update.copy(entity = x))),
             arg[String]("inputfile")
               .text("JSON streaming data file. JSON records separated by newlines.")
               .action((x, c) => c.lens(_.update.inputFile).set(x)),
@@ -282,28 +282,31 @@ object CommandLine {
               .action((x, c) => c.copy(update = c.update.copy(upsertPreventUpdate = x))),
             opt[String]("pk")
               .text("Name of PK in the data input. Defaults to id (case insensitive.")
-              .action((x, c) => c.lens(_.update.updatePKColumnName).set(x)),
+              .action((x, c) => c.lens(_.update.pk).set(Some(x))),
             opt[Seq[String]]("drops")
               .text("Drop columns. Logical column names separate by commas. Can be specifed multiple times. PK column is automatically dropped.")
-              .action((x, c) => c.copy(update = c.update.copy(updateDrops = c.update.updateDrops ++ x))),
+              .action((x, c) => c.lens(_.update.drops).set(x)),
             opt[Seq[String]]("keeps")
               .text("Keep columns. Logical column names separate by commas. Can be specifed multiple times.")
-              .action((x, c) => c.copy(update = c.update.copy(updateKeeps = c.update.updateKeeps ++ x))),
+              .action((x, c) => c.lens(_.update.keeps).set(x)),
             opt[Int]("take")
               .text("Process only N records.")
-              .action((x, c) => c.copy(update = c.update.copy(updateTake = Some(x)))),
+              .action((x, c) => c.lens(_.update.take).set(Some(x))),
             opt[Int]("drop")
               .text("Drop first N records.")
-              .action((x, c) => c.copy(update = c.update.copy(updateDrop = Some(x)))),
-            opt[Seq[String]]("renames")
+              .action((x, c) => c.lens(_.update.drop).set(Some(x))),
+            opt[String]("config-file")
+              .text("Config file in json format.")
+              .action((x, c) => c.lens(_.update.configFile).set(Option(x))),
+            opt[Map[String, String]]("renames")
               .text("Rename columns. Paris of oldname=newname, separate by commas. Can be specified multiple times.")
               .action { (x, c) =>
-                val pairs = x.map(p => p.split('=')).map { a =>
-                  if (a.size != 2 || (a(0).size == 0 || a(1).size == 0))
-                    throw new IllegalArgumentException(s"Each rename pair of values must be separated by '=': $a.")
-                  (a(0), a(1))
-                }
-                c.copy(update = c.update.copy(updateRenames = c.update.updateRenames ++ pairs))
+                // val pairs = x.map(p => p.split('=')).map { a =>
+                //   if (a.size != 2 || (a(0).size == 0 || a(1).size == 0))
+                //     throw new IllegalArgumentException(s"Each rename pair of values must be separated by '=': $a.")
+                //   (a(0), a(1))
+                // }
+                c.lens(_.update.renames).modify(p => p ++ x.toSeq)
               },
             note(
               "This is command updates and inserts if upsertpreventcreate is false. It can be difficult to get the json just right."),
@@ -473,7 +476,7 @@ object CommandLine {
             mkFilterOpt().required()
           ),
         sub("dump-errors")
-          .text("Dump logs of any import file that has errors.")
+          .text("Dump logs of any import file that has errors. NOT IMPLEMENTED.")
           .action((x,c) => withSub(c, "dumperrors")),
         sub("import")
           .text("Import data.")

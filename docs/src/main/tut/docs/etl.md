@@ -3,6 +3,8 @@ layout: docs
 title: ETL
 ---
 
+# etl
+
 You can write a simple ETL program using the dynamics-client library. Some ETL
 supporting functions are available to assist you. With this, you write simple
 ETL programs that perform more advanced manipulation of your data while still

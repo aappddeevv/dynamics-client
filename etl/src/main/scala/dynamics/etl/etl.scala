@@ -15,6 +15,7 @@ import cats.effect._
 import dynamics.common._
 import fs2helpers._
 import common.syntax.jsobject._
+import dynamics.common.jsdatahelpers._
 
 package object etl {
 
@@ -34,7 +35,7 @@ package object etl {
 
   /** Deep copy the input object. The deep copy is _2. */
   val DeepCopy: Pipe[IO, DataRecord, (DataRecord, DataRecord)] =
-    _ map (orig => (orig, jsdatahelpers.deepCopy(orig)))
+    _ map (orig => (orig, deepCopy(orig)))
 
   /** Emit the individual results objects.
     * Since you lose the TransformResult, you will want to log
@@ -79,8 +80,8 @@ package object etl {
     Transform.instance { input: InputContext[DataRecord] =>
       import dynamics.common.syntax.jsobject._
       IO {
-        val j0 = jsdatahelpers.updateObject(drops, renames, input.input.asDict[js.Any])
-        val j1 = jsdatahelpers.keepOnly(j0, keeps: _*)
+        val j0 = updateObject(drops, renames, input.input.asDict[js.Any])
+        val j1 = keepOnly(j0, keeps: _*)
         TransformResult.success(Result(input.source, Stream.emit(j1.asInstanceOf[js.Object])))
       }
     }
@@ -90,7 +91,7 @@ package object etl {
     */
   def UpdateObject[A](drops: Seq[String], renames: Seq[(String, String)], f: A => DataRecord): Pipe[IO, A, A] =
     _ map { a =>
-      jsdatahelpers.updateObject[A](drops, renames, f(a).asAnyDict)
+      updateObject[A](drops, renames, f(a).asAnyDict)
       a
     }
 

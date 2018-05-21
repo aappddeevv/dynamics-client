@@ -44,12 +44,15 @@ trait DynamicsInnerErrorJS extends js.Object {
   val stacktrace: js.UndefOr[String] = js.undefined
 }
 
+/** Scala version of ODataErrorJS error. */
 trait ServerError {
   def code: String
   def message: String
 }
 
+/** Scala version of inner DynamicsInnerErrorJS */
 case class InnerError(etype: String, message: String, stacktrace: String)
+/** Scala version of a dynamics server error. */ 
 case class DynamicsServerError(code: String, message: String, innererror: Option[InnerError] = None) extends ServerError
 
 object DynamicsServerError {

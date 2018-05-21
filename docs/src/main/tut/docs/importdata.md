@@ -3,6 +3,8 @@ layout: docs
 title: importdata
 ---
 
+# importdata
+
 importdata allows you to importdata. Combined with other CLI programs such as
 csv_splitter.py (included) and the program "parallel", you can easily create and
 execute parallel loads using the standard data import facility. This allows you

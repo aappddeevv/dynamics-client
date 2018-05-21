@@ -12,7 +12,7 @@ object Dependencies {
     "org.scalatest"          %%% "scalatest"    % "latest.release" % "test",
     "co.fs2" %%% "fs2-core" % "0.10.4",
     "org.typelevel" %%% "cats-core" % "1.1.0",
-    "org.typelevel" %%% "cats-effect" % "0.10",
+    "org.typelevel" %%% "cats-effect" % "0.10.1",
     //"com.github.mpilquist" %%% "simulacrum" % "0.10.0",
     //"com.softwaremill.retry" %%% "retry" % "0.3.0",
     "com.github.cb372" %%% "scalacache-core" % "0.10.0",

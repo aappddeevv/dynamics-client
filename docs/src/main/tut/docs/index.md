@@ -3,6 +3,8 @@ layout: docs
 title: CLI
 ---
 
+# Getting Started
+
 The default CLI program provides multiple types of functionality.
 
 * A swiss-army knife utility that performs a multitude of tasks. You can perform

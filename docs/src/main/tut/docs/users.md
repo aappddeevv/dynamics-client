@@ -3,6 +3,8 @@ layout: docs
 title: users
 ---
 
+# users
+
 The `users` command allows you to manag some aspects of users. Users are
 typically identified by their email address. "users" are under the "systemuser"
 entity.

@@ -104,91 +104,105 @@ object MainHelpers extends LazyLogger {
 
     // Run the action, print messages/errors, cleanup.
     action(config2)
-      .flatMap(_ => context.close())
       .attempt
+      .map{x => context.close(); x }
       .flatMap(actionResultProcessor[Unit](config2.noisy, start))
       .unsafeRunAsync{
         case Left(t) =>
-          println(s"Error processing final results: ${t.getMessage()}")
+          println(s"Error processing final results. Original error may be lost.")
+          println(s"${t.getMessage()}")
+          println(Utils.getStackTraceAsString(t))
           process.exit(-1)
-        case Right(code) => process.exit(code)
+        case Right((msg, code)) =>
+          println(msg)
+          process.exit(code)
       }
     // End will be reached, but node will not exit until callbacks
-    // have completed.
+    // (the unsafeRunAsync above) have completed.
   }
 
   /**
    * Process an `Attempt[A] = Either[Throwable, A]` from an Action run. Left
    * exceptions are matched and printed out otherwise the program result is
-   * printed.
+   * printed. The output program message may be quite voluminous if there
+   * was an error.
    *
    * @param noisy Whether to print the runtime out.
    * @param start Start time information array from `process.hrtime`.
-   * @return program exit code
+   * @return Tuple of final program message and program exit code.
    */
   def actionResultProcessor[A](noisy: Boolean, start: Array[Int]):
-      Either[Throwable, A] => IO[Int] =
+      Either[Throwable, A] => IO[(String, Int)] =
     _ match {
       case Right(_) =>
         // completd Ok
         IO {
           val delta = processhack.hrtime(start)
-          if (noisy) { println("\nRun time: " + delta(0) + " seconds.") }
-          0
+          val msg =
+            if (noisy) "\nRun time: " + delta(0) + " seconds."
+            else ""
+          (msg, 0)
         }
       case Left(t) =>
-        // completed with an exeception
-        // print runtime, return -1 exit code
+        // Completed with an exeception, need to print out the exception
+        // infomation as robustly as possible given that some content may be
+        // wrapped up in some effects.
+        import java.io._
+        val sw = new StringWriter(1024)
+        val pw = new PrintWriter(sw)
+
         def runtime() = {
           val delta = processhack.hrtime(start)
-          if (noisy) println("\nRun time: " + delta(0) + " seconds.")
-          -1
+          if (noisy) pw.println("Run time: " + delta(0) + " seconds.")
+          (sw.toString(), -1)
         }
         t match {
           case x: DynamicsError =>
             IO {
-              println(s"An error occurred communicating with the CRM server.")
-              println(x.show)
+              pw.println(s"An error occurred communicating with the CRM server.")
+              pw.println(x.show)
               x.underlying.foreach { ex =>
-                println(s"Underlying stacktrace:")
-                ex.printStackTrace()
+                pw.println(s"Underlying stacktrace:")
+                pw.println(Utils.getStackTraceAsString(ex))
               }
               runtime()
             }
           case x: js.JavaScriptException =>
             IO {
-              println(s"Internal error during processing: ${x}. Processing stopped.")
-              println("Report this as a bug.")
-              x.printStackTrace()
+              pw.println(s"Internal error during processing: ${x}. Processing stopped.")
+              pw.println("Report this as a bug.")
+              pw.println(Utils.getStackTraceAsString(x))
               runtime()
             }
           case x: TokenRequestError =>
             IO {
-              println(s"Unable to acquire authentication token. Processing stopped.")
-              println(x)
+              pw.println(s"Unable to acquire authentication token. Processing stopped.")
+              pw.println(x)
               runtime()              
             }
           case x @ UnexpectedStatus(s, reqOpt, respOpt) =>
-            val reqb = reqOpt.fold(IO(println(s"Body: NA")))(_.body.map(b => println(s"Body:\n$b")))
-            val respb = respOpt.fold(IO(println(s"Body: NA")))(_.body.map(b => println(s"Body:\n$b")))
+            val reqb =
+              reqOpt.fold(IO(pw.println(s"Body: NA")))(_.body.map(b => pw.println(s"Body:\n$b")))
+            val respb =
+              respOpt.fold(IO(pw.println(s"Body: NA")))(_.body.map(b => pw.println(s"Body:\n$b")))
             List(
               IO {
-                println(s"A server call returned an unexpected status and processing stopped: $s.")
-                println(reqOpt.map(r => s"Request: $r").getOrElse("Request: NA"))
+                pw.println(s"A server call returned an unexpected status and processing stopped: $s.")
+                pw.println(reqOpt.map(r => s"Request: $r").getOrElse("Request: NA"))
               },
               reqb,
-              IO { println(respOpt.map(r => s"Response: $r").getOrElse("Response: NA")) },
+              IO {pw. println(respOpt.map(r => s"Response: $r").getOrElse("Response: NA")) },
               respb,
               IO {
-                println("Stack trace:")
-                x.printStackTrace()
+                pw.println("Stack trace:")
+                pw.println(Utils.getStackTraceAsString(x))
               })
               .sequence
               .map(_ => runtime())
           case x @ _ =>
             IO {
-              println(s"Processing failed with a program exception ${t}")
-              x.printStackTrace()
+              pw.println(s"Processing failed with a program exception ${t}")
+              pw.println(Utils.getStackTraceAsString(x))
               runtime()              
             }
         }

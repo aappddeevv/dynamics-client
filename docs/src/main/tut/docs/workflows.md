@@ -3,6 +3,8 @@ layout: docs
 title: workflows
 ---
 
+# workflows
+
 The `workflows` command manages workflows. It can execute workflows against a query as well as change a workflow status.
 
 

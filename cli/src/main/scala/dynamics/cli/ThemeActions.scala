@@ -36,7 +36,7 @@ import dynamics.http.implicits._
 import dynamics.client._
 import dynamics.client.implicits._
 import client.common._
-import dynamics.etl.jsdatahelpers._
+import dynamics.common.jsdatahelpers._
 
 class ThemeActions(val context: DynamicsContext) {
 
@@ -82,14 +82,14 @@ class ThemeActions(val context: DynamicsContext) {
 
   val list = Action { config =>
     dynclient
-      .getList[Theme]("/themes")
+      .getList[Theme]("/themes?$orderby=name")
       .flatMap { items =>
         Listings.mkList(config.common, items, Seq("themeid", "name", "default", "custom")) { theme =>
           Seq(theme.themeid, theme.name, theme.isdefaulttheme.toString, theme.`type`.toString)
         }
       }
       .map(println)
-      .map(_ => ())
+      .void
   }
 
   /** Read file, convert to baes64. */

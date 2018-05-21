@@ -3,6 +3,8 @@ layout: docs
 title: update
 ---
 
+# update
+
 The `update` command allows you to update entities based on an input json
 file. You can also perform inserts via the "upsert" concept.
 

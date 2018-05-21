@@ -96,6 +96,12 @@ object headers {
     LookupLogicalName            -> (_ + "_lln"),
   )
 
+  val defaultODataToOmit = Seq[String](
+    FormattedValue,
+    AssociatedNavigationProperty,
+    LookupLogicalName,
+  )
+
   import scala.scalajs.js
   import js.|
   import dynamics.common.Utils.{merge}
@@ -124,4 +130,7 @@ object headers {
     merge[O](obj, mergemeafter.asInstanceOf[O])
   }
 
+  /** Remove any attribute that has a `@` annotation in its name. */
+  def dropODataFields[O <: js.Object](obj: O, patterns: Seq[String] = defaultODataToOmit): O =
+    dynamics.common.jsdatahelpers.omitIfMatch(obj.asInstanceOf[js.Dictionary[js.Any]], patterns).asInstanceOf[O]
 }

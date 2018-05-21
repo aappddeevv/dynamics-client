@@ -3,7 +3,7 @@
 // For more information see LICENSE or https://opensource.org/licenses/MIT
 
 package dynamics
-package etl
+package common
 
 import scala.scalajs.js
 import js._
@@ -19,16 +19,16 @@ import dynamics.common._
 import dynamics.common.implicits._
 
 /**
-  * Helpers when working with scalajs data, specifically, js.Object, js.Dynamic and
-  * js.Dictionary. Most of these mutate the input source so create a copy of the data
-  * prior to calling if you want.
-  */
+ * Helpers when working with scalajs data, specifically, js.Object, js.Dynamic and
+ * js.Dictionary. Most of these mutate the input source so create a copy of the data
+ * prior to calling if you want.
+ */
 trait JSDataHelpers {
 
   /**
-    * Assuming a property is a string, omit the property from the object if its blank.
-    * This is a mutating action.
-    */
+   * Assuming a property is a string, omit the property from the object if its blank.
+   * This is a mutating action.
+   */
   @inline
   def pruneIfBlank(obj: JsAnyDict, p: String*): obj.type = {
     p.foreach { k =>
@@ -42,8 +42,8 @@ trait JSDataHelpers {
   def deepCopy(obj: js.Object): js.Object = JSON.parse(JSON.stringify(obj)).asInstanceOf[js.Object]
 
   /**
-    * If the property is present and is not blank, apply f to it.
-    */
+   * If the property is present and is not blank, apply f to it.
+   */
   @inline
   def replaceIfBlank(obj: JsAnyDict, p: String, f: js.Any => js.Any): obj.type =
     xfObj[js.Any](obj, p, {
@@ -61,7 +61,7 @@ trait JSDataHelpers {
     obj
   }
 
-  /** If property is present, return true if its value is string 0|blank|null|undefined. Otherwise, return false. */
+  /** If property is present, return true if its value is js truthy true else return false. */
   @inline
   def isBlank(obj: JsAnyDict, p: String): Boolean =
     obj.contains(p) && !DynamicImplicits.truthValue(obj(p).asDyn)
@@ -77,9 +77,9 @@ trait JSDataHelpers {
   def roundAt(p: Int)(n: Double): Double = { val s = math pow (10, p); (math round n * s) / s }
 
   /**
-    * Get a value in the js object and return it wrapped in `Option`. If found,
-    * it is removed from the object, a mutating operation.
-    */
+   * Get a value in the js object and return it wrapped in `Option`. If found,
+   * it is removed from the object, a mutating operation.
+   */
   @inline
   def getAndZap[A](j: JsAnyDict, p: String): Option[A] = {
     val r = j.get(p).asInstanceOf[Option[A]]
@@ -92,6 +92,17 @@ trait JSDataHelpers {
   def omit(j: js.Dictionary[_], keys: String*): j.type = {
     keys.foreach { j.remove(_) }
     j
+  }
+
+  /** Removes keys if the field name contains the pattern substring. This does not
+   * use regex.
+   * @todo Make this more efficient.
+   */
+  @inline
+  def omitIfMatch(j: js.Dictionary[_], patterns: Seq[String]): j.type = {
+    def contains(a: String): Boolean = patterns.map(a.contains(_)).collect{ case x if x => x}.length >0
+    val deletes = j.keys.map(n => (contains(n), n)).collect { case (f, n) if f => n }
+    omit(j, deletes.toSeq:_*)
   }
 
   @inline

@@ -3,6 +3,8 @@ layout: docs
 title: settings
 ---
 
+# settings
+
 The `settings` command sets traditionally unsettable org settings using undocumented API. It is equivalent to Settings>Administration>System Settings.
 
 This command does not support the "previews" settings, which can more rapidly change over time.

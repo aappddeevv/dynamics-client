@@ -141,17 +141,19 @@ import dynamics.common._
 
 @Lenses case class UpdateConfig(
     inputFile: String = "",
-    updateUpsert: Boolean = false,
-    updateEntity: String = "",
-    updatePKColumnName: String = "id",
+    upsert: Boolean = false,
+    entity: String = "",
+    pk: Option[String] = Some("id"),
     upsertPreventCreate: Boolean = true,
     upsertPreventUpdate: Boolean = false,
-    updateRenames: Seq[(String, String)] = Nil,
-    updateKeeps: Seq[String] = Nil,
-    updateDrops: Seq[String] = Nil,
-    updateDrop: Option[Int] = None,
-    updateTake: Option[Int] = None,
-    updateTransform: etl.Transform[js.Object, js.Object] = etl.Transform.identity[js.Object]
+    renames: Seq[(String, String)] = Nil,
+    keeps: Seq[String] = Nil,
+    drops: Seq[String] = Nil,
+    drop: Option[Int] = None,
+    take: Option[Int] = None,
+  updateTransform: etl.Transform[js.Object, js.Object] = etl.Transform.identity[js.Object],
+  configFile: Option[String] = None,
+  cnofig: Option[UpdateProcessingConfig] = None,
 )
 
 @Lenses case class ETLConfig(

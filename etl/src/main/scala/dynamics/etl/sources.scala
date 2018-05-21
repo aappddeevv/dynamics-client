@@ -44,11 +44,11 @@ object sources {
 
   /**
     * Convert a readable to a fs2 Stream given a specific set of events and
-    * their handlers. Each handler can signal the end of the stream by
-    * enqueuing None or an error by returning a Left. Handler return results via
+    * their handlers. Each handler can signal the end of the stream by enqueuing
+    * None or signal an error by returning a Left. Handler return results via
     * `qparam.enqueue1(Some(Right(data))).unsafeRunAsync(_ => ())` or something
-    * similar. If your callbacks all have different types, you may have
-    * to type out your own conversion or cast.
+    * similar. If your callbacks all have different types, you may have to type
+    * out your own conversion or cast.
     */
   def jsToFs2Stream[F[_], A](events: Seq[(String, EventRegistration[F, A])],
                              source: io.scalajs.nodejs.events.IEventEmitter,

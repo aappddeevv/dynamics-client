@@ -2,6 +2,7 @@
 layout: docs
 title: Solution Deployment
 ---
+
 # Solution Deployment
 
 The dynamics SDK provides a solution deployer tool which you can use to bundle

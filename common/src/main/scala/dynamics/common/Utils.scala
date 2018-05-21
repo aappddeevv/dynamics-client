@@ -5,6 +5,7 @@
 package dynamics
 package common
 
+import java.io._
 import scala.scalajs.js
 import js.|
 import scala.concurrent._
@@ -87,8 +88,7 @@ object Utils {
   /**
     * This is really just a Semigroup "combine" operation but it does *not* use
     * "combine" at lower levels of the structure i.e. a shallow copy. Last
-    * object's fields
-    * wins.
+    * object's fields wins. Handles null inputs.
     *
     * @see https://stackoverflow.com/questions/36561209/is-it-possible-to-combine-two-js-dynamic-objects
     */
@@ -103,8 +103,9 @@ object Utils {
   }
 
   /**
-    * Merge objects and Ts together. Good for merging props with data- attributes.
-    * See the note from [[mergeJSObjects]]. Last object's fields win.
+    * Merge objects and Ts together. Good for merging props with data-
+    * attributes. Handles null inputs.  See the note from
+    * [[mergeJSObjects]]. Last object's fields win.
     */
   @inline def merge[T <: js.Object](objs: T | js.Dynamic*): T = {
     val result = js.Dictionary.empty[Any]
@@ -124,4 +125,19 @@ object Utils {
 
   /** Clean an id that has braces around it. */
   @inline def cleanId(id: String): String = id.stripSuffix("}").stripPrefix("{").trim
+
+  /** Given a throwable, convert the stacktrace to a string for printing. */
+  def getStackTraceAsString(t: Throwable): String = {
+    val sw = new StringWriter
+    t.printStackTrace(new PrintWriter(sw))
+    sw.toString
+  }
+
+  /** Strip a string suitable for a text attribute in dynamics. Essentially, it
+   * preserves some ASCII characters and leaves a few whitespace control
+   * characters.
+   */
+  def strip(in: String): String =
+    in.replaceAll("[\\p{Cntrl}&&[^\n\t\r]]", "").replaceAll("\\P{InBasic_Latin}", "")
+
 }

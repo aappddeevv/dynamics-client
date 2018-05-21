@@ -3,6 +3,8 @@ layout: docs
 title: themes
 ---
 
+# themes
+
 themes allows you to manage some aspects of themes including cloning, updating and setting the logo.
 
 ## Subcommands

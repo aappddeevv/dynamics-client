@@ -6,6 +6,7 @@ package dynamics
 
 import scala.concurrent._
 import scala.scalajs.js
+import scalajs.runtime.wrapJavaScriptException
 import js.|
 import fs2._
 import cats.~>
@@ -20,16 +21,9 @@ package object common {
   private[dynamics] def _jsPromiseToIO[A](p: js.Promise[A])(implicit ec: ExecutionContext): IO[A] =
     IO.async { cb =>
       p.`then`[Unit](
-        { (v: A) =>
-          cb(Right(v))
-        },
+        { (v: A) => cb(Right(v))},
         js.defined { (e: scala.Any) =>
-          // create a Throwable from e
-          val t = e match {
-            case th: Throwable => th
-            case _             => js.JavaScriptException(e)
-          }
-          cb(Left(t))
+          cb(Left(wrapJavaScriptException(e)))
         }
       )
       () // return unit

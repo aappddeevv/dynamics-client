@@ -166,12 +166,22 @@ class ChangeAsyncJobState(
 ) extends js.Object
 
 @js.native
-trait AsyncOperationOData extends js.Object {
+trait StatusCode extends js.Object {
+  var statecode: UndefOr[Int]           = js.native
+  @JSName("statecode@OData.Community.Display.V1.FormattedValue")
+  var statecode_fv: UndefOr[String] = js.native
+
+  var statuscode: UndefOr[Int]          = js.native
+  @JSName("statuscode@OData.Community.Display.V1.FormattedValue")
+  var statuscode_fv: UndefOr[String] = js.native
+}
+
+@js.native
+trait AsyncOperationOData extends StatusCode {
   val asyncoperationid: UndefOr[String] = js.native
   val name: UndefOr[String]             = js.native
   val startedon: UndefOr[String]        = js.native
-  val statecode: UndefOr[Int]           = js.native
-  val statuscode: UndefOr[Int]          = js.native
+
   val operationtype: UndefOr[Int]       = js.native
   val executiontimespan: UndefOr[Float] = js.native
 }
@@ -393,13 +403,26 @@ class ImportJson(
     val modecode: Int = ModeCode.Create,
     val sendnotification: js.UndefOr[Boolean] = js.undefined,
     val emailaddress: js.UndefOr[String] = js.undefined,
-    val statuscode: js.UndefOr[Int] = js.undefined,
-    val createdon: js.UndefOr[String] = js.undefined,
-    val statecode: js.UndefOr[Int] = js.undefined,
+  val createdon: js.UndefOr[String] = js.undefined,
+
+  val statuscode: js.UndefOr[Int] = js.undefined,
+  val statecode: js.UndefOr[Int] = js.undefined,
+
     val Import_ImportFile: js.UndefOr[js.Array[ImportFileJson]] = js.undefined,
     val Import_AsyncOperations: js.UndefOr[js.Array[AsyncOperationOData]] = js.undefined,
     val importid: js.UndefOr[String] = js.undefined
 ) extends js.Object
+
+@js.native
+trait ImportJSListing extends js.Object {
+  val name: String
+  val importid: String
+  @JSName("statuscode@OData.Community.Display.V1.FormattedValue")
+  val statuscode_fv: String
+  @JSName("createdon@OData.Community.Display.V1.FormattedValue")
+  val createdon_fv: String
+  val sequence: Int
+}
 
 object IsImport {
   val Migration = 0

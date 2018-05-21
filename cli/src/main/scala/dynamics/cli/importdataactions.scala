@@ -31,7 +31,7 @@ import client.common._
 
 case class EnityReference(entity: String, id: String)
 
-class ImportDataActions(val context: DynamicsContext) {
+class ImportDataActions(val context: DynamicsContext) { self =>
 
   import context._
   import dynamics.common.implicits._
@@ -75,19 +75,19 @@ class ImportDataActions(val context: DynamicsContext) {
     }
   }.compile.drain
 
-  def reportImportStatus(importid: String): IO[Unit] =
+  def reportImportStatus(name: String, importid: String): IO[Unit] =
     dynclient.getOneWithKey[ImportJson]("imports", importid)
       .map { i =>
         val msg = AsyncOperation.ImportStatusCode
           .get(i.statuscode.getOrElse(-1))
-          .getOrElse(s"No status code label for value ${i.statuscode}")
-        println(s"Import status (last process step completed): $msg")
+          .getOrElse(s"[$name]: No status code label for value ${i.statuscode}")
+        println(s"[$name]: Import status (last process step completed): $msg")
       }
 
-  def reportErrors(importfileid: String) =
+  def reportErrors(name: String, importfileid: String) =
     dynclient.getList[ImportLogJS](s"/importlogs?$$filter=importfileid/importfileid eq $importfileid")
       .map { i =>
-        if(i.length>0) println("Import Logs:")
+        if(i.length>0) println(s"[$name]: Import Logs:")
         i.foreach(item => println(PrettyJson.render(item)))
       }
 
@@ -113,7 +113,9 @@ class ImportDataActions(val context: DynamicsContext) {
       val importmapname = config.importdata.importDataImportMapName
       val name =
         config.importdata.importDataName.getOrElse(IOUtils.filename(path).get) + " using " + importmapname
-      println(s"Import job name: [$name]")
+
+      def log(msg: String): Unit = println(s"[$name]: $msg")
+      log(s"[$name]: Import job name: [$name]")
 
       val filename = IOUtils.namepart(path)
 
@@ -124,27 +126,28 @@ class ImportDataActions(val context: DynamicsContext) {
       val waitforit = waitForJobStreamPrint(_: String, config.importdata.importDataPollingInterval.seconds) //curry
 
       if (!IOUtils.fexists(path))
-        IO(println(s"File $path is not accessible for importing."))
+        IO(log(s"File $path is not accessible for importing."))
       else
         lift {
-          println("Creating import.")
+          log("Creating import.")
           val _importid = unlift(dynclient.createReturnId("imports", JSON.stringify(importRec)))
-          println(s"Processing import job [$name] with id ${_importid}.")
+          log(s"Processing import job [$name] with id ${_importid}.")
 
           val whoami = unlift(dynclient.executeFunction[WhoAmI]("WhoAmI"))
-          println(s"Using system user record owner with id ${whoami.UserId}")
+          log(s"Using system user record owner with id ${whoami.UserId}")
 
           val qurl        = s"/importmaps?$$filter=name eq '$importmapname'&$$select=importmapid"
           val _importmapid = unlift(dynclient.getList[ImportMapOData](qurl).map(_(0).importmapid))
-          println(s"Using import map $importmapname with id ${_importmapid}")
+          log(s"Using import map $importmapname with id ${_importmapid}")
 
           val mappingXml = unlift(new ImportMapActions(context).getImportMapXml(_importmapid))
           val (s, t)     = ImportMapUtils.getSourceAndTarget(mappingXml, importmapname)
 
           val _content        = IOUtils.slurp(path)
           val recordsOwnerId = config.importdata.recordsOwnerId.getOrElse(whoami.UserId)
+          val _name = name
           val importfile = new ImportFileJson {
-            name = s"${this.name} import"
+            name = s"${_name} import"
             source = filename.get
             filetypecode = ftypeint
             content = _content
@@ -160,31 +163,31 @@ class ImportDataActions(val context: DynamicsContext) {
             importmapid = s"/importmaps(${_importmapid})"
             recordsownerid_systemuser = s"/systemusers($recordsOwnerId)"
           }
-          println("Starting import file stage.")
+          log(s"Starting import file stage.")
           val ifileid = unlift(dynclient.createReturnId("importfiles", JSON.stringify(importfile)))
-          println(s"Processing import file: $ifileid")
+          log(s"Processing import file: $ifileid")
 
           val after = (jobid: String) =>
             for {
               _ <- waitforit(jobid)
-              _ <- reportImportStatus(_importid)
-              _ <- reportErrors(ifileid)
+              _ <- reportImportStatus(name, _importid)
+              _ <- reportErrors(name, ifileid)
             } yield jobid
 
-          println("Starting parsing stage.")
+          log(s"Starting parsing stage.")
           unlift(requestParsing(_importid) flatMap after)
 
-          println("Starting transform stage.")
+          log(s"Starting transform stage.")
           unlift(requestTransform(_importid) flatMap after)
 
-          println("Starting import records to CRM database stage.")
+          log(s"Starting import records to CRM database stage.")
           unlift(requestImport(_importid) flatMap after)
 
           // Report import stats from the input file...
           unlift(reportImportFileBasicStats(ifileid, config.common.debug))
 
           // Report final status.
-          unlift(reportImportStatus(_importid))
+          unlift(reportImportStatus(name, _importid))
         }
     }
   }
@@ -227,22 +230,21 @@ class ImportDataActions(val context: DynamicsContext) {
   }
 
   val listImportFiles: Action = Kleisli { config =>
-    val opts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
-    val header = Seq("#",
-                     "importfileid",
-                     "name",
-                     "processingstatus",
-                     "failurecounut",
-                     "partialfailurecount",
-                     "totalcount",
-                     "statuscode",
-                     "createdon")
+    val header = Seq(
+      "importfileid",
+      "name",
+      "processingstatus",
+      "failurecount",
+      "partialfailurecount",
+      "totalcount",
+      "statuscode",
+      "createdon"
+    )
 
-    dynclient.getList[ImportFileJson]("/importfiles?$orderby=createdon asc").map { list =>
-      val data = list.zipWithIndex.map {
-        case (i, idx) =>
+    dynclient.getList[ImportFileJson]("/importfiles?$orderby=createdon asc")
+      .flatMap { items =>
+        Listings.mkList(config.common, items, header){ i =>
           Seq(
-            (idx + 1).toString,
             i.importfileid.orEmpty,
             i.name.orEmpty,
             i.processingstatus_fv.orEmpty,
@@ -252,9 +254,9 @@ class ImportDataActions(val context: DynamicsContext) {
             i.statuscode_fv.orEmpty,
             i.createdon.orEmpty
           )
-      }
-      println(tablehelpers.render(header, data, opts))
-    }
+        }}
+      .map(println)
+      .void
   }
 
   val resume: Action = Kleisli { config =>
@@ -278,30 +280,31 @@ class ImportDataActions(val context: DynamicsContext) {
     val q = QuerySpec()
       .withExpand(
         Expand(
-          "Import_ImportFile",
-          select =
-            Seq("name", "processingstatus", "successcount", "statuscode", "statecode", "totalcount", "failurecount")))
+          "Import_ImportFile"))
       .withExpand(Expand("Import_AsyncOperations"))
       .withOrderBy("createdon asc")
 
-    val opts   = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
-    val header = Seq("#", "importid", "name", "statuscode", "createdon")
+    val header = Seq(
+      "importid",
+      "name",
+      "statuscode",
+      "sequence",
+      "createdon"
+    )
 
-    lift {
-      val list = unlift(dynclient.getList[ImportJson](q.url("imports")))
-      if (list.size == 0) println("No importfiles found.")
-      else {
-        val data = list.zipWithIndex.map {
-          case (i, idx) =>
-            val statuscode = AsyncOperation.ImportStatusCode
-              .get(i.statuscode.getOrElse(-1))
-              .getOrElse(s"No status code label for value ${i.statuscode}")
-            Seq((idx + 1).toString, i.importid.getOrElse("NA"), i.name, statuscode, i.createdon.getOrElse("NA"))
-        }
-        val out = tablehelpers.render(header, data, opts)
-        println(out)
-      }
-    }
+    dynclient.getList[ImportJSListing](q.url("imports"))
+    .flatMap{ items =>
+      Listings.mkList(config.common, items, header){ i =>
+        Seq(
+          i.importid,
+          i.name,
+          i.statuscode_fv,
+          i.sequence.toString(),
+          i.createdon_fv,
+        )
+      }}
+      .map(println)
+      .void
   }
 
   val delete = Action { config =>

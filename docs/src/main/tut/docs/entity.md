@@ -3,6 +3,8 @@ layout: docs
 title: entity
 ---
 
+# entity
+
 The `entity` command allows you to export data from a CRM server at fairly high
 speed. You can export in CSV or JSON format using a web api query that you
 specify on the command line or through CLI args that will compose the web api
@@ -112,8 +114,7 @@ query must return the primary key in the query and you must specify which entity
 you are deleting so that the metadata for the entity can be looked up and the
 primary key identified correctly.
 
-* `--query` and `--entity`: Specify these to delete records based on a query and
-  the entity specified.
+* `--query`: Specify these to delete records based on a query.
 * `--query-file`: Create a CSV file that has two columns title, "entity" and
   "query". Make sure you properly handle embedded commas. dynamicscli will read
   the csv file and delete the records specified in the queries in the order
@@ -132,11 +133,15 @@ contact,/contacts?$select=contactid&$filter=age gt 25
 account,/accounts?$select=accountid&$filter=importsequencenumber eq 20
 ```
 
-Note that you can run a bulk delete job directly on CRM and use a sophisticated
-FetchXml query. This delete functionality is designed to handle simple delete
-scenarios that you often run into after a bad data load in a script.
+You can run a bulk delete job directly on CRM and use a sophisticated FetchXml
+query. This delete functionality is designed to handle simple delete scenarios
+that you often run into after a bad data load in a script.
+
+To find the sequence number of an import, use `dynamicscli importdata list-imports`.
 
 ## Examples
-
-
-## Future
+* `dynamicsclient entity delete connection
+  '/connections?$select=connectionid&$filter=importsequencenumber eq 176`: Delete connections that
+  were imported with an import sequence number of 176.
+* `dynamicsclient entity delete --query-file deleteme.json`: Delete based on the queries contained in the
+  json file similar to above.

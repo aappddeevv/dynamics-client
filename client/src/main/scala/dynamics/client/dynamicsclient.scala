@@ -87,12 +87,15 @@ case class DynamicsClient(http: Client[IO], private val connectInfo: ConnectionI
     with ClientMethods {
 
   /**
-    * Create a failed effect and pull out a dynamics server error message from the body, if present.
+    * Called in response to a bad status returned from a request. Create a
+    * failed effect and pull out a dynamics server error message from the body,
+    * if present.
     */
   def responseToFailedTask[A](resp: HttpResponse[IO], msg: String, req: Option[HttpRequest[IO]]): IO[A] = {
     resp.body.flatMap { body =>
       logger.debug(s"ERROR: ${resp.status}: RESPONSE BODY: $body")
-      val statuserror                            = Option(UnexpectedStatus(resp.status, request = req, response = Option(resp)))
+      val statuserror                            = Option(UnexpectedStatus(resp.status, request = req,
+        response = Option(resp)))
       val json                                   = js.JSON.parse(body)
       val dynamicserror: Option[DynamicsErrorJS] = findDynamicsError(json)
       val derror =

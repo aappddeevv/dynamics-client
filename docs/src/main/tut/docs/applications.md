@@ -3,6 +3,8 @@ layout: docs
 title: applications
 ---
 
+# applications
+
 The `applications` command allows you to list applications and add/remove roles
 that can access the application. You often need this if you migrated your app
 but you need to adjust the roles afterwards.

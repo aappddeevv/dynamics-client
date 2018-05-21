@@ -182,8 +182,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
           }
         })
         values.to(Sink{ jobj =>
-          promiseWithError0[nodejs.Error](out.write(jobj.asInstanceOf[Buffer],_))
-            .toIO
+          CallbackHelpers.withError0[IO, nodejs.Error](out.write(jobj.asInstanceOf[Buffer],_))
             .map(_ => icounter.getAndIncrement())
             .void
         })
@@ -191,11 +190,9 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       p => p._2.endFuture().toIO
     )
 
-    // Quick hack since we are not terminating correctly. Wait 5 seconds to
-    // write the last buffer out. HACK!
     withSink
       .compile
-      .drain //*>
+      .drain
       .flatMap(_ => IO(println(s"""# input records: ${icounter.get()}
                                   |No records written count available.""".stripMargin)))
   }

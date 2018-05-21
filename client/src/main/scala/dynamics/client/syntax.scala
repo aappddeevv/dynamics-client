@@ -25,21 +25,29 @@ trait DynamicsIdSyntax {
   implicit def stringToId(v: String): DynamicsId = v.id
 }
 
-trait ClientShows {
-  implicit val innerErrorShow: Show[InnerError] = Show { e =>
-    s"${e.message} (${e.etype})\n${e.stacktrace}"
+trait ClientShowInstances {
+  implicit def innerErrorShow: Show[InnerError] = Show.show{ err =>
+    s"""InnerError
+       |etype = ${err.etype}
+       |message = ${err.message}
+       |stacktrace = ${err.stacktrace}
+       |""".stripMargin
   }
 
-  implicit val dynamicsServerErrorShow: Show[DynamicsServerError] = Show { e =>
-    s"${e.message} (code=${e.code})\n" +
-      s"Inner Error: " + e.innererror.map(_.show).getOrElse("<not present>")
+  implicit def dynamicsServerErrorShow: Show[DynamicsServerError] = Show.show{ err =>
+    s"""DynamicsServerError
+       |code = ${err.code}
+       |message = {$err.message}
+       |innererror = ${err.innererror.map(_.show).getOrElse("N/A")}
+       |""".stripMargin
   }
 
-  implicit val showDynamicsError: Show[DynamicsError] = Show { e =>
-    s"Dynamics error: ${e.getMessage}\n" +
-      s"Status code: ${e.status.show}\n" +
-      s"Dynamics server error: " + e.cause.map(_.show).getOrElse("<dynamics server error not provided>") + "\n" +
-      s"Underlying error: " + e.underlying.map(_.toString).getOrElse("<underlying error not provided>") + "\n"
+  implicit val showDynamicsError: Show[DynamicsError] = Show.show { e =>
+    s""""Dynamics error = ${e.getMessage}
+        |Status code = ${e.status.show}
+        |Server error = ${e.cause.map(_.show).getOrElse("N/A")}
+        |Underlying error = ${e.underlying.map(_.toString).getOrElse("N/A")}
+        |""".stripMargin
   }
 }
 
@@ -51,11 +59,11 @@ object syntax {
   object dynamicsid extends DynamicsIdSyntax
 }
 
-trait AllInstances extends ClientShows
+trait AllInstances extends ClientShowInstances
 
 object instances {
   object all    extends AllInstances
-  object client extends ClientShows
+  object client extends ClientShowInstances
 }
 
 object implicits extends AllSyntax with AllInstances
