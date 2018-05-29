@@ -67,6 +67,7 @@ object DynamicsServerError {
       )
     }.toOption
 
+    //println(s"CREATING err.message ${err.message}")
     DynamicsServerError(err.code.filterNot(_.isEmpty).getOrElse("<no code provided>"),
                         err.message.getOrElse("<no message provided>"),
                         ierror)

@@ -20,7 +20,7 @@ package object http {
   type StreamingClient[F[_], A] = fs2.Pipe[F, HttpRequest[F], F[A]]
 
   /**
-    * Non-streaming but good enough for our needs.  IO is used explicitly but
+    * Non-streaming but good enough for our needs. IO is used explicitly but
     * since we have strict bodies for dynamics, why not use "Id" in the short
     * term? Entity is the body part of a Message.
     *

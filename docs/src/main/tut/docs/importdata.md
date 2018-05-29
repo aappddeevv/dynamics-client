@@ -28,7 +28,7 @@ times. A small amount of experimentaton to determine the optimal # chunks/#
 simultaneous chunk combinations.
 
 ## Subcommands
-* list-imports: List imports, status and ownership information for an import job.
+* list-imports: List imports, status and ownership information. This also lists the sequence number.
 * list-importfiles: List import files. These are typically created as part of creating an import job. You should run this command when you want to see the status of the import files e.g. what's being processed, error counts, etc.
 * dump-errors: Dump detailed info about importfiles that import errors. In the UI, you can only export the rows, this dump gets everything.
 * bulkdelete: Create a bulkdelete job from a query file.
@@ -73,7 +73,14 @@ Where accounts.csv_*.csv are the file parts created by `csv_splitter.py` from th
 
 ## list-importfiles
 
-List import files. In the example below, DYNAMICS_CRMCONFIG has been set.
+List import files.
 
 Examples:
 * `dynamicscli importdata list-importfiles`
+
+## list-imports
+
+List imports. Imports will list the sequence number of the import. You can use the sequence number to delete all imported records using the dynamicsclient delete command.
+
+Examples:
+* `dynamicscli importdata list-imports`

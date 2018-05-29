@@ -10,6 +10,10 @@ file. You can also perform inserts via the "upsert" concept.
 
 ## Subcommands
 * entity: Update records as specified on the command line.
+* one-property: Update a single property on a record from another attribute on the same record or a constant.
+
+
+## entity
 
 This command is designed to process a load ready file. It does not perform
 lookups or other transformations. It can add/drop/rename attributes in the json
@@ -50,3 +54,15 @@ this means you need to generate your own guids, this is not hard in practice and
 allows you to load data with the same "primary key" as a source system, assuming
 they use guids as well.
 
+## one-property
+
+Update a single property on a record. Batch is *not* used so increase the concurrency, e.g. `--concurrency 1000`.
+
+The argument structure is `entity source target query`.
+
+Other arguments include:
+* `--constant`: Instead of another value on the same record, use this constant value instead. The value is parsed using `JSON.parse()`.
+* `--skip-if-null <boolean>`: Default is true, so if the "source" value is null, the update step is skipped.
+
+Examples:
+*`dynamicsclient update one-property contact new_overriddenmodifiedon modifiedon '/contacts'`: Update the modified on property with another property, `new_overriddenmodifiedon` that was loaded specifically to overwrite modifiedon just like you can through the supported createdon override.

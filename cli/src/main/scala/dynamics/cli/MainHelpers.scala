@@ -214,115 +214,121 @@ object MainHelpers extends LazyLogger {
     * returns a Some.
     */
   val defaultActionSelector: ActionSelector = (config, context) =>
-    Some(config.common.command match {
-      case "webresources" =>
-        val ops = new WebResourcesCommand(context)
-        ops.get(config.common.subcommand)
+  Some(config.common.command match {
+    case "applications" =>
+      val ops = new ApplicationActions(context)
+      ops.get(config.common.subcommand)
 
-      case "settings" =>
-        val ops = new SettingsActions(context)
-        ops.get(config.common.subcommand)
+    case "deduplication" =>
+      val ops = new DeduplicationActions(context)
+      ops.get(config.common.subcommand)
 
-      case "solutions" =>
-        val ops = new SolutionActions(context)
-        ops.get(config.common.subcommand)
+    case "entity" =>
+      val ops = new EntityActions(context)
+      ops.get(config.common.subcommand)
 
-      case "publishers" =>
-        val ops = new PublisherActions(context)
-        config.common.subcommand match {
-          case "list" => ops.list()
-        }
+    case "importmaps" =>
+      val ops = new ImportMapActions(context)
+      ops.get(config.common.subcommand)
 
-      case "systemjobs" =>
-        val ops = new AsyncOperationsCommand(context)
-        config.common.subcommand match {
-          case "list"                      => ops.list()
-          case "deleteCompleted"           => ops.deleteCompleted()
-          case "deleteCanceled"            => ops.deleteCanceled()
-          case "deleteFailed"              => ops.deleteFailed()
-          case "deleteWaiting"             => ops.deleteWaiting()
-          case "deleteWaitingForResources" => ops.deleteWaitingForResources()
-          case "deleteInProgress"          => ops.deleteInProgress()
-          case "cancel"                    => ops.cancel()
-        }
-      case "workflows" =>
-        val ops = new WorkflowActions(context)
-        ops.get(config.common.subcommand)
+    case "importdata" =>
+      val ops = new ImportDataActions(context)
+      ops.get(config.common.subcommand)
 
-      case "applications" =>
-        val ops = new ApplicationActions(context)
-        ops.get(config.common.subcommand)
+    case "metadata" =>
+      val ops = new MetadataActions(context)
+      config.common.subcommand match {
+        case "listentities" => ops.listEntities()
+        case "downloadcsdl" => ops.downloadCSDL()
+        case "test"         => ops.test()
+      }
 
-      case "themes" =>
-        val ops = new ThemeActions(context)
-        ops.get(config.common.subcommand)
+    case "optionsets" =>
+      val ops = new OptionSetsActions(context)
+      config.common.subcommand match {
+        case "list" => ops.list()
+      }
 
-      case "importmaps" =>
-        val ops = new ImportMapActions(context)
-        config.common.subcommand match {
-          case "list"     => ops.list()
-          case "download" => ops.download()
-          case "upload"   => ops.upload()
-        }
+    case "plugins" =>
+      val ops = new PluginActions(context)
+      ops.get(config.common.subcommand)
 
-      case "importdata" =>
-        val ops = new ImportDataActions(context)
-        ops.get(config.common.subcommand)
+    case "publishers" =>
+      val ops = new PublisherActions(context)
+      config.common.subcommand match {
+        case "list" => ops.list()
+      }
 
-      case "update" =>
-        val ops = new UpdateActions(context)
-        ops.get(config.common.subcommand)
-      case "whoami" =>
-        val ops = new WhoAmIActions(context)
-        ops.whoami()
-      case "metadata" =>
-        val ops = new MetadataActions(context)
-        config.common.subcommand match {
-          case "listentities" => ops.listEntities()
-          case "downloadcsdl" => ops.downloadCSDL()
-          case "test"         => ops.test()
-        }
-      case "sdkmessageprocessingsteps" =>
-        val ops = new SDKMessageProcessingStepsActions(context)
-        config.common.subcommand match {
-          case "list"       => ops.list()
-          case "activate"   => ops.activate()
-          case "deactivate" => ops.deactivate()
-        }
-      case "users" =>
-        val ops = new UsersActions(context)
-        ops.get(config.common.subcommand)
+    case "settings" =>
+      val ops = new SettingsActions(context)
+      ops.get(config.common.subcommand)
 
-      case "token" =>
-        val ops = new TokenActions(context)
-        config.common.subcommand match {
-          case "getOne"  => ops.getOne();
-          case "getMany" => ops.getMany();
-        }
-      case "entity" =>
-        val ops = new EntityActions(context)
-        config.common.subcommand match {
-          case "export"          => ops.export()
-          case "count"           => ops.count()
-          case "exportFromQuery" => ops.exportFromQuery()
-          case "deleteByQuery"   => ops.deleteByQuery()
-        }
-      case "optionsets" =>
-        val ops = new OptionSetsActions(context)
-        config.common.subcommand match {
-          case "list" => ops.list()
-        }
-      case "plugins" =>
-        val ops = new PluginActions(context)
-        ops.get(config.common.subcommand)
-      case "__test__" =>
-        val ops = new TestCommand(context)
-        ops.runTest()
-      case "" =>
-        NoArgAction { println(s"No command provided. Print help using --help.") }
-      case _ =>
-        NoArgAction { println(s"Unrecognized command. This may be a bug. Please report it.") }
-    })
+    case "solutions" =>
+      val ops = new SolutionActions(context)
+      ops.get(config.common.subcommand)
+
+    case "systemjobs" =>
+      val ops = new AsyncOperationsCommand(context)
+      config.common.subcommand match {
+        case "list"                      => ops.list()
+        case "deleteCompleted"           => ops.deleteCompleted()
+        case "deleteCanceled"            => ops.deleteCanceled()
+        case "deleteFailed"              => ops.deleteFailed()
+        case "deleteWaiting"             => ops.deleteWaiting()
+        case "deleteWaitingForResources" => ops.deleteWaitingForResources()
+        case "deleteInProgress"          => ops.deleteInProgress()
+        case "cancel"                    => ops.cancel()
+      }
+
+    case "sdkmessageprocessingsteps" =>
+      val ops = new SDKMessageProcessingStepsActions(context)
+      config.common.subcommand match {
+        case "list"       => ops.list()
+        case "activate"   => ops.activate()
+        case "deactivate" => ops.deactivate()
+      }
+
+    case "themes" =>
+      val ops = new ThemeActions(context)
+      ops.get(config.common.subcommand)
+
+    case "token" =>
+      val ops = new TokenActions(context)
+      config.common.subcommand match {
+        case "getOne"  => ops.getOne();
+        case "getMany" => ops.getMany();
+      }
+
+    case "update" =>
+      val ops = new UpdateActions(context)
+      ops.get(config.common.subcommand)
+
+    case "users" =>
+      val ops = new UsersActions(context)
+      ops.get(config.common.subcommand)
+
+    case "whoami" =>
+      val ops = new WhoAmIActions(context)
+      ops.whoami()
+
+    case "webresources" =>
+      val ops = new WebResourcesCommand(context)
+      ops.get(config.common.subcommand)
+
+    case "workflows" =>
+      val ops = new WorkflowActions(context)
+      ops.get(config.common.subcommand)
+
+    case "__test__" =>
+      val ops = new TestCommand(context)
+      ops.runTest()
+
+    case "" =>
+      NoArgAction { println(s"No command provided. Print help using --help.") }
+
+    case _ =>
+      NoArgAction { println(s"Unrecognized command. This may be a bug. Please report it.") }
+  })
 
   /** Create a copy of CommonConfig to reflect enviroment variables relevant to
    * dynamicsclient.

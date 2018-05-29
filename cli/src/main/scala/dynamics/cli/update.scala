@@ -96,12 +96,54 @@ class UpdateActions(val context: DynamicsContext) {
       upsertpreventupdate = config.upsertPreventUpdate
     }
 
+  def update1(entitySet: String, pk: String, query: String, source: String, target: String,
+    skipIfNull: Boolean, value: Option[js.Any], c: Int) = {
+    val data = dynclient.getListStream[js.Object](query)
+    data
+      .map { a =>
+        val dict = a.asDict[js.Any]
+        val id = dict(pk).asString
+        val v = value.getOrElse(dict(source))
+        if(v == null && skipIfNull)
+          IO.pure(s"""No update /$entitySet($id): Skip if null and value was null.""")
+        else
+          dynclient.updateOneProperty(entitySet, id, target, v)
+          .map(_ => s"Updated /$entitySet($id): $v")
+          .recover{
+            case x:DynamicsError => s"Failed /$entitySet($id)\nValue: $v\n${x.show}"
+          }
+      }
+      .map(Stream.eval(_))
+      .join(c)
+      .map(println)
+  }
+
+  val updateOneProperty = Action { config =>
+    val uc = config.update
+    println("Updating one property with another. Works on simple, single valued properties, not lookups (yet).")
+    val processOpt = (uc.query, uc.source, uc.target).mapN{ (q, s, t) =>
+      val counter = new java.util.concurrent.atomic.AtomicInteger(0)
+        (IO.shift *> meta.entitySetName(uc.entity), IO.shift *> meta.pk(uc.entity)).parMapN{ (esopt, pkopt) =>
+          update1(esopt.get, pkopt.get, q, s, t, uc.skipIfNull, uc.value.map(JSON.parse(_)), config.common.concurrency)
+            .map{ a => counter.getAndIncrement(); a}
+            .compile
+            .drain
+            .flatMap(_ => IO(println(s"""Processed ${counter.get()} input records.""")))
+        }}
+    processOpt.fold(
+      IO(println("Insufficient parameters to run action."))
+    )(
+      runme => runme.flatten
+    )
+  }
+
   // TODO: Convert to batch
   val update = Action { config =>
     // obtain processing config
     val pconfig =
       Utils.merge[UpdateProcessingConfig](
         config.update.configFile.map(IOUtils.slurpAsJson[UpdateProcessingConfig](_)).getOrElse(null),
+        config.update.config.getOrElse(null),
         toProcessingConfig(config.update),
       )
 
@@ -154,6 +196,7 @@ class UpdateActions(val context: DynamicsContext) {
   def get(command: String): Action = {
     command match {
       case "entity" => update
+      case "updateOneProperty" => updateOneProperty
       case _ =>
         Action { _ =>
           IO(println(s"update command '${command}' not recognized."))

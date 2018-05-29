@@ -22,7 +22,7 @@ lazy val licenseSettings = Seq(
     )))
 
 lazy val buildSettings = Seq(
-  organization := "com.github.aappddeevv.dynamics",
+  organization := "ttg",
   licenses ++= Seq(("MIT", url("http://opensource.org/licenses/MIT"))),
   scalaVersion := "2.12.4",
   scalaModuleInfo ~= (_.map(_.withOverrideScalaVersion(true))),

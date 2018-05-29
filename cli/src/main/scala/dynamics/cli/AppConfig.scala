@@ -94,11 +94,16 @@ import dynamics.common._
     pprint: Boolean = false,
 )
 
+@Lenses case class DeduplicationConfig(
+  /** Names or ids. */
+  identifiers: Seq[String] = Nil,
+)
+
 @Lenses case class ImportConfig(
-    importMapUploadFilename: Seq[String] = Nil,
+    uploadFilename: Seq[String] = Nil,
     importMapNoClobber: Boolean = false,
     importDataInputFile: String = "",
-    importDataImportMapName: String = "",
+    mapName: String = "",
     //importDataImportMapFilename: Option[String] = None,
     importDataName: Option[String] = None,
     importDataPollingInterval: Int = 60, // in seconds
@@ -153,7 +158,15 @@ import dynamics.common._
     take: Option[Int] = None,
   updateTransform: etl.Transform[js.Object, js.Object] = etl.Transform.identity[js.Object],
   configFile: Option[String] = None,
-  cnofig: Option[UpdateProcessingConfig] = None,
+  config: Option[UpdateProcessingConfig] = None,
+
+  /** Query to run a "update one property" process on. */
+  query: Option[String] = None,
+  /** Skip updating the target attribute if the source is null. */
+  skipIfNull: Boolean = true,
+  source: Option[String] = None,
+  target: Option[String] = None,
+  value: Option[String] = None,
 )
 
 @Lenses case class ETLConfig(
@@ -299,7 +312,8 @@ trait StandardCLIApplication extends CLIApplication {
     appModule: AppModuleConfig = AppModuleConfig(),
     token: TokenConfig = TokenConfig(),
     user: UserConfig = UserConfig(),
-    themes: ThemesConfig = ThemesConfig()
+  themes: ThemesConfig = ThemesConfig(),
+  deduplication: DeduplicationConfig = DeduplicationConfig(),
 ) {
   def debug       = common.debug
   def noisy       = !common.quiet

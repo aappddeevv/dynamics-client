@@ -28,25 +28,25 @@ trait DynamicsIdSyntax {
 trait ClientShowInstances {
   implicit def innerErrorShow: Show[InnerError] = Show.show{ err =>
     s"""InnerError
-       |etype = ${err.etype}
-       |message = ${err.message}
-       |stacktrace = ${err.stacktrace}
+       |InnerError.etype = ${err.etype}
+       |InnerError.message = ${err.message}
+       |InnerError.stacktrace = ${err.stacktrace}
        |""".stripMargin
   }
 
   implicit def dynamicsServerErrorShow: Show[DynamicsServerError] = Show.show{ err =>
     s"""DynamicsServerError
-       |code = ${err.code}
-       |message = {$err.message}
-       |innererror = ${err.innererror.map(_.show).getOrElse("N/A")}
+       |DynamicsServerError.code = ${err.code}
+       |DynamicsServerError.message = ${err.message}
+       |DynamicsServerError.innererror = ${err.innererror.map(_.show).getOrElse("N/A")}
        |""".stripMargin
   }
 
   implicit val showDynamicsError: Show[DynamicsError] = Show.show { e =>
-    s""""Dynamics error = ${e.getMessage}
-        |Status code = ${e.status.show}
-        |Server error = ${e.cause.map(_.show).getOrElse("N/A")}
-        |Underlying error = ${e.underlying.map(_.toString).getOrElse("N/A")}
+    s"""Dynamics error = ${e.getMessage}
+        |DynamicsError.Status code = ${e.status.show}
+        |DynamicsError.Server error = ${e.cause.map(_.show).getOrElse("N/A")}
+        |DynamicsError.Underlying error = ${e.underlying.map(_.toString).getOrElse("N/A")}
         |""".stripMargin
   }
 }

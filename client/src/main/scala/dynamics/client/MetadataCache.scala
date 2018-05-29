@@ -327,6 +327,8 @@ class MetadataCache(protected val dynclient: DynamicsClient, LCID: Int = 1033)(i
 
   /**
     * Given an entity set name and an attribute name, return the attribute type.
+   * The AttributeType is a simple string and is not AttributeTypeName which
+   * typically places a suffix "Type" at the end of the type name.
     */
   def attributeType(ename: String, aname: String): IO[Option[String]] = {
     baseAttributes(ename).map { _ =>

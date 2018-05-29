@@ -31,8 +31,8 @@ case class RelatedEntity(ename: String,
                          esname: String,
                          objectTypeCode: Int,
                          roleName: String,
-                         roleId: apps.Id,
-                         id: apps.Id)
+                         roleId: dynamics.client.common.Id,
+                         id: dynamics.client.common.Id)
 
 /**
   * Used when we need to print out information about a record. Think of this as
@@ -61,7 +61,7 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
     * @return record2 derived fat tuples (entity name, entity object type code, role name, role id, entity id)
     * @todo fromEntitySet is not technically needed for the query if we have an id
     */
-  def entitiesFromConnectionsUsingNames(fromEntityId: apps.Id,
+  def entitiesFromConnectionsUsingNames(fromEntityId: dynamics.client.common.Id,
                                         toEntityNames: Traversable[String] = Nil,
                                         toRoleNames: Traversable[String] = Nil): IO[Seq[RelatedEntity]] = {
     val params = for {
@@ -72,14 +72,14 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
     params.flatMap {
       case (codes, roles) =>
         entitiesFromConnections(fromEntityId, codes.collect { case Some(c) => c }, roles.collect {
-          case Some(r)                                                     => apps.Id(r)
+          case Some(r)                                                     => dynamics.client.common.Id(r)
         })
     }
   }
 
-  def entitiesFromConnections(fromEntityId: apps.Id,
+  def entitiesFromConnections(fromEntityId: dynamics.client.common.Id,
                               toCodes: Traversable[Int] = Nil,
-                              toRoleIds: Traversable[apps.Id] = Nil): IO[Seq[RelatedEntity]] = {
+                              toRoleIds: Traversable[dynamics.client.common.Id] = Nil): IO[Seq[RelatedEntity]] = {
     val codesq =
       if (!toCodes.isEmpty) "and " + In("record2objecttypecode", toCodes.map(_.toString))
       else ""
@@ -99,8 +99,8 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
               esname,
               c.record2objecttypecode,
               c._record2roleid_value_fv,
-              apps.Id(c._record2roleid_value),
-              apps.Id(c._record2id_value)
+              dynamics.client.common.Id(c._record2roleid_value),
+              dynamics.client.common.Id(c._record2id_value)
             )
           })
       }
@@ -117,7 +117,7 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
     * list.
     */
   def systemusersFromConnections(entitySet: String,
-                                 entityId: apps.Id,
+                                 entityId: dynamics.client.common.Id,
                                  record2roleids: Seq[String]): IO[Seq[SystemuserJS]] = {
     val q = QuerySpec(
       filter = Some(s"""_record1id_value eq $entityId"""),
@@ -134,15 +134,15 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
   }
 
   /** Fetch email address from dynamics systemuser record. */
-  def fetchEmailAddressFromId(id: apps.Id): IO[UPN] = {
+  def fetchEmailAddressFromId(id: dynamics.client.common.Id): IO[UPN] = {
     fetchSystemuser(id).map(user => UPN(user.internalemailaddress))
   }
 
   /** Fetch a system user by id. */
-  def fetchSystemuser(id: apps.Id): IO[SystemuserJS] =
+  def fetchSystemuser(id: dynamics.client.common.Id): IO[SystemuserJS] =
     dynclient.getOneWithKey[SystemuserJS]("systemusers", id.asString)
 
-  def fetchEmailableSystemuser(id: apps.Id): IO[Option[SystemuserJS]] =
+  def fetchEmailableSystemuser(id: dynamics.client.common.Id): IO[Option[SystemuserJS]] =
     fetchSystemuser(id)
       .map { user =>
         //if(user.isemailaddressapprovedbyo365admin && !user.isdisabled) Some(user)
@@ -155,11 +155,11 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
     * retrieve those systemusers. If errors occur along the way,
     * ignore them and return Nil as appropriate.
     */
-//  def fetchOwnerUserOrTeam(esname: String, id: apps.Id): IO[Seq[String]] = {
+//  def fetchOwnerUserOrTeam(esname: String, id: dynamics.client.common.Id): IO[Seq[String]] = {
 //    dynclient.getOne()
 //  }
 
-  def fetchTeamSystemuserIds(teamId: apps.Id): IO[Seq[String]] = {
+  def fetchTeamSystemuserIds(teamId: dynamics.client.common.Id): IO[Seq[String]] = {
     val q = QuerySpec(
       select = Seq("systemuserid"),
       properties = Seq(NavProperty("teammembership_association"))

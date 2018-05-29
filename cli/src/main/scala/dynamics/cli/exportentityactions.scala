@@ -63,7 +63,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     dynclient
       .getListStream[js.Object](query)
       .map(jsobj => jsobj.asDict[String](primaryId))
-      .map(id => dynclient.delete(esname, Id(id)))
+      .map(id => dynclient.delete(esname, dynamics.client.Id(id)))
       .map(Stream.eval(_))
       .join(concurrency)
       .as(1L)
@@ -317,4 +317,15 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       Stream.eval(runCounts).compile.drain
   }
 
+  def get(command: String): Action =
+    command match {
+      case "export"          => export()
+      case "count"           => count()
+      case "exportFromQuery" => exportFromQuery()
+      case "deleteByQuery"   => deleteByQuery()
+      case _ =>
+        Action { _ =>
+          IO(println(s"entity command '${command}' not recognized"))
+        }
+    }
 }

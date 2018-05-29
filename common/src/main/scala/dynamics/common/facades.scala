@@ -165,6 +165,10 @@ class ChangeAsyncJobState(
     val statecode: Int
 ) extends js.Object
 
+/**
+ * These are only here if you place them here or call
+ * `dynamics.client.common.mapODataArtifacts`.
+ */
 @js.native
 trait StatusCode extends js.Object {
   var statecode: UndefOr[Int]           = js.native
@@ -174,6 +178,17 @@ trait StatusCode extends js.Object {
   var statuscode: UndefOr[Int]          = js.native
   @JSName("statuscode@OData.Community.Display.V1.FormattedValue")
   var statuscode_fv: UndefOr[String] = js.native
+}
+
+
+trait StatusCodeNonNative extends js.Object {
+  var statecode: UndefOr[Int]           = js.undefined
+  @JSName("statecode@OData.Community.Display.V1.FormattedValue")
+  var statecode_fv: UndefOr[String] = js.undefined
+
+  var statuscode: UndefOr[Int]          = js.undefined
+  @JSName("statuscode@OData.Community.Display.V1.FormattedValue")
+  var statuscode_fv: UndefOr[String] = js.undefined
 }
 
 @js.native
@@ -738,4 +753,28 @@ trait Theme extends js.Object {
 trait BusinessUnitJS extends js.Object {
   val businessunitid: String
   val name: String
+}
+
+trait DuplicateRuleJS extends StatusCodeNonNative {
+  var duplicateruleid: js.UndefOr[String] = js.undefined
+  var name: js.UndefOr[String] = js.undefined
+  var description: js.UndefOr[String] = js.undefined
+
+  var baseentitymatchcodetable: js.UndefOr[String] = js.undefined
+  var baseentityname: js.UndefOr[String] = js.undefined
+  var baseentitytypecode: js.UndefOr[Int] = js.undefined
+
+  var excludeinactiverecords: js.UndefOr[Boolean] = js.undefined
+  var iscasesensitive: js.UndefOr[Boolean] = js.undefined
+  var matchingentitymatchcodetable: js.UndefOr[String] = js.undefined
+  var matchingentityname: js.UndefOr[String] = js.undefined
+  var matchingentitytypecode: js.UndefOr[Int] = js.undefined
+
+  /** Only here if you perform an $expand. */
+  var DuplicateRule_DuplicateRuleConditions: js.UndefOr[js.Array[DuplicateRuleCondition]] = js.undefined
+}
+
+
+trait DuplicateRuleCondition extends StatusCodeNonNative {
+  var duplicateruleconditionid: js.UndefOr[String] = js.undefined
 }

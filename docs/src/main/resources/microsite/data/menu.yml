@@ -8,6 +8,9 @@ options:
   - title: applications
     url: docs/applications.html
 
+  - title: deduplication
+    url: docs/deduplication.html
+    
   - title: entity
     url: docs/entity.html
 

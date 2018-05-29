@@ -135,9 +135,17 @@ object Utils {
 
   /** Strip a string suitable for a text attribute in dynamics. Essentially, it
    * preserves some ASCII characters and leaves a few whitespace control
-   * characters.
+   * characters (newline, cr, tab).
    */
   def strip(in: String): String =
     in.replaceAll("[\\p{Cntrl}&&[^\n\t\r]]", "").replaceAll("\\P{InBasic_Latin}", "")
 
+  /** JS version. @see https://stackoverflow.com/questions/7905929/how-to-test-valid-uuid-guid */
+  val GUID_r = new js.RegExp("^[0-9A-F]{8}-[0-9A-F]{4}-[5][0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$", "i")
+
+  /** 
+   * Return true if the identifier matches a GUId format, false otherwise.
+   * @see https://www.ietf.org/rfc/rfc4122.txt
+   */
+  def maybeId(identifier: String): Boolean = GUID_r.test(identifier)
 }

@@ -25,7 +25,7 @@ object Listings {
   /**
     * Create an in-memory table for output. Potentially contains terminal escape
     * codes. You do not want to use this for large tables of more than a few
-    * thousand rows.
+    * thousand rows. Column options start at index 1.
     */
   def mkList[T](config: CommonConfig, items: Seq[T], colnames: Seq[String], cols: Option[js.Dynamic] = None)(
       flatten: T => Seq[String]): IO[String] = {

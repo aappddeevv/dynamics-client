@@ -5,6 +5,7 @@
 package dynamics
 package cli
 
+import scala.util.control.NonFatal
 import scala.scalajs.js
 import js._
 import js.annotation._
@@ -145,13 +146,13 @@ class ThemeActions(val context: DynamicsContext) {
           .associate("themes", t.themeid, "logoimage", "webresourceset", w.webresourceid, true)
           .map(_ => s"Logo updated to $wname on theme $name")
           .recover {
-            case scala.util.control.NonFatal(e) => s"Unable to set logo for theme $name to $wname."
+            case NonFatal(e) => s"Unable to set logo for theme $name to $wname."
           }
       }
     }
     io.flatMap{
       case Validated.Invalid(msglist) => IO(msglist.toList.foreach(println))
-      case Validated.Valid(msg) => msg.map(println)
+      case Validated.Valid(msgio) => msgio.map(println)
     }
   }
 

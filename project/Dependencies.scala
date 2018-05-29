@@ -1,6 +1,6 @@
 import sbt._
 import org.scalajs.sbtplugin._
-import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport._
 
 object Dependencies {
 
@@ -14,10 +14,10 @@ object Dependencies {
     "org.typelevel" %%% "cats-core" % "1.1.0",
     "org.typelevel" %%% "cats-effect" % "0.10.1",
     //"com.github.mpilquist" %%% "simulacrum" % "0.10.0",
-    //"com.softwaremill.retry" %%% "retry" % "0.3.0",
     "com.github.cb372" %%% "scalacache-core" % "0.10.0",
     "org.scala-js" %%% "scalajs-java-time" % "latest.version",
-    "org.scala-sbt" % "test-interface" % "1.0"
+    "org.scala-sbt" % "test-interface" % "1.0",
+    "io.estatico" %% "newtype" % "0.4.0",
   ))
 
   val monadlessDependencies = Def.setting(Seq(
@@ -32,10 +32,10 @@ object Dependencies {
     "com.github.julien-truffaut" %%%  "monocle-core"  % monocleVersion,
     "com.github.julien-truffaut" %%%  "monocle-macro" % monocleVersion,
     "org.scala-lang.modules" %% "scala-xml" % "1.1.0",
+    "ru.pavkin" %%% "scala-js-momentjs" % "0.9.1",    
   ))
 
   val appDependencies = Def.setting(Seq(
-    "io.estatico" %% "newtype" % "0.3.0",
     "ru.pavkin" %%% "scala-js-momentjs" % "0.9.1",
   ))
 

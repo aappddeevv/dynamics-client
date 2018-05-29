@@ -264,6 +264,29 @@ object CommandLine {
         "Update dynamics records. An update can also be an insert if you provide your own PK.")
       .action((x, c) => withCmd(c, "update"))
       .children(
+        sub("one-property")
+          .text("Update on property on all records either from another property on the same record on a constant.")
+          .action((x,c) => withSub(c, "updateOneProperty"))
+          .children(
+            arg[String]("entity")
+              .text("Entity logical name.")
+              .action((x,c) => c.lens(_.update.entity).set(x)),
+            arg[String]("source-attribute")
+              .text("Source attribute.")
+              .action((x,c) => c.lens(_.update.source).set(Some(x))),
+            arg[String]("target-attribute")
+              .text("Target attribute.")
+              .action((x,c) => c.lens(_.update.target).set(Some(x))),
+            arg[String]("query")
+              .text("Query to run that includes both source and target attribute.")
+              .action((x,c) => c.lens(_.update.query).set(Some(x))),
+            opt[Boolean]("skip-if-null")
+              .text("Skip the update if thte source is null.")
+              .action((x,c) => c.lens(_.update.skipIfNull).set(x)),
+            opt[String]("constant")
+              .text("Set the value to a constant represented by this string value.")
+              .action((x,c) => c.lens(_.update.value).set(Some(x)))
+          ),
         sub("entity")
           .text("Update data in dynamics.")
           .action((x, c) => withSub(c, "entity"))
@@ -311,7 +334,7 @@ object CommandLine {
             note(
               "This is command updates and inserts if upsertpreventcreate is false. It can be difficult to get the json just right."),
             note("Both configuration data or Dynamics entity in json format can be used. Processing performance is good even for large datasets."),
-              note("Attributes processing order is removes, updates, renames. WHICH IS NOT WORKING YET!")
+            note("Attributes processing order is removes, updates, renames. WHICH IS NOT WORKING YET!")
           ),
         sub("test")
           .text("Test some update stuff")
@@ -487,7 +510,7 @@ object CommandLine {
               .action((x, c) => c.lens(_.importdata.importDataInputFile).set(x)),
             arg[String]("<importmap file>")
               .text("Import map name, must already be loaded in CRM.")
-              .action((x, c) => c.lens(_.importdata.importDataImportMapName).set(x)),
+              .action((x, c) => c.lens(_.importdata.mapName).set(x)),
             opt[String]('n', "name")
               .text("Set the job name. A name is derived otherwise.")
               .action((x, c) => c.lens(_.importdata.importDataName).set(Option(x))),
@@ -547,11 +570,19 @@ object CommandLine {
           .action((x, c) => withSub(c, "list")),
         mkFilterOptBase().text("Filter on import map names and descriptions."),
         sub("download")
-          .text("Download import maps.")
+          .text("Download all import maps.")
           .action((x, c) => withSub(c, "download"))
           .children(
             mkNoClobber(),
             mkOutputDir()
+          ),
+        sub("delete")
+          .text("Delete an impoprt map by name.")
+          .action((x,c) => withSub(c,"delete"))
+          .children(
+            arg[String]("Import map name. It must be unique.")
+              .text("Import map name.")
+              action((x,c) => c.lens(_.importdata.mapName).set(x))
           ),
         sub("upload")
           .text("Upload a map.")
@@ -560,7 +591,7 @@ object CommandLine {
             arg[String]("<file>...")
               .text("Upload files.")
               .unbounded()
-              .action((x, c) => c.lens(_.importdata.importMapUploadFilename).modify(f => f :+ x)),
+              .action((x, c) => c.lens(_.importdata.uploadFilename).modify(f => f :+ x)),
             mkNoClobber()
           )
       )
@@ -968,6 +999,39 @@ object CommandLine {
       )
   }
 
+  def deduplication(op: scopt.OptionParser[AppConfig]): Unit = {
+    import op._
+    val h = CliHelpers(op)
+    import h.sub
+    cmd("deduplication")
+      .text("Manage deduplication rules.")
+      .action((x,c) => withCmd(c, "deduplication"))
+      .children(
+        sub("list")
+          .text("List deduplication rules.")
+          .action((x,c) => withSub(c, "list")),
+        sub("publish")
+          .text("Publish a deduplication rule.")
+          .action((x,c) => withSub(c, "publish"))
+          .children(
+            arg[Seq[String]]("identifier")
+              .text("Either the id or name of the duplicate rule. Comma separated for multiple items.")
+              .action((x,c) => c.lens(_.deduplication.identifiers).modify(f => f ++ x))
+          ),
+        sub("unpublish")
+          .text("Unpbulish a deduplication rule.")
+          .action((x,c) => withSub(c, "unpublish"))
+          .children(
+            arg[Seq[String]]("identifier")
+              .text("Either the id or name of the duplicate rule. Comma separated for multiple items.")
+              .action((x,c) => c.lens(_.deduplication.identifiers).modify(f => f ++ x))
+          ),
+        sub("unpublish-all")
+          .text("Unpbulish all dedupliaction rules..")
+          .action((x,c) => withSub(c, "unpublishAll"))
+      )
+  }
+
   def themes(op: scopt.OptionParser[AppConfig]): Unit = {
     import op._
     val h = CliHelpers(op)
@@ -1169,10 +1233,11 @@ object CommandLine {
   /** All base options. */
   val stdOps: Seq[scopt.OptionParser[AppConfig] => Unit] = Seq(
     applications,
+    common,    
+    deduplication,
     entity,
     importdata,
     importmaps,
-    common,
     metadata,
     optionsets,
     plugins,

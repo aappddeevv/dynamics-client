@@ -110,7 +110,7 @@ class ImportDataActions(val context: DynamicsContext) { self =>
     {
 
       val path          = config.importdata.importDataInputFile
-      val importmapname = config.importdata.importDataImportMapName
+      val importmapname = config.importdata.mapName
       val name =
         config.importdata.importDataName.getOrElse(IOUtils.filename(path).get) + " using " + importmapname
 

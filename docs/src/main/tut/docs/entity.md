@@ -33,7 +33,7 @@ You can specify any/all `--query`, `--query-file` or ``--filter` to select the e
 * `--query`: key=value pairs. The key will be used to sort the count results.
 * `--query-file`: A JSON file with key, value pairs.
 * `--filter`: Specify only the entity. A query will be created e.g. `--filter contact` === `--query contact='/contacts?$select=contactid`.
-* `--function` with `--filter`: Use the fast function approach, but if you do, you cannot use queries to count, you can only count the entire entity.
+* `--function` with `--filter`: Use the fast function approach, but if you do, you cannot use queries to count, you can only count the entire entity. The "function" implies the use of a dynamics server provided web api function that counts entities but it is limited to counting all entities. If you want a total count, use this option because it is fast and does not impact the server.
 
 Shell expansion can make specifying the query difficult on the command
 line. `--query-file` allows you to use single quotes in your query much
@@ -139,7 +139,7 @@ that you often run into after a bad data load in a script.
 
 To find the sequence number of an import, use `dynamicscli importdata list-imports`.
 
-## Examples
+Examples:
 * `dynamicsclient entity delete connection
   '/connections?$select=connectionid&$filter=importsequencenumber eq 176`: Delete connections that
   were imported with an import sequence number of 176.

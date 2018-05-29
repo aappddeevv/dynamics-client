@@ -5,6 +5,7 @@
 package dynamics
 package cli
 
+import scala.util.control.NonFatal
 import scala.scalajs.js
 import js._
 import annotation._
@@ -80,7 +81,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
       .map(_.MappingsXml)
   }
 
-  def download() = Action { config =>
+  val download = Action { config =>
     getList()
       .map(filter(_, config.common.filter))
       .map { _.map(imap => (imap.importmapid, imap.name)) }
@@ -109,7 +110,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
       }
   }
 
-  def list(): Action = Kleisli { config =>
+  val list = Action { config =>
     {
       val cols = jsobj("3" -> jsobj(width = 60))
       getList().map(filter(_, config.common.filter)).map { items =>
@@ -180,7 +181,7 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
     })
   }
 
-  def upload(files: Seq[String], noclobber: Boolean = true): IO[Unit] = {
+  def uploadMultiple(files: Seq[String], noclobber: Boolean = true): IO[Unit] = {
     val loads = files.map { f =>
       if (IOUtils.fexists(f)) uploadOne(f, noclobber)
       else IO(println(s"Import map $f is not accessible to upload."))
@@ -189,10 +190,41 @@ class ImportMapActions(context: DynamicsContext) extends LazyLogger {
   }
 
   /** Upload and optionally clobber an import map. */
-  def upload(): Action = Kleisli { config =>
-    upload(config.importdata.importMapUploadFilename, config.common.noclobber)
+  val upload = Action { config =>
+    uploadMultiple(config.importdata.uploadFilename, config.common.noclobber)
   }
 
+  def getByName(name: String) = {
+        val q = QuerySpec(filter = Some(s"name eq '${name}'"))
+    dynclient.getOne[Option[ImportMapOData]](q.url("importmaps"))(ExpectOnlyOneToOption)
+  }
+
+  val delete = Action { config =>
+    val name = config.importdata.mapName
+    getByName(name)
+      .flatMap{
+        case Some(imap) =>
+          dynclient.delete("importmaps", imap.importmapid)
+            .map(p => if(p._2) s"Import map $name deleted." else s"Import map $name was not deleted.")
+            .recover{
+              case NonFatal(e) => s"Import map $name could not be deleted."
+            }
+        case _ => IO.pure(s"Import map $name could not be found")
+      }
+      .map(println)
+  }
+
+  def get(command: String): Action =
+    command match {
+      case "list"       => list
+      case "delete"     => delete
+      case "download"     => download        
+      case "upload"     => upload
+      case _ =>
+        Action { _ =>
+          IO(println(s"importmap command '${command}' not recognized."))
+        }
+    }
 }
 
 object ImportMapActions {
