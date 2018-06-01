@@ -7,5 +7,5 @@ collections:
   tut:
     output: true
 version: 0.1.1-M6
-org: com.github.aappddeevv.dynamics
+org: ttg
 markdown: kramdown
