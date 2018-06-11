@@ -9,10 +9,10 @@ The `webresources` command allows you to list, download and upload (one-time and
 
 ## Subcommands
 
-* upload: Upload web resources. Optionally watch a directory to perform the upload. "Watch" both adds, updates and delete resources from your local disk depending on what happens to the file.
-* delete: Delete a specific webresource by id. You can obtain the id from `list`.
-* list: List web resources.
-* delete-source-maps: Delete .js.map files from a specific solution's set of webresources.
+* [upload](#upload): Upload web resources. Optionally watch a directory to perform the upload. "Watch" both adds, updates and delete resources from your local disk depending on what happens to the file.
+* [delete](#delete): Delete a specific webresource by id. You can obtain the id from `list`.
+* [list](#list): List web resources.
+* [delete-source-maps](#delete-source-maps): Delete .js.map files from a specific solution's set of webresources.
 
 ## upload
 

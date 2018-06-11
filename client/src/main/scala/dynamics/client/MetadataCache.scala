@@ -79,18 +79,35 @@ trait AttributeMetadata extends js.Object {
 
 case class Property(name: String, edmType: String)
 
+@js.native
+trait MetadataBase extends js.Object {
+  val MetadataId: String = js.native
+}
+
 /**
   * Option metadata complex type.
   * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/optionmetadata?view=dynamics-ce-odata-9
   *
   */
 @js.native
-trait OptionSetItem extends js.Object {
+trait OptionMetadata extends MetadataBase {
   val Value: Int                 = js.native
-  val Label: LocalizedInfo       = js.native
-  val Description: LocalizedInfo = js.native
+  val Label: Label       = js.native
+  val Description: Label = js.native
   val IsManaged: Boolean         = js.native
   val Color: js.UndefOr[String]  = js.native
+}
+
+object OptionSetType {
+  val PickList = 0
+  val State = 1
+  val Status = 2
+  val Boolean = 3
+}
+
+@js.native
+trait OptionSetMetadataBase extends MetadataBase {
+  var OptionSetType: Int
 }
 
 /**
@@ -99,35 +116,32 @@ trait OptionSetItem extends js.Object {
   * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/optionsetmetadata?view=dynamics-ce-odata-9
   */
 @js.native
-trait OptionSetResponse extends js.Object {
-  val Name: String                     = js.native
-  val IsGlobal: Boolean                = js.native
-  val HasChanged: Boolean              = js.native
-  val IsCustomOptionSet: Boolean       = js.native
-  val Description: LocalizedInfo       = js.native
-  val DisplayName: LocalizedInfo       = js.native
-  val MetadataId: String               = js.native
-  val ExternalTypeName: String         = js.native
-  val OptionSetType: String            = js.native
-  val Options: js.Array[OptionSetItem] = js.native
+trait OptionSetMetadata extends OptionSetMetadataBase {
+  var Name: String  
+  var DisplayName: Label  
+  var Description: Label
+  var ExternalTypeName: String
+  var HasChanged: Boolean
+  var IsGlobal: Boolean
+  var IsManaged: Boolean
+  var Options: js.Array[OptionMetadata]
+  var IsCustomOptionSet: Boolean
 }
 
-/** The actual trait that we should use. */
-@js.native
-trait OptionSetMetadata extends OptionSetResponse
-
 /**
-  * When asking for both local or global options set. Either one of these
-  * could be null as well according to the documentation.
+  * When asking for both local or global options set e.g. the OptionSet expanded
+ * nav property on a PickList attribute. Either one of these could be null
+ * according to the documentation.
   *
   * @see https://msdn.microsoft.com/en-us/library/mt788314.aspx
   */
 @js.native
 trait LocalOrGlobalOptionSetsResponse extends js.Object {
-  val OptionSet: UndefOr[OptionSetResponse]       = js.native
-  val GlobalOptionSet: UndefOr[OptionSetResponse] = js.native
+  val OptionSet: UndefOr[OptionSetMetadata]       = js.native
+  val GlobalOptionSet: UndefOr[OptionSetMetadata] = js.native
 }
 
+/** Simplified optionset info once language has been sorted out. */
 case class OptionValue(label: String, value: Int)
 
 @js.native
@@ -317,7 +331,7 @@ class MetadataCache(protected val dynclient: DynamicsClient, LCID: Int = 1033)(i
     }
   }
 
-  protected def optionSetMetadataToOptionValues(items: js.Array[OptionSetItem]): Seq[OptionValue] =
+  protected def optionSetMetadataToOptionValues(items: js.Array[OptionMetadata]): Seq[OptionValue] =
     items.map { oitem =>
       LocalizedHelpers
         .findByLCID(LCID, oitem.Label)

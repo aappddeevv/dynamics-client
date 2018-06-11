@@ -47,7 +47,7 @@ object ADALMiddleware extends LazyLogger {
     * @param sch fs2 Scheduler
     * @param timer cats Timer[F]
     * @param F Error handling for F.
-    * @parm IOtoF: Natural transformation from IO (used internally) to F.
+    * @param IOtoF: Natural transformation from IO (used internally) to F.
     * @return new Middleware and a "stop" effect.
     */
   def apply[F[_]](info: ConnectionInfo,

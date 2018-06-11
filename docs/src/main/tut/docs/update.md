@@ -9,8 +9,8 @@ The `update` command allows you to update entities based on an input json
 file. You can also perform inserts via the "upsert" concept.
 
 ## Subcommands
-* entity: Update records as specified on the command line.
-* one-property: Update a single property on a record from another attribute on the same record or a constant.
+* [entity](#entity): Update records as specified on the command line.
+* [one-property](#one-property): Update a single property on a record from another attribute on the same record or a constant.
 
 
 ## entity

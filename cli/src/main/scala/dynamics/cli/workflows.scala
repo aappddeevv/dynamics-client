@@ -81,12 +81,12 @@ class WorkflowActions(val context: DynamicsContext) {
   implicit val dec = JsObjectDecoder[WorkflowJson]()
 
   protected def getList(attrs: Seq[String] = Nil) = {
-    val q = QuerySpec(select = attrs)
+    val q = QuerySpec(select = attrs, orderBy=Seq("name asc"))
     dynclient.getList[WorkflowJson](q.url("workflows"))
   }
 
   protected def getListStream(attrs: Seq[String] = Nil): Stream[IO, WorkflowJson] = {
-    val q = QuerySpec(select = attrs)
+    val q = QuerySpec(select = attrs, orderBy=Seq("name asc"))
     dynclient.getListStream[WorkflowJson](q.url("workflows"))
   }
 

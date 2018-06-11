@@ -22,7 +22,7 @@ class TestCommand(context: DynamicsContext) {
   import context._
   import dynamics.common.implicits._
   import etl.sources._
-  import etl.jsdatahelpers._
+  import jsdatahelpers._
   import dynamics.common.syntax.all._
 
   val data = JSON.parse("""

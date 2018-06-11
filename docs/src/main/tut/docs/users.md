@@ -11,11 +11,11 @@ entity.
 
 ## Subcommands
 
-* *add-roles*: Add roles to a user, by name.
-* *delete-roles*: Delete roles from a user, by name.
-* *list*: List users.
-* *list-roles*: List roles.
-* *user-roles*: List roles for an user given their email address.
+* [add-roles](#add-roles): Add roles to a user, by name.
+* [delete-roles](#delete-roles): Delete roles from a user, by name.
+* [list](#list): List users.
+* [list-roles](#list-roles): List roles.
+* [user-roles](#user-roles): List roles for an user given their email address.
 
 ## add-roles
 

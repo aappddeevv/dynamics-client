@@ -7,7 +7,7 @@ plugins allows you to upload an assembly (.dll) file to the dynamics server. It 
 
 ## Subcommands
 
-* upload: Upload a plugin to a dynamics server.
+* [upload](#upload): Upload a plugin to a dynamics server.
 
 ### upload
 The publickeytoken is set to null for the upload explicitly to allow the plugin to upload without an error and without needing to load .net assemblies in the CLI program itself.

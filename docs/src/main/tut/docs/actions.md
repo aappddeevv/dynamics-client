@@ -8,7 +8,7 @@ title: actions
 The `actions` command issues Action requests to the Dynamics server then prints the payload response to the standard output. 
 
 ## Subcommands
-* execute: Execute an action.
+* [execute](#execute): Execute an action.
 
 ### execute
 Execute an action specified on the command line using an optional json formatted payload file.

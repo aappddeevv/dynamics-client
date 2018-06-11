@@ -10,9 +10,9 @@ The `workflows` command manages workflows. It can execute workflows against a qu
 
 ## Subcommands
 
-* change-activation: Change the activation of a workflow.
-* execute: Execute a workflow against the results of a OData query. The query must return the primary key of the entity to run the workflow against.
-* list: List existing workflows.
+* [change-activation](#change-activation): Change the activation of a workflow.
+* [execute](#execute): Execute a workflow against the results of a OData query. The query must return the primary key of the entity to run the workflow against.
+* [list](#list): List existing workflows.
 
 You should look for the "Definition" workflows instead of the "Activation" workflow and use the "definition" workflow id in the change-activation command. Deactivating the definition workflow deactivates the activations as well. Each deactivation/activation cycle generates a new "activation" workflow so you may see several "activation" workflows although most of them will be deactivated.
 
@@ -34,4 +34,12 @@ Examples:
 
 * `dynamicscli workflows execute 21019c52-6cf6-4cc6-924c-33736818f0f1 '/new_entity?$select=new_entityid' --pk new_entityid`: Execute a workflow against
 worklow 210*. The entity is called new_entity and its PK is `new_entityid`.
+
+## list
+
+List workflows.
+
+Examples:
+
+* `dynamicscli workflows list`: List workflows including ids and workflow type.
 

@@ -48,12 +48,14 @@ class PrettyJsonOptions(
 ) extends js.Object
 
 class WebResourceUpsertArgs(
-    val name: String,
-    val displayname: String,
-    val webresourcetype: Int,
+  val name: String,
+  val displayname: String,
+  val webresourcetype: Int,
     //  val isenabledformobileclient: Boolean = false,
     //  val iscustomizable: Boolean = true,
-    val content: UndefOr[String] = js.undefined
+  val content: UndefOr[String] = js.undefined
+    // need to set solution it belongs to
+    // parentsolutionid@odatabind = /solutions(id)
 ) extends js.Object
 
 @js.native
@@ -260,6 +262,7 @@ trait SolutionComponentOData extends js.Object {
 trait WebResourceOData extends js.Object {
   val name: String           = js.native
   val displayname: String    = js.native // can be null!2
+  val uniquename: String    = js.native // can be null!2  
   val webresourceid: String  = js.native
   val description: String    = js.native // can be null!
   val content: String        = js.native // base64 encoded, can be null
@@ -269,7 +272,7 @@ trait WebResourceOData extends js.Object {
   val version: String        = js.native // can be null
   val webresourcetype: Int   = js.native
   @JSName("webresourcetype@OData.Community.Display.V1.FormattedValue")
-  val webresourcetypeF: String = js.native
+  val webresourcetype_fv: String = js.native
   // 0 published, 1 unpublished, 2 deleted, 3 deleted unpublished
   val componentstate: Int = js.native
 }

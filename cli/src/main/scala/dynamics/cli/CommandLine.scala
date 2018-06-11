@@ -178,12 +178,9 @@ object CommandLine {
     import h.sub
     import op._
     cmd("metadata")
-      .text("Report out on metadata.")
+      .text("Manage metadata.")
       .action((x, c) => withCmd(c, "metadata"))
       .children(
-        sub("list-entities")
-          .text("List all entities and object type codes.")
-          .action((x, c) => withSub(c, "listentities")),
         sub("download-csdl")
           .text("Download CSDL.")
           .action((x, c) => withSub(c, "downloadcsdl"))
@@ -192,6 +189,20 @@ object CommandLine {
               .text("Output CSDL file.")
               .action((x, c) => c.lens(_.common.outputFile).set(Some(x)))
           ),
+        sub("export-option-sets")
+          .text("Export option set data, global and entity level.")
+          .action((x,c) => withSub(c, "exportOptionSets"))
+          .children(
+            arg[Boolean]("include-global")
+              .text("Include global option sets. Default is true.")
+              .action((x,c) => c.lens(_.metadata.includeGlobal).set(x)),
+            arg[Boolean]("include-local")
+              .text("Include local option sets. Default is true.")
+              .action((x,c) => c.lens(_.metadata.includeLocal).set(x)),
+          ),
+        sub("list-entities")
+          .text("List all entities and object type codes.")
+          .action((x, c) => withSub(c, "listentities")),
         sub("test")
           .text("Run a metadata test.")
           .hidden()
@@ -1015,7 +1026,8 @@ object CommandLine {
           .action((x,c) => withSub(c, "publish"))
           .children(
             arg[Seq[String]]("identifier")
-              .text("Either the id or name of the duplicate rule. Comma separated for multiple items.")
+              .unbounded()
+              .text("Either the id or name of the duplicate rule. Comma separated for multiple items or repeated.")
               .action((x,c) => c.lens(_.deduplication.identifiers).modify(f => f ++ x))
           ),
         sub("unpublish")
@@ -1023,7 +1035,8 @@ object CommandLine {
           .action((x,c) => withSub(c, "unpublish"))
           .children(
             arg[Seq[String]]("identifier")
-              .text("Either the id or name of the duplicate rule. Comma separated for multiple items.")
+              .unbounded()
+              .text("Either the id or name of the duplicate rule. Comma separated for multiple items or repeated.")
               .action((x,c) => c.lens(_.deduplication.identifiers).modify(f => f ++ x))
           ),
         sub("unpublish-all")

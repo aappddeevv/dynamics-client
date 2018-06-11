@@ -45,10 +45,14 @@ object IOUtils {
     ).asInstanceOf[T]
   }
 
-  /** Slurp a file as a utf8 string, synchronous. */
+  /** Slurp a file as a utf8 string, synchronous, full read into memory. */
   def slurp(file: String, encoding: String = "utf8"): String = {
     io.scalajs.nodejs.fs.Fs.readFileSync(file, encoding)
   }
+
+  /** Slurp a file as a base64 encoded string. Good for json upload bodies. Synchronous */
+  def slurpAsBase64(file: String): String =
+    io.scalajs.nodejs.fs.Fs.readFileSync(file).toString("base64")
 
   /** Get the extension/postfix on a filename less
     * the preceeding ".".

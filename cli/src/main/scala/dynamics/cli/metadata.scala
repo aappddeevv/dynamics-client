@@ -27,6 +27,7 @@ import dynamics.client.implicits._
 import dynamics.common.implicits._
 import dynamics.http.implicits._
 import client.common._
+import LocalizedHelpers._
 
 class MetadataActions(val context: DynamicsContext) {
 
@@ -40,6 +41,22 @@ class MetadataActions(val context: DynamicsContext) {
     val request =
       HttpRequest[IO](Method.GET, "/$metadata", headers = HttpHeaders("Accept" -> "application/xml;charset=utf8"))
     dynclient.http.expect[String](request)
+  }
+
+  val exportOptionSets = Action { config =>
+    m.globalOptionSets()
+      .flatMap{ osets =>
+        // expand each option set
+        val items = osets.flatMap(o =>
+          o.Options.map(oi =>
+            Seq(o.Name, oi.Label.label, oi.Value.toString(), oi.Description.label)))
+
+        Listings.mkList(config.common, items,
+          Seq("optionsetname", "label", "value", "description")){ item =>
+          Seq("blah","blah","blah","blah")
+        }
+        .map(println)
+      }
   }
 
   def listEntities() = Action { config =>
@@ -79,8 +96,21 @@ class MetadataActions(val context: DynamicsContext) {
        */
       ()
     }
-
   }
+
+
+  def get(command: String): Action =
+    command match {
+      case "exportOptionSets" => exportOptionSets
+      case "listentities" => listEntities()
+      case "downloadcsdl" => downloadCSDL()
+      case "test"         => test()
+      case _ =>
+        Action { _ =>
+          IO(println(s"metadata command '${command}' not recognized"))
+        }
+    }
+
 
 }
 

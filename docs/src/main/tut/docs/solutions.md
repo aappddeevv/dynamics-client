@@ -8,11 +8,11 @@ title: solutions
 solutions allows you to list, import and export solutions from a Dynamics instance.
 
 ## Subcommands
-* list: List solutions.
-* export: Export a solution.
-* delete: Delete a solution
-* upload: Upload a solution with an optional upload config file.
-* publish-all: Publish all customizations in solutions.
+* [list](#list): List solutions.
+* [export](#export): Export a solution.
+* [delete](#delete): Delete a solution
+* [upload](#upload): Upload a solution with an optional upload config file.
+* [publish-all](#publish-all): Publish all customizations in solutions.
 
 Export and import options come from the web api documentation and are specified in json format.
 

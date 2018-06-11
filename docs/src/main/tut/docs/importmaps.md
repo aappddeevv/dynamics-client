@@ -13,9 +13,9 @@ Once you are ready to lead data, load the import maps first. The use the CLI to 
 
 ## Subcommands
 
-* *download*: Download importmaps.
-* *list*: List importmaps.
-* *upload*: Upload import maps.
+* [download](#download): Download importmaps.
+* [list](#list): List importmaps.
+* [upload](#upload): Upload import maps.
 
 ## download
 

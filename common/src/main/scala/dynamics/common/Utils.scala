@@ -30,7 +30,7 @@ object Utils {
     WebResource.allowedExtensions.get(ext.toLowerCase)
 
   /** Factory to create a matcher.
-    * @returns A => Boolean
+    * @return A => Boolean
     */
   def filterOneForMatches[A](f: A => Seq[String], filters: Traversable[String] = Nil) = {
     val counter = matchCount(filters)

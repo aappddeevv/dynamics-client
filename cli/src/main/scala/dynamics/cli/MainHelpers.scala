@@ -237,11 +237,7 @@ object MainHelpers extends LazyLogger {
 
     case "metadata" =>
       val ops = new MetadataActions(context)
-      config.common.subcommand match {
-        case "listentities" => ops.listEntities()
-        case "downloadcsdl" => ops.downloadCSDL()
-        case "test"         => ops.test()
-      }
+      ops.get(config.common.subcommand)
 
     case "optionsets" =>
       val ops = new OptionSetsActions(context)

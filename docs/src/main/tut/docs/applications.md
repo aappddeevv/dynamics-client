@@ -10,8 +10,8 @@ that can access the application. You often need this if you migrated your app
 but you need to adjust the roles afterwards.
 
 ## Subcommands
-* list: List all applications.
-* roles: Add/remove roles for a specific application. You add/remove roles by
+* [list](#list): List all applications.
+* [roles](#roles): Add/remove roles for a specific application. You add/remove roles by
   role name, not role id. You must use the application unique name and not the
   application display name.
 

@@ -8,10 +8,10 @@ title: themes
 themes allows you to manage some aspects of themes including cloning, updating and setting the logo.
 
 ## Subcommands
-* list: List themes.
-* copy: Copy an existing theme to a new one. Optionally merge additional properties into the copy.
-* publish: Publish a theme.
-* set-logo: Set the logo for an existing theme.
+* [list](#list): List themes.
+* [copy](#copy): Copy an existing theme to a new one. Optionally merge additional properties into the copy.
+* [publish](#publish): Publish a theme.
+* [set-logo](#set-logo): Set the logo for an existing theme.
 
 Note that system themes are read-only. If you want to set the logo, first copy it then set the logo on the copy. Then publish the copy.
 

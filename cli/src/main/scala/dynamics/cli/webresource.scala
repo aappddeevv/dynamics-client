@@ -64,9 +64,8 @@ class WebResourcesCommand(val context: DynamicsContext) {
   val defaultAttrs = Seq("name", "displayname", "webresourceid", "webresourcetype", "solutionid")
 
   def getList(attrs: Seq[String] = defaultAttrs) = {
-    val query =
-      s"""/webresourceset?$$select=${attrs.mkString(",")}"""
-    dynclient.getList[WebResourceOData](query)
+    val qs = QuerySpec(select = attrs)
+    dynclient.getList[WebResourceOData](qs.url("webresourceset"))
   }
 
   protected def filter(wr: Traversable[WebResourceOData], filters: Seq[String]) =
@@ -88,17 +87,12 @@ class WebResourcesCommand(val context: DynamicsContext) {
     *  List Web Resources but apply a filter.
     */
   def list() = Action { config =>
-    val topts = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
-    getList().map(filter(_, config.common.filter)).map { wr =>
-      val data =
-        Seq(Seq("#", "webresourceid", "displayname", "name", "webresourcetype", "solutionid").map(Chalk.bold(_))) ++
-          wr.zipWithIndex.map {
-            case (i, idx) =>
-              Seq((idx + 1).toString, i.webresourceid, i.displayname, i.name, i.webresourcetype.toString, i.solutionid)
-          }
-      val out = Table.table(data.map(_.toJSArray).toJSArray, topts)
-      println(out)
-    }
+    getList().flatMap { items =>
+      Listings.mkList(config.common, items,
+        Seq("webresourceid", "displayname", "name", "webresourcetype", "solution")){ i =>
+        Seq(i.webresourceid, i.displayname, i.name, i.webresourcetype_fv.toString, i.solutionid)
+      }}
+      .map(println)
   }
 
   def delete() = Action { config =>
@@ -189,19 +183,15 @@ class WebResourcesCommand(val context: DynamicsContext) {
   }
 
   /** Read file, convert to baes64. */
-  def base64FromFile(path: String): IO[String] =
-    IO {
-      var content = Fs.readFileSync(path)
-      new Buffer(content).toString("base64")
-    }
+  def base64FromFile(path: String): IO[String] = IO { IOUtils.slurpAsBase64(path) }
 
   def upload() = Action { config =>
-    val f: String => IO[Seq[WebResourceOData]] = getWRByName(_)
+    val f: String => IO[Option[WebResourceOData]] = getWRByName(_)
     val sources = determineCreateOrUpdateActions(config.webResource.webResourceUploadSource flatMap interpretGlob,
                                                 config.webResource.webResourceUploadPrefix,
                                                  f,
                                                  config.webResource.webResourceUploadType)
-    _process(config, sources)
+    processWRAction(config, sources)
   }
 
   protected def log[A](prefix: String): Pipe[IO, A, A] = _.evalMap { a =>
@@ -210,8 +200,6 @@ class WebResourcesCommand(val context: DynamicsContext) {
 
   def watchAndUpload() = Action { config =>
     import dynamics.common.FSWatcher.{add, unlink, change, error}
-
-    val f: String => IO[Seq[WebResourceOData]] = getWRByName(_)
 
     // create a stream of events that closes the chokidar watcher when completed
     val str2 = Stream.bracket(
@@ -234,16 +222,15 @@ class WebResourcesCommand(val context: DynamicsContext) {
           case "add" | "change" =>
             determineCreateOrUpdateActions(Seq(path),
                                            config.webResource.webResourceUploadPrefix,
-                                           f,
+                                           getWRByName(_),
                                            config.webResource.webResourceUploadType)
           case "unlink" =>
             val resourceName = Utils.stripUpTo(path, config.webResource.webResourceUploadPrefix.getOrElse(""))
-            val fileActionF = f(resourceName) map { arr =>
-              if (arr.length == 1) (Delete(arr(0).webresourceid), WebResourceFile(path, path))
-              else if (arr.length > 1)
-                (NoAction("Multiple resources with name $resourceName were found."), WebResourceFile(path, path))
-              else (NoAction(s"No existing Web Resource with name $resourceName found."), WebResourceFile(path, path))
-            }
+            val fileActionF = getWRByName(resourceName).map { _ match {
+              case None =>
+                (NoAction(s"No existing Web Resource with name $resourceName found."), WebResourceFile(path, path))
+              case Some(wr) => (Delete(wr.webresourceid), WebResourceFile(path, path))
+            }}
             Seq(fileActionF)
           case "error" => Seq(IO((NoAction(path), WebResourceFile(path, path))))
           case _ =>
@@ -255,12 +242,15 @@ class WebResourcesCommand(val context: DynamicsContext) {
 
     val estr = str2
       .through(fs2helpers.log[(String, String)] { p =>
-        println(format(p._2, s"Event: ${p._1} detected. Identifying action to take..."))
+        println(format(p._2, s"Event: ${p._1} detected."))
       })
       .map(identifyFileAction)
-      .map(_process(config, _))
+      .map(processWRAction(config, _))
       .map(Stream.eval(_))
-      .join(config.common.concurrency)
+    // don't do it concurrently, can cause issues whent he same file
+    // is saved multiple times quickly.
+    //.join(config.common.concurrency)
+    .join(1)
 
     IO(println("Watching for changes in web resources..."))
       .flatMap(_ => estr.compile.drain)
@@ -310,7 +300,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
     */
   def determineCreateOrUpdateActions(files: Traversable[String],
                                      prefix: Option[String],
-                                     f: String => IO[Seq[WebResourceOData]],
+                                     f: String => IO[Option[WebResourceOData]],
                                      defaultExt: Option[String] = None,
                                      isIllegal: String => Boolean = isIllegalName,
                                      skip: String => Boolean = _ => false): Traversable[IO[FileAction]] = {
@@ -334,11 +324,11 @@ class WebResourcesCommand(val context: DynamicsContext) {
       } else if (badName) {
         IO.pure((NoAction(s"Resource name is not valid. Does it have spaces, dashes or underscores in it?"), wrf))
       } else {
-        f(wrf.resourceName).map { wrs =>
-          if (wrs.length == 1) (Update(wrs(0).webresourceid), wrf)
-          else if (wrs.length == 0) (Create, wrf)
-          else if (wrs.length > 1) (NoAction(s"More than one resource was found with name ${wrf.resourceName}"), wrf)
-          else (NoAction(s"Unable to determine action for Web Resource path ${item}"), wrf)
+        f(wrf.resourceName).map {
+          case Some(wr) =>
+            (Update(wr.webresourceid), wrf)
+          case None =>
+            (Create, wrf)
         }
       }
     }
@@ -349,7 +339,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
   /**
     * Process each FileAction and optionally publish them.
     */
-  def _process(config: AppConfig, sources: Traversable[IO[FileAction]]): IO[Unit] = {
+  def processWRAction(config: AppConfig, sources: Traversable[IO[FileAction]]): IO[Unit] = {
     //val publish = (id: String) => publishXml(dynclient, Seq(id))
     val create          = (data: String) => dynclient.createReturnId("webresourceset", data)
     val allowedToCreate = config.webResource.webResourceUploadRegister
@@ -375,6 +365,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
           case Create if allowedToCreate =>
             def createit(rtype: Int) = {
               base64FromFile(item.fspath).flatMap { resourceContent =>
+                // component is added to the solution via an action call later once the id has been created
                 val body = JSON.stringify(new WebResourceUpsertArgs(rname, rname, rtype, content = resourceContent))
                 create(body).flatMap { id =>
                   println(format(item.fspath, s"Created Web Resource ${item.resourceName}"))
@@ -405,6 +396,7 @@ class WebResourcesCommand(val context: DynamicsContext) {
                 Option(id)
               }
             }
+
           case Delete(id) =>
             dynclient.delete("webresourceset", id).map { _ =>
               println(format(item.fspath, s"Deleted $rname."))
@@ -446,10 +438,12 @@ class WebResourcesCommand(val context: DynamicsContext) {
     }
   }
 
-  /** Get a web resource by name. There may be more than one so return a list. */
-  def getWRByName(name: String) = {
-    val query = s"/webresourceset?$$filter=name eq '$name'&$$select=webresourceid"
-    dynclient.getList[WebResourceOData](query)
+  /** Get a web resource by name. */
+  def getWRByName(name: String)  = {
+    val qs = QuerySpec(
+      filter = Some(s"name eq '$name'"),
+      select =Seq("webresourceid"))
+    dynclient.getOne[Option[WebResourceOData]](qs.url("webresourceset"))(ExpectOnlyOneToOption)
   }
 
   /** Upload action. Return entity id. */

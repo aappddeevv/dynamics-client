@@ -11,16 +11,16 @@ specify on the command line or through CLI args that will compose the web api
 query string for you.
 
 ## Subcommands
-* export: Export entity data. Command line options allow you to build up a query
+* [export](#export): Export entity data. Command line options allow you to build up a query
   using web api fragments. dynamicscli will stitch them together. Output is csv.
-* export-from-query: Provide a web api query to specify the data to export. It
+* [export-from-query](#export-from-query): Provide a web api query to specify the data to export. It
   can be trick to properly single quote value inside the web api query so watch
   your OS shell expansion carefully. The only output format is json.
-* count: Count the number of entities. If you provide the --repeat option, it
+* [count](#count): Count the number of entities. If you provide the --repeat option, it
   will continuously count entities, which can be resource intensive so use
   --repeat wisely. You can provide a list of entities to count. Count requests
   are run in parallel.
-* delete: Delete data by providing a query. If you created a load id for your
+* [delete](#count): Delete data by providing a query. If you created a load id for your
   data loads or use the builtin load id, you can delete a slice of the data
   based on the id. Otherwise, the query must return the primary key which will
   be used to issue the delete commands. It is suggested that you first run count
@@ -28,12 +28,14 @@ query string for you.
   select the correct records.
 
 ### count
-You can specify any/all `--query`, `--query-file` or ``--filter` to select the entities to count.
+You can specify any/all `--query`, `--query-file` or `--filter` to select the entities to count.
 
 * `--query`: key=value pairs. The key will be used to sort the count results.
 * `--query-file`: A JSON file with key, value pairs.
 * `--filter`: Specify only the entity. A query will be created e.g. `--filter contact` === `--query contact='/contacts?$select=contactid`.
 * `--function` with `--filter`: Use the fast function approach, but if you do, you cannot use queries to count, you can only count the entire entity. The "function" implies the use of a dynamics server provided web api function that counts entities but it is limited to counting all entities. If you want a total count, use this option because it is fast and does not impact the server.
+* `--repeat`: Repeat the count.
+* `--repeat-delay`: Delay in seconds between repeats. Default is 60 seconds.
 
 Shell expansion can make specifying the query difficult on the command
 line. `--query-file` allows you to use single quotes in your query much
@@ -77,6 +79,7 @@ dynamicscli entity count --function true --filter contact,account
 ```
 
 ### export, export-from-query
+
 Exporting data comes in two flavors. Exporting using a query created from parts
 on the command line and using a fully formed query. You can export data into a
 CSV or JSON streaming file.

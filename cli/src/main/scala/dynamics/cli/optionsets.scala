@@ -28,13 +28,6 @@ import dynamics.client.implicits._
 import dynamics.client._
 import client.common._
 
-@js.native
-trait GlobalOptionSetDefinition extends js.Object {
-  val Name: String                        = js.native // always retrieve the name
-  val MetadataId: String                  = js.native // always get this to
-  val Description: UndefOr[LocalizedInfo] = js.native
-}
-
 class OptionSetsActions(context: DynamicsContext) extends LazyLogger {
 
   import LocalizedHelpers._
@@ -42,14 +35,14 @@ class OptionSetsActions(context: DynamicsContext) extends LazyLogger {
   import context._
 
   protected def getList() = {
-    val qs = QuerySpec(select = Seq("Name", "Description", "MetadataId"))
-    dynclient.getList[GlobalOptionSetDefinition](qs.url(ENTITYSET))
+    val qs = QuerySpec(/*select = Seq("Name", "Description", "MetadataId")*/)
+    dynclient.getList[OptionSetMetadata](qs.url(ENTITYSET))
   }
 
-  protected def filter(r: Seq[GlobalOptionSetDefinition], filter: Seq[String]) =
+  protected def filter(r: Seq[OptionSetMetadata], filter: Seq[String]) =
     Utils.filterForMatches(r.map(a => (a, Seq(a.Name))), filter)
 
-  protected def getFilteredList(data: Seq[GlobalOptionSetDefinition], criteria: Seq[String]) =
+  protected def getFilteredList(data: Seq[OptionSetMetadata], criteria: Seq[String]) =
     filter(data, criteria)
 
   /** Finds global option set by name. If not found, returns None. Extremely expensive call
@@ -57,19 +50,19 @@ class OptionSetsActions(context: DynamicsContext) extends LazyLogger {
     * to retrieve the entire object.
     */
   def findByName(name: String) = {
-    val qs = QuerySpec(select = Seq("Name", "MetadataId"))
-    dynclient.getList[GlobalOptionSetDefinition](qs.url(ENTITYSET)).map(_.filter(_.Name == name).headOption).flatMap {
+    val qs = QuerySpec(/*select = Seq("Name", "MetadataId")*/)
+    dynclient.getList[OptionSetMetadata](qs.url(ENTITYSET)).map(_.filter(_.Name == name).headOption).flatMap {
       _ match {
         case Some(obj) =>
-          dynclient.getOneWithKey[GlobalOptionSetDefinition](ENTITYSET, obj.MetadataId)
+          dynclient.getOneWithKey[OptionSetMetadata](ENTITYSET, obj.MetadataId)
         case _ => IO.pure(None)
       }
     }
   }
 
   /** Get the global option set with just one call. */
-  def findByName2(name: String): IO[GlobalOptionSetDefinition] = {
-    dynclient.getOneWithKey[GlobalOptionSetDefinition](ENTITYSET, AltId("Name", name))
+  def findByName2(name: String): IO[OptionSetMetadata] = {
+    dynclient.getOneWithKey[OptionSetMetadata](ENTITYSET, AltId("Name", name))
   }
 
   def list(): Action = Kleisli { config =>
@@ -83,11 +76,8 @@ class OptionSetsActions(context: DynamicsContext) extends LazyLogger {
             println(s"${PrettyJson.render(i)}")
             Seq(idx.toString,
                 i.Name,
-                i.Description.toOption
-                  .flatMap(findByLCID(config.common.lcid, _))
-                  .filterNot(_ == null)
-                  .map(_.Label)
-                  .getOrElse(""))
+                i.Description.label
+            )
         }
       println(tablehelpers.render(header, data, topts))
     }

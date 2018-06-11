@@ -71,11 +71,20 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
   implicit val solnDecoder = JsObjectDecoder[SolutionOData]()
 
   protected def getList() = {
-    val query =
-      "/solutions?$select=description,friendlyname,ismanaged,_organizationid_value," +
-        "_parentsolutionid_value,_publisherid_value,solutionid,solutionpackageversion," +
-        "solutiontype,uniquename,version,versionnumber"
-    dynclient.getList(query)
+    val qs = QuerySpec(select = Seq(
+      "description",
+      "friendlyname",
+      "ismanaged",
+      "_organizationid_value",
+      "_parentsolutionid_value",
+      "_publisherid_value",
+      "solutionid",
+      "solutionpackageversion",
+      "solutiontype",
+      "uniquename",
+      "version",
+      "versionnumber"))
+    dynclient.getList(qs.url("solutions"))
   }
 
   protected def filterSolutions(r: Seq[SolutionOData], filter: Seq[String]) = {
@@ -95,17 +104,12 @@ class SolutionActions(context: DynamicsContext) extends LazyLogger {
 
   protected def _list(): Kleisli[IO, (AppConfig, Seq[SolutionOData]), Unit] =
     Kleisli {
-      case (config, wr) =>
-        val topts  = new TableOptions(border = Table.getBorderCharacters(config.common.tableFormat))
-        val header = Seq("#", "solutionid", "name", "displayname", "version")
-        IO {
-          val data =
-            wr.zipWithIndex.map {
-              case (i, idx) =>
-                Seq(idx.toString, i.solutionid.orEmpty, i.uniquename.orEmpty, i.friendlyname.orEmpty, i.version.orEmpty)
-            }
-          println(tablehelpers.render(header, data, topts))
+      case (config, items) =>
+        Listings.mkList(config.common, items,
+          Seq("solutionid", "uniquename", "displayname", "version")){ i =>
+          Seq(i.solutionid.orEmpty, i.uniquename.orEmpty, i.friendlyname.orEmpty, i.version.orEmpty)
         }
+          .map(println)
     }
 
   def list(): Action = withData andThen _list

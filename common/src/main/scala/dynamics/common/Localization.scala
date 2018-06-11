@@ -4,6 +4,7 @@
 
 package dynamics
 package client
+package common
 
 import dynamics.common._
 
@@ -20,6 +21,7 @@ import js.Dynamic.{literal => jsobj}
 import MonadlessIO._
 import cats.effect._
 
+import dynamics.common.syntax.jsundefor._
 import Utils._
 
 /**
@@ -39,7 +41,7 @@ trait LocalizedLabel extends js.Object {
   * @see https://docs.microsoft.com/en-us/dynamics365/customer-engagement/web-api/label?view=dynamics-ce-odata-9
   */
 @js.native
-trait LocalizedInfo extends js.Object {
+trait Label extends js.Object {
   val LocalizedLabels: UndefOr[js.Array[LocalizedLabel]] = js.native
   val UserLocalizedLabel: UndefOr[LocalizedLabel]        = js.native
 }
@@ -47,19 +49,27 @@ trait LocalizedInfo extends js.Object {
 object LocalizedHelpers {
 
   /** Get user localized label. If absent, use lcid, if absent, return None */
-  def label(info: LocalizedInfo, lcid: Option[Int] = None): Option[String] =
+  def label(info: Label, lcid: Option[Int] = None): Option[String] =
     labelForUser(info) orElse lcid.flatMap(i => findByLCID(i, info)).map(_.Label)
 
   /** Return the label for the user localized label or None. */
-  def labelForUser(info: LocalizedInfo): Option[String] =
-    info.UserLocalizedLabel.map(_.Label).toOption
+  def labelForUser(info: Label): Option[String] =
+    info.UserLocalizedLabel.toNonNullOption.map(_.Label)
 
   /**
     * Return the localized label (based on lcid) then the user localized label
     * then None.
     */
-  def findByLCID(lcid: Int, info: LocalizedInfo): Option[LocalizedLabel] =
+  def findByLCID(lcid: Int, info: Label): Option[LocalizedLabel] =
     info.LocalizedLabels.toOption.flatMap(_.find(_.LanguageCode == lcid)) orElse
       info.UserLocalizedLabel.toOption
+
+    /** Make labels easier to use. */
+  implicit class RichLabel(label: Label) {
+    /** Obtain the label string from a Label or a default empty string.. */
+    def label: String = LocalizedHelpers.label(label).getOrElse("")
+    /** Obtain the label string from a Label and lcsid or fallback to user label. */
+    def label(lcsid: Int): String = findByLCID(lcsid, label).map(_.Label).getOrElse("no label")
+  }
 
 }

@@ -120,7 +120,9 @@ import dynamics.common._
 )
 
 @Lenses case class MetadataConfig(
-    )
+  includeGlobal: Boolean = true,
+  includeLocal: Boolean = true,
+)
 
 @Lenses case class ExportConfig(
     entity: String = "",

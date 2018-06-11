@@ -24,9 +24,9 @@ The settings allowed in the json file are documented here:
 However, its easier to just run the `list` command, find your org, then see what the settings names and values are.
 
 ## Subcommands
-* post: Post a settings file to the org.
-* list: Dump out an unformatted json record of the settings. Use this to see the current settings. This dumps all settings for all orgs with json "formatted values" so the output is quite voluminous.
-* categorizedsearch: Set the entity list for categorized list. NOT WORKNG YET!
+* [post](#post): Post a settings file to the org.
+* [list](#list): Dump out an unformatted json record of the settings. Use this to see the current settings. This dumps all settings for all orgs with json "formatted values" so the output is quite voluminous.
+* [categorizedsearch](#categorizedsearch): Set the entity list for categorized list. NOT WORKNG YET!
 
 ## post
 

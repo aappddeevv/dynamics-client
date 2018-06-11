@@ -20,17 +20,22 @@ The CLI program can be used like any other program but it has many commands and
 subcommands. Overall you run the CLI like:
 
 ```sh
-dynamicscli <command> <subcommand> args optional-args -c connectionfile.json
+dynamicscli <command> <subcommand> args optional-args -c dynamics.json
 ```
 
-The `connectionfile.json` is a file that specifies the connection parameters in
-json format. By default it is named 'dynamics.json' and it looks in the current
-directory for it. If the file exists, you can just type `dynamicscli <command>
-<subcommand> args optional-args`.
+`dynamics.json` is a file that specifies the connection parameters in json
+format. By default the CLI looks in the current directory for it. If the file
+exists, you can just type 
 
-If the enviroment variable `DYNAMCIS_CRMCONFIG` is defined, that value will be
-used. The precedence is the CLI parameter, the environment variable and then the
-default `./dynamics.json`.
+```sh
+# file dynamics.json exist in the current working directory
+# no need for -c dynamics.json
+dynamicscli command subcommand args optional-args
+```
+
+If the environment variable `DYNAMCIS_CRMCONFIG` is defined, that value will be
+used as the name of the connection file. The precedence is the CLI parameter,
+the environment variable and then the default `./dynamics.json`.
 
 Environment variables include:
 
