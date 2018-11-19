@@ -20,7 +20,7 @@ query string for you.
   will continuously count entities, which can be resource intensive so use
   --repeat wisely. You can provide a list of entities to count. Count requests
   are run in parallel.
-* [delete](#count): Delete data by providing a query. If you created a load id for your
+* [delete](#delete): Delete data by providing a query. If you created a load id for your
   data loads or use the builtin load id, you can delete a slice of the data
   based on the id. Otherwise, the query must return the primary key which will
   be used to issue the delete commands. It is suggested that you first run count

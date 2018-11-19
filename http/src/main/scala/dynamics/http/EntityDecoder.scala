@@ -77,7 +77,7 @@ trait EntityDecoder[F[_], T] { self =>
     }
   }
 
-  /** Covariant widenening via cast. */
+  /** Covariant widenening via cast. We do it for you so you don't have to. */
   def widen[T2 >: T]: EntityDecoder[F, T2] = this.asInstanceOf[EntityDecoder[F, T2]]
 
   /** Transform a decode result into another decode result. */
@@ -272,7 +272,8 @@ trait EntityDecoderInstances {
   /**
     * Decode based on the expectation of a "value" field name that has an array
     * of "A" values. The returned value is a js Array not a scala collection.
-    * If "value" fieldname is undefined, return an empty array freshly allocated.
+    * If "value" fieldname is undefined, return an empty array freshly
+    * allocated.
     */
   def ValueArrayDecoder[A <: js.Any](implicit ec: ExecutionContext): EntityDecoder[IO, js.Array[A]] =
     JsObjectDecoder[ValueArrayResponse[A]]().map(_.value.getOrElse(js.Array[A]()))

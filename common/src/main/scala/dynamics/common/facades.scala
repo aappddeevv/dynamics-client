@@ -704,6 +704,41 @@ trait SystemuserJS extends js.Object {
 }
  */
 
+/**
+ * Contains owner user/team attributes for entities that are can be owned. Some
+ * attributse can only be owned by the business unit. The trait does not assume
+ * that the odata extra attributes have been mapped.
+ */
+trait Owned extends js.Object {
+  // General owning id: team or user.
+  var _ownerid_value: js.UndefOr[String] = js.undefined
+  @JSName("_ownerid_value@OData.Community.Display.V1.FormattedValue")
+  var _ownerid_value_fv: js.UndefOr[String] = js.undefined
+  @JSName("_ownerid_value@Microsoft.Dynamics.CRM.lookuplogicalname")
+  var _ownerid_value_lln: js.UndefOr[String] = js.undefined
+
+  // Owning user.
+  var _owninguser_value: js.UndefOr[String] = js.undefined
+  @JSName("_owninguser_value@OData.Community.Display.V1.FormattedValue")
+  var _owninguser_value_fv: js.UndefOr[String] = js.undefined
+  @JSName("_owninguser_value@Microsoft.Dynamics.CRM.lookuplogicalname")
+  var _owninguser_value_lln: js.UndefOr[String] = js.undefined
+
+  // Owning team.
+  var _owningteam_value: js.UndefOr[String] = js.undefined
+  @JSName("_owningteam_value@OData.Community.Display.V1.FormattedValue")
+  var _owningteam_value_fv: js.UndefOr[String] = js.undefined
+  @JSName("_owningteam_value@Microsoft.Dynamics.CRM.lookuplogicalname")
+  var _owningteam_value_lln: js.UndefOr[String] = js.undefined
+
+  // Owning businessunit.
+  var _owningbusinessunit_value: js.UndefOr[String] = js.undefined
+  @JSName("_owningbusinessunit_value@OData.Community.Display.V1.FormattedValue")
+  var _owningbusinessunit_value_fv: js.UndefOr[String] = js.undefined
+  @JSName("_owningbusinessunit_value@Microsoft.Dynamics.CRM.lookuplogicalname")
+  var _owningbusinessunit_value_lln: js.UndefOr[String] = js.undefined
+}
+
 @js.native
 trait TeamJS extends js.Object {
   val teamid: String         = js.native

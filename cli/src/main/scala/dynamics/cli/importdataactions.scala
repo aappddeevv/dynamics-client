@@ -19,6 +19,7 @@ import cats.data._
 import cats.implicits._
 import io.scalajs.npm.chalk._
 import cats.effect._
+import monocle.macros.syntax.lens._
 
 import dynamics.common._
 import MonadlessIO._
@@ -168,11 +169,11 @@ class ImportDataActions(val context: DynamicsContext) { self =>
           log(s"Processing import file: $ifileid")
 
           val after = (jobid: String) =>
-            for {
-              _ <- waitforit(jobid)
-              _ <- reportImportStatus(name, _importid)
-              _ <- reportErrors(name, ifileid)
-            } yield jobid
+          for {
+            _ <- waitforit(jobid)
+            _ <- reportImportStatus(name, _importid)
+            _ <- reportErrors(name, ifileid)
+          } yield jobid
 
           log(s"Starting parsing stage.")
           unlift(requestParsing(_importid) flatMap after)
@@ -206,8 +207,8 @@ class ImportDataActions(val context: DynamicsContext) { self =>
   def requestParsing(importid: String): IO[String] = {
     dynclient
       .executeAction[AsyncOperationOData]("Microsoft.Dynamics.CRM.ParseImport",
-                                          Entity.fromString(""),
-                                          Option(("imports", importid)))
+        Entity.fromString(""),
+        Option(("imports", importid)))
       .map(_.asyncoperationid.get)
   }
 
@@ -215,8 +216,8 @@ class ImportDataActions(val context: DynamicsContext) { self =>
   def requestTransform(importid: String): IO[String] = {
     dynclient
       .executeAction[AsyncOperationOData]("TransformImport",
-                                          Entity.fromString(s"""{ "ImportId": "$importid"  }"""),
-                                          None)
+        Entity.fromString(s"""{ "ImportId": "$importid"  }"""),
+        None)
       .map(_.asyncoperationid.get)
   }
 
@@ -224,8 +225,8 @@ class ImportDataActions(val context: DynamicsContext) { self =>
   def requestImport(importid: String): IO[String] = {
     dynclient
       .executeAction[AsyncOperationOData]("Microsoft.Dynamics.CRM.ImportRecordsImport",
-                                          Entity.fromString(""),
-                                          Option(("imports", importid)))
+        Entity.fromString(""),
+        Option(("imports", importid)))
       .map(_.asyncoperationid.get)
   }
 
@@ -293,16 +294,16 @@ class ImportDataActions(val context: DynamicsContext) { self =>
     )
 
     dynclient.getList[ImportJSListing](q.url("imports"))
-    .flatMap{ items =>
-      Listings.mkList(config.common, items, header){ i =>
-        Seq(
-          i.importid,
-          i.name,
-          i.statuscode_fv,
-          i.sequence.toString(),
-          i.createdon_fv,
-        )
-      }}
+      .flatMap{ items =>
+        Listings.mkList(config.common, items, header){ i =>
+          Seq(
+            i.importid,
+            i.name,
+            i.statuscode_fv,
+            i.sequence.toString(),
+            i.createdon_fv,
+          )
+        }}
       .map(println)
       .void
   }
@@ -313,8 +314,8 @@ class ImportDataActions(val context: DynamicsContext) { self =>
       select = Seq("importid", "name")
     )
     val deleteone = (id: String) =>
-      dynclient.delete("imports", id).flatMap { id =>
-        IO(println(s"[$id] Deleted on ${new Date().toISOString()}."))
+    dynclient.delete("imports", id).flatMap { id =>
+      IO(println(s"[$id] Deleted on ${new Date().toISOString()}."))
     }
     val counter = new java.util.concurrent.atomic.AtomicInteger(0)
 
@@ -329,7 +330,7 @@ class ImportDataActions(val context: DynamicsContext) { self =>
       }
       .compile
       .drain
-      .map(_ => println(s"${counter.get} imports delete."))
+      .map(_ => println(s"${counter.get} imports deleted."))
   }
 
   val bulkDelete: Action = Kleisli { config =>
@@ -356,6 +357,7 @@ class ImportDataActions(val context: DynamicsContext) { self =>
     }
   }
 
+  // not sure where this was going, but its not quite right...
   val dumpErrors = Action { config =>
     val outdir = config.common.outputDir
     val qs = QuerySpec(
@@ -380,6 +382,24 @@ class ImportDataActions(val context: DynamicsContext) { self =>
     }
   }
 
+  val dumpErrors2 = Action { config =>
+    val qs = QuerySpec(
+      select=Seq(
+        "importlogid", // allows us to pull the entire record
+        "headercolumn", "errordescription", "sequencenumber", "additionalinfo",
+        "errornumber", "columnvalue", "logphasecode", "createdon",
+      ),
+      expand=Seq(
+        Expand("importdataid", select=Seq("linenumber", "errortype", "data")),
+        Expand("importfileid", select=Seq("name")))
+    )
+    val exporter = new EntityActions(context)
+    val econfig = config
+      .lens(_.export.query).set(qs.url("importlogs"))
+      .lens(_.export.includeFormattedValues).set(true)
+    exporter.exportFromQuery(econfig)
+  }
+
   def get(command: String): Action =
     command match {
       case "import"          => importData
@@ -388,7 +408,7 @@ class ImportDataActions(val context: DynamicsContext) { self =>
       case "bulkdelete"      => bulkDelete
       case "resume"          => resume
       case "delete"          => delete
-      case "dumperrors"      => dumpErrors
+      case "dumperrors"      => dumpErrors2
       case _ =>
         Action { _ =>
           IO(println(s"importdata command '${command}' not recognized."))

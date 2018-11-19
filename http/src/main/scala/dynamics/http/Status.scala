@@ -9,13 +9,12 @@ import cats._
 import cats.data._
 import cats.implicits._
 
-/** Represents a Status. Allows us to manage status
-  * values in web calls more easily.
-  * Provide a way to match a response to a status or other criteria
-  * in a DSL-sort of way.
+/** Represents a Status. Allows us to manage status values in web calls more
+  * easily.  Provide a way to match a response to a status or other criteria in
+  * a DSL-sort of way.
   * {{{
   * client.fetch(...) {
-  *  case Status(200)(response) => decode response
+  *  case Status(200)(response) => decode the response
   *  case failedResponse => Task.fail(...)
   * }
   * }}}

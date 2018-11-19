@@ -26,13 +26,15 @@ import dynamics.client.common._
 import dynamics.client.implicits._
 import dynamics.client.crmqueryfunctions._
 import http.instances.entitydecoder.ValueArrayDecoder
+import dynamics.client.common.{Id => EID}
 
+/** An entity potentially related through a role. */
 case class RelatedEntity(ename: String,
                          esname: String,
                          objectTypeCode: Int,
                          roleName: String,
-                         roleId: dynamics.client.common.Id,
-                         id: dynamics.client.common.Id)
+                         roleId: EID,
+                         id: EID)
 
 /**
   * Used when we need to print out information about a record. Think of this as
@@ -57,11 +59,11 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
 
   /**
     * Fetch entities (from record2) that match the specified record2 entity
-    * logical names and roles.
+    * logical names and roles. This just translates logical names into object
+    * type codes then calls `entitiesFromConnections`.
     * @return record2 derived fat tuples (entity name, entity object type code, role name, role id, entity id)
-    * @todo fromEntitySet is not technically needed for the query if we have an id
     */
-  def entitiesFromConnectionsUsingNames(fromEntityId: dynamics.client.common.Id,
+  def entitiesFromConnectionsUsingNames(fromEntityId: EID,
                                         toEntityNames: Traversable[String] = Nil,
                                         toRoleNames: Traversable[String] = Nil): IO[Seq[RelatedEntity]] = {
     val params = for {
@@ -77,9 +79,14 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
     }
   }
 
-  def entitiesFromConnections(fromEntityId: dynamics.client.common.Id,
+  /**
+   * Given a "from" entity, return "to" entities that are in the specified
+   * roles and have a specific object type code (yes the number since
+   * connections store numbers and not logical names).
+   */
+  def entitiesFromConnections(fromEntityId: EID,
                               toCodes: Traversable[Int] = Nil,
-                              toRoleIds: Traversable[dynamics.client.common.Id] = Nil): IO[Seq[RelatedEntity]] = {
+                              toRoleIds: Traversable[EID] = Nil): IO[Seq[RelatedEntity]] = {
     val codesq =
       if (!toCodes.isEmpty) "and " + In("record2objecttypecode", toCodes.map(_.toString))
       else ""
@@ -112,12 +119,12 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
   }
 
   /**
-    * Return systemmusers that have systemuser connections to the specified
-    * entity. record1=entity, record2=sysemusers connected via he record2roleids
-    * list.
+    * Given a "from" entity return systemusers that are on the "to" side of the
+    * connection. record1=entity, record2=sysemusers connected via he
+    * record2roleids list.
     */
   def systemusersFromConnections(entitySet: String,
-                                 entityId: dynamics.client.common.Id,
+                                 entityId: EID,
                                  record2roleids: Seq[String]): IO[Seq[SystemuserJS]] = {
     val q = QuerySpec(
       filter = Some(s"""_record1id_value eq $entityId"""),
@@ -134,12 +141,12 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
   }
 
   /** Fetch email address from dynamics systemuser record. */
-  def fetchEmailAddressFromId(id: dynamics.client.common.Id): IO[UPN] = {
+  def fetchEmailAddressFromId(id: EID): IO[UPN] = {
     fetchSystemuser(id).map(user => UPN(user.internalemailaddress))
   }
 
   /** Fetch a system user by id. */
-  def fetchSystemuser(id: dynamics.client.common.Id): IO[SystemuserJS] =
+  def fetchSystemuser(id: EID): IO[SystemuserJS] =
     dynclient.getOneWithKey[SystemuserJS]("systemusers", id.asString)
 
   def fetchEmailableSystemuser(id: dynamics.client.common.Id): IO[Option[SystemuserJS]] =
@@ -150,16 +157,8 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
         else Option.empty
       }
 
-  /**
-    * Given an entity id, find its owner. If the owner is a team,
-    * retrieve those systemusers. If errors occur along the way,
-    * ignore them and return Nil as appropriate.
-    */
-//  def fetchOwnerUserOrTeam(esname: String, id: dynamics.client.common.Id): IO[Seq[String]] = {
-//    dynclient.getOne()
-//  }
-
-  def fetchTeamSystemuserIds(teamId: dynamics.client.common.Id): IO[Seq[String]] = {
+  /** Expand the team id to a list of systemuser ids. */
+  def fetchTeamSystemuserIds(teamId: EID): IO[Seq[String]] = {
     val q = QuerySpec(
       select = Seq("systemuserid"),
       properties = Seq(NavProperty("teammembership_association"))
@@ -167,6 +166,29 @@ class MiscQueries(dynclient: DynamicsClient, m: MetadataCache, concurrency: Int 
     dynclient
       .getOne[js.Array[SystemuserJS]](q.url("teams", Some(teamId.asString)))(ValueArrayDecoder[SystemuserJS])
       .map(_.map(_.systemuserid).toSeq)
+  }
+
+  /** Given a dynamics entity look at the "owning" attributes to find all
+   * systemusers. This expands out a team if the entity is owned by a team.  If
+   * neither of these are filled out, return an empty list. If those attributes
+   * are not found it tries to interpret _ownerid_value if the lookup logical
+   * name odata attribute is found. IF assumeUser is true, a plain  _ownerid_value
+   * without the lookup logical name is assumed to be a systemuser.
+   */
+  def ownerIdsFrom(obj: js.Object, assumeUser: Boolean = false): IO[Seq[String]] = {
+    val tmp = obj.asInstanceOf[Owned]
+    (tmp._owninguser_value.map(id => IO.pure(Seq(id))).toOption orElse
+    tmp._owningteam_value.map(tid => fetchTeamSystemuserIds(EID(tid))).toOption orElse
+      ((tmp._ownerid_value.toOption, tmp._ownerid_value_lln.toOption) match {
+        case (Some(id), Some(lln)) if lln == "systemuser" =>
+          Some(IO.pure(Seq(id)))
+        case (Some(id), Some(lln)) if lln == "team" =>
+          Some(fetchTeamSystemuserIds(EID(id)))
+        case (Some(id), _) if assumeUser =>
+          Some(IO.pure(Seq(id)))
+        case _ =>
+          Some(IO.pure(Seq.empty))
+      })).getOrElse(IO.pure(Seq.empty))
   }
 
 }

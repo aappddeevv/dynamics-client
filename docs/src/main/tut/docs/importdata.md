@@ -28,25 +28,44 @@ times. A small amount of experimentaton to determine the optimal # chunks/#
 simultaneous chunk combinations.
 
 ## Subcommands
-* [list-imports](#list-imports): List imports, status and ownership information. This also lists the sequence number.
-* [list-importfiles](#list-importfiles): List import files. These are typically created as part of creating an import job. You should run this command when you want to see the status of the import files e.g. what's being processed, error counts, etc.
-* [dump-errors](#dump-errors): Dump detailed info about importfiles that import errors. In the UI, you can only export the rows, this dump gets everything.
 * [bulkdelete](#bulkdelete): Create a bulkdelete job from a query file.
 * [delete](#delete): Delete imports (jobs) by name.
+* [dump-errors](#dump-errors): Dump detailed info about importfiles that import errors. In the UI, you can only export the rows, this dump gets everything.
 * [import](#import): Import data. Specify a data file and an available import map. The
   import map must already be loaded.
+* [list-imports](#list-imports): List imports, status and ownership information. This also lists the sequence number.
+* [list-importfiles](#list-importfiles): List import files. These are typically created as part of creating an import job. You should run this command when you want to see the status of the import files e.g. what's being processed, error counts, etc.
 * [resume](#resume): Resume in imported job at the last processing stage. I'm not sure how
   well this works.
 
-## delete
+## bulk-delete
 
-delete is often used after a bad import. It can be just as fast as a bulk delete and you can specify the delete query using the web api syntax:
+NEED MORE EXPLANATION HERE
+
+Bulk delete an import. This uses a json configuration file so it is a bit complex to setup.
 
 Examples:
-* `dynamicscli entity delete contact --query '/contacts?$select=contactid'`: Delete all contacts. Note how the query selects the amount of data it pulls from the server by *only* specifying the contactid as the returned value.
-* `dynamicscli entity delete contact --query '/contacts?$select=contactid&$filter=importsequencenumber eq 64`: Delete all contacts that were imported with the sequence number 64.
 
-You can also specify the queries to delete from a json file. The keys are used to sort and report back the deletion counts.
+* `dynamicscli importdata bulkdelete bulkdeleteconfig.json`
+
+## delete
+
+delete is often used after a bad import or you just want to clear out imports that were successful. Delete the import will also delete the underlying import files. You can use also `dynamicscli entity delete ...` for a more general delete approach by specifying the "import" entity. The name is used as a match so be very careful on the name you provide.
+
+Examples:
+* `dynamicscli entity delete --filter "some import name"`: Delete the imports whose name matches "some import name".
+
+
+## dump-errors
+
+Dump all error data associated with imports assuming that an error is indicated
+by a failure or partial failure count. This command currently outputs only json
+so its best to browse it *after* you process it for beautification
+e.g. `js-beautify -r errors.json`.
+
+Examples:
+
+* `dynamicscli importdata dump-errors --outputfile errors.json`
 
 
 ## import

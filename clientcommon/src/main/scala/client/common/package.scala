@@ -24,6 +24,9 @@ package object common {
   /** Entity logical name newtype. Could be entity or attribute. */
   @newtype case class EntityLogicalName(asString: String)
 
+  /** Any type of logical name. */
+  @newtype case class LogicalName(asString: String)
+
   import headers._
 
   val defaultMappers = Map[String, String => String](

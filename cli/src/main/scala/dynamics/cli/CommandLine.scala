@@ -99,7 +99,7 @@ object CommandLine {
       .validate(pause =>
         if (pause < 0 || pause > 60 * 5) failure("Pause must be between 0 and 300 seconds.") else success)
     opt[Int]("request-timeout")
-      .text("Request timeout in millis. 1000millis = 1s")
+      .text("Request timeout in millis. 1000millis = 1sec. 60000millis = 1min, 3600000millis = 1hr.")
       .action((x, c) => c.lens(_.common.requestTimeOutInMillis).set(Some(x)))
     opt[String]("metadata-cache-file")
       .text("Metadata cache file to use explicitly. Otherwise it is automatically located.")
@@ -146,10 +146,10 @@ object CommandLine {
 
     def sub(n: String) = { note("\n"); cmd(n) }
 
-    val mkOutputDir = () =>
-      opt[String]("outputdir")
-        .text("Output directory for downloads.")
-        .action((x, c) => c.lens(_.common.outputDir).set(x))
+    // val mkOutputDir = () =>
+    //   opt[String]("outputdir")
+    //     .text("Output directory for downloads.")
+    //     .action((x, c) => c.lens(_.common.outputDir).set(x))
 
     val mkNoClobber = () =>
       opt[Unit]("noclobber")
@@ -359,19 +359,19 @@ object CommandLine {
     val helpers = CliHelpers(op)
     import helpers._
 
-    val formattedValues = opt[Unit]("include-formatted-values")
+    val formattedValues = () => opt[Unit]("include-formatted-values")
       .text("Include formmated values in the output. This increases the size significantly.")
       .action((x, c) => c.lens(_.export.includeFormattedValues).set(true))
 
-    val top = opt[Int]("top")
+    val top = () => opt[Int]("top")
       .text("Top N records.")
       .action((x, c) => c.lens(_.export.top).set(Option(x)))
 
-    val skip = opt[Int]("skip")
+    val skip = () => opt[Int]("skip")
       .text("Skip N records.")
       .action((x, c) => c.lens(_.export.skip).set(Option(x)))
 
-    val maxPageSize = opt[Int]("maxpagesize")
+    val maxPageSize = () => opt[Int]("maxpagesize")
       .text(
         "Set the maximum number of entities returned per 'fetch'. If node crashes when exporting large entities, set this smaller than 5000.")
       .action((x, c) => c.lens(_.export.maxPageSize).set(Option(x)))
@@ -393,8 +393,8 @@ object CommandLine {
             opt[Boolean]("header")
               .text("Include header if true (default), or skip writing an output header if false.")
               .action((x,c) => c.lens(_.export.header).set(x)),
-            top,
-            skip,
+            top(),
+            skip(),
             opt[String]("filter")
               .text("Filter criteria using web api format. Do not include $filter.")
               .action((x, c) => c.lens(_.export.filter).set(Option(x))),
@@ -407,8 +407,8 @@ object CommandLine {
             opt[Seq[String]]("select")
               .text("Select criteria using web api format. Do not include $select.")
               .action((x, c) => c.lens(_.export.select).set(x)),
-            maxPageSize,
-            formattedValues
+            maxPageSize(),
+            formattedValues()
           ),
         sub("export-from-query")
           .text("Export entities from a raw web api query. Only raw json export is supported.")
@@ -420,10 +420,10 @@ object CommandLine {
             opt[Unit]("wrap")
               .text("Wrap the entire output in an array.")
               .action((x, c) => c.lens(_.export.wrap).set(true)),
-            formattedValues,
-            maxPageSize,
-            skip,
-            top,
+            formattedValues(),
+            maxPageSize(),
+            skip(),
+            top(),
           ),
         sub("count")
           .text("Count entities. Concurrency affects how many counters run simultaneously.")
@@ -510,8 +510,10 @@ object CommandLine {
             mkFilterOpt().required()
           ),
         sub("dump-errors")
-          .text("Dump logs of any import file that has errors. NOT IMPLEMENTED.")
-          .action((x,c) => withSub(c, "dumperrors")),
+          .text("Dump all import logs outputting json.")
+          .action((x,c) => withSub(c, "dumperrors"))
+          .children(
+          ),
         sub("import")
           .text("Import data.")
           .action((x, c) => withSub(c, "import"))
@@ -585,7 +587,7 @@ object CommandLine {
           .action((x, c) => withSub(c, "download"))
           .children(
             mkNoClobber(),
-            mkOutputDir()
+            //mkOutputDir()
           ),
         sub("delete")
           .text("Delete an impoprt map by name.")
@@ -1191,7 +1193,7 @@ object CommandLine {
           .action((x, c) => withSub(c, "download"))
           .children(
             mkFilterOpt(),
-            mkOutputDir(),
+            //mkOutputDir(),
             /*
              opt[Unit]("nodirs")
              .text("Place all downloaded files at the same level in the output directory.")

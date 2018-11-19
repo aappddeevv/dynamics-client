@@ -72,7 +72,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
   }
 
   // TODO: Convert to batch request, this is way stupid.
-  def deleteByQuery() = Action { config =>
+  val deleteByQuery = Action { config =>
     val m           = new MetadataCache(dynclient, LCID)
     val concurrency = config.common.concurrency
 
@@ -103,7 +103,7 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       .drain
   }
 
-  def exportFromQuery() = Action { config =>
+  val exportFromQuery = Action { config =>
     println(s"Export entity using query: ${config.export.query}")
     val outputpath = config.common.outputFile.getOrElse("dump_" + config.export.query.hashCode() + ".json")
     println(s"Output file: $outputpath")
@@ -112,28 +112,69 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
       prefers =
         client.common.headers.PreferOptions(maxPageSize = config.export.maxPageSize,
                                             includeFormattedValues = Some(config.export.includeFormattedValues)))
-    val values =
-      dynclient
-        .getListStream[js.Object](config.export.query, opts)
-        .drop(config.export.skip.map(_.toLong).getOrElse(0))
-        .take(config.export.top.map(_.toLong).getOrElse(Long.MaxValue))
 
+    val inputs = dynclient.getListStream[js.Object](config.export.query, opts)
+
+    export(outputpath, inputs, config.export.wrap,
+      config.export.skip.map(_.toLong).getOrElse(0),
+      config.export.top.map(_.toLong).getOrElse(Long.MaxValue)
+    )
+    .flatMap(count => IO(println(s"# output records: ${count}")))
+
+    // val opts = DynamicsOptions(
+    //   prefers =
+    //     client.common.headers.PreferOptions(maxPageSize = config.export.maxPageSize,
+    //                                         includeFormattedValues = Some(config.export.includeFormattedValues)))
+    // val values =
+    //   dynclient
+    //     .getListStream[js.Object](config.export.query, opts)
+    //     .drop(config.export.skip.map(_.toLong).getOrElse(0))
+    //     .take(config.export.top.map(_.toLong).getOrElse(Long.MaxValue))
+
+    // Stream
+    //   .bracket(IO(Fs.createWriteStream(outputpath, null)))(
+    //     f => {
+    //       if (config.export.wrap) f.write("[")
+    //       values
+    //         .map(JSON.stringify(_))
+    //         .to(_ map { jstr =>
+    //           f.write(jstr + (if (config.export.wrap) ",\n" else "\n"))
+    //         })
+    //     },
+    //     f => IO(if (config.export.wrap) f.write("]")).flatMap(_ => f.endFuture().toIO)
+    //   )
+    //   .compile
+    //   .drain
+  }
+
+  def export(outputpath: String, inputs: Stream[IO, js.Object],
+    wrap: Boolean = false,
+    drops: Long = 0, take: Long = Long.MaxValue,
+    transform: js.Object => js.Object = identity): IO[Long] = {
+    val values =
+      inputs
+        .drop(drops)
+        .take(take)
+
+    val icounter = new java.util.concurrent.atomic.AtomicLong(0)
     Stream
       .bracket(IO(Fs.createWriteStream(outputpath, null)))(
         f => {
-          if (config.export.wrap) f.write("[")
+          if (wrap) f.write("[")
           values
-            .map(JSON.stringify(_))
-            //.map(Utils.render(_))
+            .map{obj => icounter.getAndIncrement(); JSON.stringify(transform(obj))}
             .to(_ map { jstr =>
-              f.write(jstr + (if (config.export.wrap) ",\n" else "\n"))
+              f.write(jstr + (if (wrap) ",\n" else "\n"))
             })
         },
-        f => IO(if (config.export.wrap) f.write("]")).flatMap(_ => f.endFuture().toIO)
+        f => IO(if (wrap) f.write("]")).flatMap(_ => f.endFuture().toIO)
       )
       .compile
       .drain
+      .map(_ => icounter.get())
   }
+
+
 
   def exportAll(config: AppConfig, q: QuerySpec): IO[Unit] = {
     println(s"Export entity: ${config.export.entity}")
@@ -321,8 +362,8 @@ class EntityActions(context: DynamicsContext) extends LazyLogger {
     command match {
       case "export"          => export()
       case "count"           => count()
-      case "exportFromQuery" => exportFromQuery()
-      case "deleteByQuery"   => deleteByQuery()
+      case "exportFromQuery" => exportFromQuery
+      case "deleteByQuery"   => deleteByQuery
       case _ =>
         Action { _ =>
           IO(println(s"entity command '${command}' not recognized"))
